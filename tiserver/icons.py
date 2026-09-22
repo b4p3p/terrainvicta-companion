@@ -17,26 +17,39 @@ import threading
 
 from ticore import paths
 
-_BUNDLE = "councilor_missions"
+# bundle Unity da cui arrivano le icone, per famiglia
+BUNDLES = ("councilor_missions", "icons_2d")
+_BUNDLE = BUNDLES[0]          # compatibilita': la famiglia storica
+
 _lock = threading.Lock()
-_done = False
+_done = set()
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_SHIPPED = os.path.join(_REPO, "assets", "icons", _BUNDLE)
+
+
+def _shipped_dir(bundle):
+    return os.path.join(_REPO, "assets", "icons", bundle)
+
+
+_SHIPPED = _shipped_dir(_BUNDLE)
 
 
 def available():
     """True se le icone sono servibili, comunque le si ottenga."""
-    if os.path.isdir(_SHIPPED) and os.listdir(_SHIPPED):
+    if shipped_count():
         return True
     return can_extract()
 
 
-def shipped_count():
-    try:
-        return len([f for f in os.listdir(_SHIPPED) if f.endswith(".png")])
-    except OSError:
-        return 0
+def shipped_count(bundle=None):
+    bundles = (bundle,) if bundle else BUNDLES
+    n = 0
+    for b in bundles:
+        try:
+            n += len([f for f in os.listdir(_shipped_dir(b)) if f.endswith(".png")])
+        except OSError:
+            pass
+    return n
 
 
 def can_extract():
@@ -47,26 +60,25 @@ def can_extract():
     return paths.bundle_dir() is not None
 
 
-def icons_dir():
-    d = os.path.join(paths.data_dir(), "icons", _BUNDLE)
+def icons_dir(bundle=_BUNDLE):
+    d = os.path.join(paths.data_dir(), "icons", bundle)
     os.makedirs(d, exist_ok=True)
     return d
 
 
-def extract(force=False):
-    """Estrae le icone delle missioni. Ritorna quante ne ha scritte.
+def extract(bundle=_BUNDLE, force=False):
+    """Estrae le icone di un bundle. Ritorna quante ne ha scritte.
 
-    Idempotente: gia' presenti non vengono riscritte, e l'estrazione parte una
-    volta sola per processo salvo `force`.
+    Idempotente: quelle gia' presenti non vengono riscritte, e ogni bundle si
+    estrae una volta sola per processo salvo `force`.
     """
-    global _done
     with _lock:
-        if _done and not force:
+        if bundle in _done and not force:
             return 0
         bundles = paths.bundle_dir()
         if not bundles:
             return 0
-        src = os.path.join(bundles, _BUNDLE)
+        src = os.path.join(bundles, bundle)
         if not os.path.isfile(src):
             return 0
         try:
@@ -74,7 +86,7 @@ def extract(force=False):
         except ImportError:
             return 0
 
-        out = icons_dir()
+        out = icons_dir(bundle)
         env = UnityPy.load(src)
         n = 0
         for obj in env.objects:
@@ -85,11 +97,14 @@ def extract(force=False):
             except Exception:
                 continue
             name = data.m_Name
-            # ogni icona esiste in variante _on (accesa) e _off (spenta):
-            # serve solo la prima, e il suffisso sparisce dal nome del file
-            if not name.endswith("_on"):
+            # nelle missioni ogni icona esiste in variante _on (accesa) e _off
+            # (spenta): serve solo la prima, e il suffisso sparisce dal nome.
+            # Gli altri bundle hanno un'icona sola per voce.
+            if name.endswith("_off"):
                 continue
-            dest = os.path.join(out, name[:-3] + ".png")
+            if name.endswith("_on"):
+                name = name[:-3]
+            dest = os.path.join(out, name + ".png")
             if os.path.exists(dest) and not force:
                 continue
             try:
@@ -97,27 +112,34 @@ def extract(force=False):
                 n += 1
             except Exception:
                 continue
-        _done = True
+        _done.add(bundle)
         return n
 
 
-def mission_icon_file(icon_name):
+def icon_file(bundle, icon_name):
     """Percorso del PNG di un'icona. None se non recuperabile.
 
     Ordine: quella distribuita col progetto, poi la cache locale, poi
     l'estrazione dall'installazione del gioco.
     """
-    if not icon_name or "/" in icon_name or "\\" in icon_name or ".." in icon_name:
+    if bundle not in BUNDLES:
+        return None
+    if (not icon_name or "/" in icon_name or "\\" in icon_name
+            or ".." in icon_name):
         return None
     name = icon_name + ".png"
 
-    p = os.path.join(_SHIPPED, name)
+    p = os.path.join(_shipped_dir(bundle), name)
     if os.path.isfile(p):
         return p
 
-    p = os.path.join(icons_dir(), name)
+    p = os.path.join(icons_dir(bundle), name)
     if os.path.isfile(p):
         return p
 
-    extract()
+    extract(bundle)
     return p if os.path.isfile(p) else None
+
+
+def mission_icon_file(icon_name):
+    return icon_file(_BUNDLE, icon_name)

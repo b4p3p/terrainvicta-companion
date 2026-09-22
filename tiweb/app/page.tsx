@@ -2,8 +2,8 @@
 
 import { useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
-import { Bars, Empty, Panel, Tag, nf } from "@/components/ui";
-import type { Alert } from "@/lib/types";
+import { Bars, Empty, MissionIcon, Panel, ResourceIcon, Tag, nf } from "@/components/ui";
+import type { Alert, Snapshot } from "@/lib/types";
 
 const TONE = {
   critical: { border: "border-bad", text: "text-bad" },
@@ -11,17 +11,36 @@ const TONE = {
   info: { border: "border-accent", text: "text-accent" },
 } as const;
 
+/** Una voce di flusso: icona della risorsa, nome tradotto, valore firmato. */
+function Flow({ snap, k, v, bold }: {
+  snap: Snapshot; k: string; v: number; bold?: boolean;
+}) {
+  const r = snap.flows.resources?.[k];
+  return (
+    <span className={`flex items-baseline gap-1 ${v < 0 ? "text-bad" : "text-good"}
+                      ${bold ? "font-semibold" : ""}`}>
+      <ResourceIcon icon={r?.icon} size={14} title={r?.name ?? k} />
+      <span className="text-dim">{r?.name ?? k}</span>
+      {v > 0 ? "+" : ""}{nf(v)}
+    </span>
+  );
+}
+
 function AlertCard({ a, label }: { a: Alert; label: string }) {
   const tone = TONE[a.severity];
   return (
-    <div className={`border-l-[3px] ${tone.border} bg-panel rounded-r px-3 py-2 mb-2`}>
+    <div className={`border-l-[3px] ${tone.border} bg-panel px-3 py-2 mb-[2px]`}>
+      {/* il colore del filetto dice gia' la severita': l'etichetta compare solo
+          quando è qualcosa di più di un'informazione */}
       <div className="flex items-baseline gap-2">
-        <span className={`text-[10.5px] uppercase tracking-wide font-bold ${tone.text}`}>
-          {label}
-        </span>
-        <span className="font-semibold text-[13.5px]">{a.title}</span>
+        <span className={`font-semibold text-[13px] ${
+          a.severity === "info" ? "" : tone.text}`}>{a.title}</span>
+        {a.severity !== "info" && (
+          <span className={`text-[10.5px] uppercase tracking-[.06em] ${tone.text}`}
+            title={label}>{label}</span>
+        )}
       </div>
-      <p className="text-dim text-[12.5px] mt-0.5 mb-0">{a.detail}</p>
+      <p className="text-dim text-[12px] mt-0.5 mb-0">{a.detail}</p>
     </div>
   );
 }
@@ -53,30 +72,36 @@ export default function Overview() {
           <Panel title={t.overview.flows}
             sub={`${String(snap.flows.month).padStart(2, "0")}/${snap.flows.year}`}>
             <div className="flex flex-col gap-1.5">
-              {Object.entries(snap.flows.byCategory).map(([cat, vals]) => (
-                <div key={cat} className="flex gap-3 text-[12.5px] items-baseline">
-                  <span className="w-52 shrink-0 text-dim truncate">{cat}</span>
-                  <span className="flex gap-3 flex-wrap">
-                    {Object.entries(vals)
-                      .filter(([, v]) => Math.abs(v) > 0.05)
-                      .map(([k, v]) => (
-                        <span key={k} className={v < 0 ? "text-bad" : "text-good"}>
-                          {k} {v > 0 ? "+" : ""}{nf(v)}
+              {Object.entries(snap.flows.byCategory).map(([cat, vals]) => {
+                const meta = snap.flows.categories?.find((c) => c.id === cat);
+                return (
+                  <div key={cat} className="flex gap-3 text-[12.5px] items-baseline">
+                    <span className="w-56 shrink-0 truncate flex items-baseline gap-1.5">
+                      <MissionIcon icon={meta?.icon} size={15} title={meta?.name ?? cat} />
+                      {meta?.kind === "unresolved" ? (
+                        // il salvataggio scrive un hash, non un id risolvibile:
+                        // dirlo è più onesto che inventare un nome
+                        <span className="text-faint italic" title={`codice ${cat}`}>
+                          {t.overview.flowUnresolved}
                         </span>
-                      ))}
-                  </span>
-                </div>
-              ))}
+                      ) : (
+                        <span className="text-dim">{meta?.name ?? cat}</span>
+                      )}
+                    </span>
+                    <span className="flex gap-3 flex-wrap">
+                      {Object.entries(vals)
+                        .filter(([, v]) => Math.abs(v) > 0.05)
+                        .map(([k, v]) => <Flow key={k} snap={snap} k={k} v={v} />)}
+                    </span>
+                  </div>
+                );
+              })}
               <div className="border-t border-edge mt-1 pt-2 flex gap-3 text-[12.5px]">
-                <span className="w-52 shrink-0 font-semibold">{t.overview.net}</span>
+                <span className="w-56 shrink-0 font-semibold">{t.overview.net}</span>
                 <span className="flex gap-3 flex-wrap">
                   {Object.entries(net)
                     .filter(([, v]) => Math.abs(v) > 0.05)
-                    .map(([k, v]) => (
-                      <span key={k} className={v < 0 ? "text-bad font-semibold" : "text-good"}>
-                        {k} {v > 0 ? "+" : ""}{nf(v)}
-                      </span>
-                    ))}
+                    .map(([k, v]) => <Flow key={k} snap={snap} k={k} v={v} bold />)}
                 </span>
               </div>
             </div>

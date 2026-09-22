@@ -130,15 +130,15 @@ def health():
     }
 
 
-@app.get("/api/icons/mission/{name}.png")
-def mission_icon(name: str):
+@app.get("/api/icons/{bundle}/{name}.png")
+def game_icon(bundle: str, name: str):
     """Icona di una missione.
 
     Servita da `assets/icons/`, o estratta dall'installazione locale del gioco
     se manca da li'. Arte di Pavonis Interactive, fuori dalla licenza MIT del
     progetto: vedi LICENSE.
     """
-    p = icons.mission_icon_file(name)
+    p = icons.icon_file(bundle, name)
     if not p:
         raise HTTPException(404, "icona non disponibile")
     return FileResponse(p, media_type="image/png",
@@ -149,7 +149,7 @@ def mission_icon(name: str):
 def icons_status():
     return {
         "available": icons.available(),
-        "shipped": icons.shipped_count(),
+        "shipped": {b: icons.shipped_count(b) for b in icons.BUNDLES},
         "canExtract": icons.can_extract(),
         "cacheDir": icons.icons_dir(),
     }

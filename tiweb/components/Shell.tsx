@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { api, askNotificationPermission, useSnapshot } from "@/lib/api";
 import { UI_LANGS, type UiLang } from "@/lib/i18n";
 import { useSettings, GAME_FOR_UI } from "@/lib/settings";
+import { ResourceIcon } from "@/components/ui";
 
 const TABS = [
   { href: "/", key: "overview" },
@@ -19,9 +20,9 @@ const TABS = [
 /* Terra Invicta tiene le risorse in una barra fissa in cima allo schermo.
    Stesso posto qui: è la riga che si guarda senza cercarla. */
 const RESOURCES = [
-  { key: "Money", label: "Denaro", tone: "text-warn" },
-  { key: "Influence", label: "Influenza", tone: "text-accent" },
-  { key: "Operations", label: "Operazioni", tone: "text-other" },
+  { key: "Money", label: "Denaro", icon: "ICO_currency", tone: "text-warn" },
+  { key: "Influence", label: "Influenza", icon: "ICO_influence", tone: "text-accent" },
+  { key: "Operations", label: "Operazioni", icon: "ICO_ops", tone: "text-other" },
 ] as const;
 
 export default function Shell({ children }: { children: React.ReactNode }) {
@@ -98,6 +99,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               if (v == null) return null;
               return (
                 <span key={r.key} className="flex items-baseline gap-1.5">
+                  <ResourceIcon icon={r.icon} size={14} title={r.label} />
                   <span className="text-faint text-[11px]">{r.label}</span>
                   <span className={`display text-[14px] ${r.tone}`}>
                     {Math.round(v).toLocaleString("it-IT")}
@@ -108,6 +110,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             {/* la ricerca utile e' quella che entra nei progetti ogni mese,
                 non la risorsa accumulata, che a inizio partita resta a zero */}
             <span className="flex items-baseline gap-1.5">
+              <ResourceIcon icon="ICO_research" size={14} title="Ricerca" />
               <span className="text-faint text-[11px]">Ricerca/mese</span>
               <span className="display text-[14px] text-good">
                 {Math.round(snap.projects?.rate ?? 0)}
@@ -119,6 +122,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             </span>
             {snap.controlPoints && (
               <span className="flex items-baseline gap-1.5 ml-auto">
+                <ResourceIcon icon="ICO_ControlPoint_empty" size={14}
+                  title="Punti di controllo" />
                 <span className="text-faint text-[11px]">Punti di controllo</span>
                 <span className="display text-[14px] text-ink">
                   {snap.controlPoints.mine}

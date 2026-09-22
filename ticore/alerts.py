@@ -5,7 +5,17 @@ piu' allerte con severita' 'critical' | 'warning' | 'info' e un id stabile,
 cosi' il frontend puo' non ripetere una notifica gia' mostrata.
 """
 
+from . import gamedata
+
 SEVERITY_ORDER = {"critical": 0, "warning": 1, "info": 2}
+
+# le rendite delle org usano chiavi minuscole: qui tornano alle risorse del
+# gioco, cosi' l'allerta parla la lingua della localizzazione ufficiale
+_INCOME_RESOURCE = {
+    "money": "Money", "influence": "Influence", "ops": "Operations",
+    "research": "Research", "boost": "Boost",
+    "missionControl": "MissionControl",
+}
 
 # soglie: sotto queste una risorsa blocca le operazioni
 LOW = {"Influence": 15, "Operations": 10, "Money": 50}
@@ -132,12 +142,15 @@ def opportunities(cur, prev):
                    if o.get("affordable")}
     for o in cur.get("orgMarket", []):
         if o.get("affordable") and o["name"] not in prev_afford and o["eligible"]:
-            gains = ", ".join("%+g %s" % (v, k) for k, v in o["income"].items() if v)
+            lang = cur.get("lang", "ita")
+            gains = ", ".join(
+                "%+g %s" % (v, gamedata.resource_name(lang, _INCOME_RESOURCE.get(k, k)))
+                for k, v in o["income"].items() if v)
             out.append(_alert(
                 "org:%s" % o["name"], "info",
                 "Organizzazione acquistabile: %s" % o["name"],
-                "%s. Puo' tenerla: %s." % (gains or "nessuna rendita",
-                                           ", ".join(o["eligible"])),
+                "%s. Può tenerla: %s." % (gains or "nessuna rendita",
+                                          ", ".join(o["eligible"])),
                 tab="orgs", org=o["name"]))
     for p in (cur.get("projects") or {}).get("items", []):
         if p["active"] and p["monthsLeft"] is not None and 0 < p["monthsLeft"] <= 0.5:

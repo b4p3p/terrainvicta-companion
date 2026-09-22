@@ -150,6 +150,32 @@ def faction_colors(data_name):
     return {"accent": accent, "background": t.get("backgroundColor")}
 
 
+# risorsa -> icona nel bundle icons_2d, come la disegna il gioco
+RESOURCE_ICONS = {
+    "Money": "ICO_currency",
+    "Influence": "ICO_influence",
+    "Operations": "ICO_ops",
+    "Research": "ICO_research",
+    "Projects": "ICO_projects",
+    "Boost": "ICO_boost",
+    "MissionControl": "ICO_mission_control",
+}
+
+
+def resource_name(lang, key):
+    """Nome tradotto di una risorsa, dalla localizzazione ufficiale.
+
+    Le righe sono `UI.Global.Money=Denaro`. Mai tradurre a mano: la stringa
+    deve essere quella che il giocatore legge in partita.
+    """
+    return loc(lang, "UI", "Global", key, key)
+
+
+def resource_view(lang, key):
+    return {"id": key, "name": resource_name(lang, key),
+            "icon": RESOURCE_ICONS.get(key)}
+
+
 def trait_name(lang, data_name):
     t = templates()["traits"].get(data_name) or {}
     return loc(lang, "TITraitTemplate", "displayName", data_name,

@@ -147,7 +147,16 @@ export interface Snapshot {
   flows: {
     year: number; month: number;
     byCategory: Record<string, Record<string, number>>;
+    /* etichette delle categorie; `unresolved` = il save scrive un hash */
+    categories: {
+      id: string;
+      name: string | null;
+      icon?: string | null;
+      kind: "mission" | "label" | "unresolved";
+    }[];
     net: Record<string, number>;
+    /* nome tradotto e icona di ogni risorsa che compare nei flussi */
+    resources: Record<string, { id: string; name: string; icon: string | null }>;
   };
   controlPoints: { byNation: Record<string, number>; mine: number; total: number };
   nations: Nation[];

@@ -12,6 +12,11 @@ variant; these are the `_on` ones, with the suffix dropped, so the file name mat
 `missionIconImagePath` field in `TIMissionTemplate.json`
 (`councilor_missions/ICO_assassinate` → `ICO_assassinate.png`).
 
+`icons_2d/` holds 16 icons from the bundle of the same name: the seven resources
+(`ICO_currency`, `ICO_influence`, `ICO_ops`, `ICO_research`, `ICO_boost`,
+`ICO_mission_control`, `ICO_projects`), the control-point marker, and the eight
+councilor attribute glyphs.
+
 ## Why they are here
 
 They are included so the interface shows the same icons the player sees in game, without
@@ -24,7 +29,8 @@ identification, in a non-commercial fan tool.
 
 ```python
 from tiserver import icons
-icons.extract(force=True)   # writes to ~/.terrainvicta-companion/icons/
+icons.extract("councilor_missions", force=True)   # -> ~/.terrainvicta-companion/icons/
+icons.extract("icons_2d", force=True)
 ```
 
 That path is also the runtime fallback: if an icon is missing from this folder, the

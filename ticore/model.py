@@ -73,7 +73,7 @@ def nations(g):
     return out
 
 
-def flows(g, months_back=1):
+def flows(g, months_back=1, lang="ita"):
     """Transazioni aggregate per categoria su un mese di gioco."""
     y, m, _ = g.game_date()
     m -= months_back
@@ -93,8 +93,36 @@ def flows(g, months_back=1):
     return {
         "year": y, "month": m,
         "byCategory": {c: dict(v) for c, v in agg.items()},
+        "categories": [flow_category(c, lang) for c in agg],
         "net": dict(net),
+        "resources": {k: gamedata.resource_view(lang, k) for k in net},
     }
+
+
+# etichette che il salvataggio scrive in chiaro, in inglese
+_FLOW_LABELS = {
+    "Daily Income": "Entrate correnti",
+    "Objective Completed": "Obiettivo completato",
+    "Narrative Event": "Evento narrativo",
+}
+
+
+def flow_category(cat, lang="ita"):
+    """Etichetta di una categoria di transazione.
+
+    Il salvataggio mescola tre cose sotto la stessa chiave: nomi interni di
+    missione, etichette inglesi fisse, e codici numerici che **non
+    corrispondono a nessun id presente nel save** — sono hash, non risolvibili.
+    Quelli restano dichiarati come tali invece di inventare un nome.
+    """
+    if cat in _FLOW_LABELS:
+        return {"id": cat, "name": _FLOW_LABELS[cat], "kind": "label"}
+    if cat.lstrip("-").isdigit():
+        return {"id": cat, "name": None, "kind": "unresolved"}
+    name = gamedata.mission_name(lang, cat)
+    return {"id": cat, "name": name,
+            "icon": gamedata.mission_icon(cat),
+            "kind": "mission" if name != cat else "label"}
 
 
 def projects(g, lang="ita"):
@@ -160,7 +188,7 @@ def snapshot(g, lang="ita"):
         "lang": lang,
         "resources": {k: round(v, 1) for k, v in (g.me.get("resources") or {}).items()
                       if k in RESOURCES},
-        "flows": flows(g, 1),
+        "flows": flows(g, 1, lang),
         "controlPoints": {"byNation": cpn, "mine": sum(cpn.values()),
                           "total": sum(n["cp"] for n in ns)},
         "nations": ns,
