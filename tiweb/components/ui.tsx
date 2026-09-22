@@ -19,19 +19,22 @@ export function Panel({
   children: ReactNode; className?: string;
 }) {
   return (
-    <section
-      className={`bg-panel border border-line rounded-lg p-4 mb-5 ${className}`}
-    >
+    <section className={`bg-raised border border-edge mb-4 ${className}`}>
       {(title || right) && (
-        <header className="flex items-start justify-between gap-4 mb-1">
-          <div>
-            {title && <h2 className="text-[15px] text-warn font-semibold m-0">{title}</h2>}
-            {sub && <p className="text-dim text-[12.5px] mt-1 mb-0">{sub}</p>}
-          </div>
+        <header className="bg-bar border-b border-edge-lit
+                           flex items-baseline justify-between gap-4 px-3 py-1.5">
+          {/* il filetto d'accento a sinistra ripete il bordo di selezione del gioco */}
+          <h2 className="display text-[13px] uppercase tracking-[.06em] m-0
+                         border-l-2 border-accent pl-2 leading-tight">
+            {title}
+          </h2>
           {right}
         </header>
       )}
-      <div className={title ? "mt-3" : ""}>{children}</div>
+      {sub && (
+        <p className="text-faint text-[11.5px] px-3 pt-2 pb-0 mb-0 max-w-[80ch]">{sub}</p>
+      )}
+      <div className="p-3">{children}</div>
     </section>
   );
 }
@@ -40,12 +43,12 @@ export function Stat({
   label, value, tone = "accent",
 }: { label: string; value: ReactNode; tone?: "accent" | "mine" | "warn" | "bad" }) {
   const color =
-    tone === "mine" ? "text-mine" : tone === "warn" ? "text-warn"
+    tone === "mine" ? "text-good" : tone === "warn" ? "text-warn"
       : tone === "bad" ? "text-bad" : "text-accent";
   return (
-    <div className="bg-panel border border-line rounded-lg px-4 py-3 min-w-[140px] flex-1">
-      <div className={`text-[22px] font-semibold leading-tight ${color}`}>{value}</div>
-      <div className="text-[11.5px] text-dim uppercase tracking-wide mt-1">{label}</div>
+    <div className="bg-panel border border-edge px-3 py-2 min-w-[132px] flex-1">
+      <div className="text-[11px] text-faint tracking-[.05em]">{label}</div>
+      <div className={`display text-[21px] leading-none mt-1 ${color}`}>{value}</div>
     </div>
   );
 }
@@ -54,14 +57,15 @@ export function Tag({
   children, tone = "dim",
 }: { children: ReactNode; tone?: "mine" | "free" | "bad" | "warn" | "dim" }) {
   const map = {
-    mine: "bg-mine/15 text-mine",
-    free: "bg-free/15 text-free",
-    bad: "bg-bad/12 text-bad",
-    warn: "bg-warn/15 text-warn",
-    dim: "bg-panel2 text-dim",
+    mine: "border-good/50 text-good",
+    free: "border-other/50 text-other",
+    bad: "border-bad/60 text-bad",
+    warn: "border-warn/50 text-warn",
+    dim: "border-edge text-dim",
   } as const;
   return (
-    <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-semibold ${map[tone]}`}>
+    <span className={`inline-block border bg-void/40 px-1.5 py-[1px]
+                      text-[11px] leading-[16px] ${map[tone]}`}>
       {children}
     </span>
   );
@@ -100,7 +104,7 @@ export function Spark({ data, w = 54, h = 14 }: { data: number[]; w?: number; h?
   return (
     <svg width={w} height={h} className="inline-block align-middle">
       <polyline points={pts} fill="none" strokeWidth={1.4}
-        stroke={up ? "var(--mine)" : "var(--bad)"} />
+        stroke={up ? "var(--good)" : "var(--bad)"} />
     </svg>
   );
 }
@@ -121,11 +125,11 @@ export function Bars<T>({
       {rows.map((r, i) => (
         <div key={i} className="flex items-center gap-2 text-[12px]">
           <span className="w-40 shrink-0 text-right text-dim truncate">{label(r)}</span>
-          <span className="h-3 rounded-sm"
+          <span className="h-[11px]"
             style={{
               width: `${Math.max((value(r) / max) * 100, 1)}%`,
-              background: highlight?.(r) ? "var(--mine)" : "var(--accent)",
-              opacity: 0.8,
+              background: highlight?.(r) ? "var(--good)" : "var(--accent)",
+              opacity: 0.85,
             }} />
           <span className="text-dim shrink-0">{format(r)}</span>
         </div>
@@ -177,7 +181,7 @@ export function DataTable<T extends Record<string, unknown>>({
                   else { setSortKey(c.key); setAsc(false); }
                 }}>
                 {c.title}
-                {c.key === sortKey && <span className="text-accent">{asc ? " ▴" : " ▾"}</span>}
+                {c.key === sortKey && <span className="text-accent ml-1">{asc ? "▴" : "▾"}</span>}
               </th>
             ))}
           </tr>
@@ -199,7 +203,7 @@ export function DataTable<T extends Record<string, unknown>>({
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <p className="text-dim text-[13px] py-6 text-center">{children}</p>;
+  return <p className="text-faint text-[12px] py-8 text-center">{children}</p>;
 }
 
 export function Button({
@@ -210,14 +214,14 @@ export function Button({
   type?: "button" | "submit";
 }) {
   const map = {
-    normal: "border-line hover:border-accent hover:text-accent",
-    primary: "border-accent text-accent hover:bg-accent/10",
-    danger: "border-line text-dim hover:border-bad hover:text-bad",
+    normal: "border-edge-lit text-ink hover:border-sel-edge hover:bg-sel",
+    primary: "border-accent text-accent hover:bg-accent/15",
+    danger: "border-edge-lit text-dim hover:border-bad hover:text-bad",
   } as const;
   return (
     <button type={type} onClick={onClick} disabled={disabled}
-      className={`bg-panel2 border rounded-md px-4 py-2 text-[13px] cursor-pointer
-        disabled:opacity-50 disabled:cursor-default transition-colors ${map[tone]}`}>
+      className={`bg-control border px-3 py-1 text-[12px] cursor-pointer
+        disabled:opacity-40 disabled:cursor-default transition-colors ${map[tone]}`}>
       {children}
     </button>
   );

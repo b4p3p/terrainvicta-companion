@@ -69,7 +69,7 @@ export default function NationsPage() {
     { key: "inequality", title: "Disugu.", render: (r) => nf(r.inequality) },
     {
       key: "support", title: "Sostegno",
-      render: (r) => <span className={r.support > 0.2 ? "text-mine" : ""}>{pct(r.support)}</span>,
+      render: (r) => <span className={r.support > 0.2 ? "text-good" : ""}>{pct(r.support)}</span>,
     },
     { key: "difficulty", title: "Difficoltà", render: (r) => nf(r.difficulty) },
     { key: "spaceFunding", title: "Fondi sp.", render: (r) => nf(r.spaceFunding, 0) },

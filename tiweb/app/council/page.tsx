@@ -23,7 +23,7 @@ function AttrRow({ c }: { c: Councilor }) {
           <span key={a}
             title={bonus ? `base ${base} + ${bonus} da organizzazioni` : `base ${base}`}
             className={`px-1.5 py-0.5 rounded text-[11.5px] tabular-nums
-              ${strong ? "bg-mine/15 text-mine" : v <= 2 ? "bg-panel2 text-dim" : "bg-panel2"}`}>
+              ${strong ? "bg-good/15 text-good" : v <= 2 ? "bg-panel text-dim" : "bg-panel"}`}>
             {SHORT[a]} <b>{v}</b>
             {bonus > 0 && <sup className="text-accent">+{bonus}</sup>}
           </span>
@@ -40,7 +40,7 @@ function OrgLine({ o }: { o: Org }) {
   if (o.projectSlots) bits.push(`+${o.projectSlots} slot`);
   return (
     <div className="text-[12px]">
-      <span className="text-text">{o.name}</span>{" "}
+      <span className="text-ink">{o.name}</span>{" "}
       <span className="text-dim">{bits.join(", ") || "—"}</span>
     </div>
   );
@@ -65,7 +65,7 @@ export default function CouncilPage() {
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {coverage.map((c) => (
             <div key={c.attribute}
-              className={`rounded-md px-3 py-2 border ${c.weak ? "border-bad/40" : "border-line"} bg-panel2`}>
+              className={`rounded-md px-3 py-2 border ${c.weak ? "border-bad/40" : "border-edge"} bg-panel`}>
               <div className="flex justify-between items-baseline">
                 <span className="font-semibold">{c.short}</span>
                 <span className={`text-[18px] font-semibold ${c.weak ? "text-bad" : "text-accent"}`}>
@@ -90,7 +90,7 @@ export default function CouncilPage() {
       <Panel title={t.council.team}>
         <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
           {team.map((c) => (
-            <div key={c.id} className="bg-panel2 border border-line rounded-lg p-3">
+            <div key={c.id} className="bg-panel border border-edge rounded-lg p-3">
               <div className="flex justify-between items-baseline gap-2">
                 <div>
                   <span className="font-semibold text-[14px]">{c.name}</span>
@@ -104,10 +104,10 @@ export default function CouncilPage() {
               <div className="my-2"><AttrRow c={c} /></div>
 
               <dl className="text-[12px] grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-dim">
-                <dt>{t.council.location}</dt><dd className="text-text">{c.location ?? "—"}</dd>
-                <dt>{t.council.nationality}</dt><dd className="text-text">{c.nationality ?? "—"}</dd>
-                <dt>XP</dt><dd className="text-text">{c.xp}</dd>
-                <dt>{t.council.lastMission}</dt><dd className="text-text">{c.priorMission ?? "—"}</dd>
+                <dt>{t.council.location}</dt><dd className="text-ink">{c.location ?? "—"}</dd>
+                <dt>{t.council.nationality}</dt><dd className="text-ink">{c.nationality ?? "—"}</dd>
+                <dt>XP</dt><dd className="text-ink">{c.xp}</dd>
+                <dt>{t.council.lastMission}</dt><dd className="text-ink">{c.priorMission ?? "—"}</dd>
               </dl>
 
               <div className="mt-2 text-[12px]">
@@ -131,7 +131,7 @@ export default function CouncilPage() {
           ))}
 
           <Link href="/recruits"
-            className="bg-panel2 border border-line border-dashed rounded-lg p-3
+            className="bg-panel border border-edge border-dashed rounded-lg p-3
                        flex flex-col justify-center items-start gap-1
                        hover:border-accent hover:bg-accent/5 transition-colors">
             <span className="font-semibold text-[14px] text-accent">
@@ -144,7 +144,7 @@ export default function CouncilPage() {
               <span className="text-[12px]">
                 <span className="text-dim">{t.council.recruitBestCoverage}:</span>{" "}
                 {bestCover.name}
-                <span className="text-mine ml-1">
+                <span className="text-good ml-1">
                   {bestCover.covers?.length}/{missions.missing.length}
                 </span>
               </span>
@@ -160,7 +160,7 @@ export default function CouncilPage() {
         ) : (
           <div className="flex flex-col gap-2">
             {missions.missing.map((m) => (
-              <div key={m.id} className="bg-panel2 border border-line rounded-md px-3 py-2">
+              <div key={m.id} className="bg-panel border border-edge rounded-md px-3 py-2">
                 <div className="flex items-baseline gap-2 flex-wrap">
                   <MissionIcon icon={m.icon} size={20} title={m.name} />
                   <span className="font-semibold text-[13.5px]">{m.name}</span>
@@ -175,7 +175,7 @@ export default function CouncilPage() {
                   {m.providers?.councilorTypes.length ? (
                     <>
                       {t.council.viaTypes}:{" "}
-                      <span className="text-text">
+                      <span className="text-ink">
                         {m.providers.councilorTypes.map((x) => x.name).join(", ")}
                       </span>
                     </>
@@ -201,7 +201,7 @@ export default function CouncilPage() {
               .map(([k, v]) => `${v} ${k}`).join(" + ");
             return (
               <div key={o.id}
-                className={`bg-panel2 border rounded-lg p-3 ${o.affordable ? "border-mine/40" : "border-line"}`}>
+                className={`bg-panel border rounded-lg p-3 ${o.affordable ? "border-good/40" : "border-edge"}`}>
                 <div className="flex justify-between items-baseline gap-2">
                   <span className="font-semibold text-[13.5px]">{o.name}</span>
                   <Tag tone={o.affordable ? "mine" : "dim"}>
@@ -216,7 +216,7 @@ export default function CouncilPage() {
                 <div className="text-[11.5px] mt-1.5">
                   <span className="text-dim">{t.council.canHold}: </span>
                   {o.eligible && o.eligible.length
-                    ? <span className="text-mine">{o.eligible.join(", ")}</span>
+                    ? <span className="text-good">{o.eligible.join(", ")}</span>
                     : <span className="text-bad">{t.council.nobody}</span>}
                 </div>
                 {o.missionsGranted.length > 0 && (

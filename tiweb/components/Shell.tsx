@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { api, askNotificationPermission } from "@/lib/api";
+import { api, askNotificationPermission, useSnapshot } from "@/lib/api";
 import { UI_LANGS, type UiLang } from "@/lib/i18n";
 import { useSettings, GAME_FOR_UI } from "@/lib/settings";
 
@@ -16,8 +16,17 @@ const TABS = [
   { href: "/plan", key: "plan" },
 ] as const;
 
+/* Terra Invicta tiene le risorse in una barra fissa in cima allo schermo.
+   Stesso posto qui: è la riga che si guarda senza cercarla. */
+const RESOURCES = [
+  { key: "Money", label: "Denaro", tone: "text-warn" },
+  { key: "Influence", label: "Influenza", tone: "text-accent" },
+  { key: "Operations", label: "Operazioni", tone: "text-other" },
+] as const;
+
 export default function Shell({ children }: { children: React.ReactNode }) {
   const { t, ui, setUi, game, setGame, live } = useSettings();
+  const { data: snap } = useSnapshot(live.version, game);
   const path = usePathname();
   const [langs, setLangs] = useState<{ id: string; name: string }[]>([]);
 
@@ -31,35 +40,41 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const critical = live.alerts.filter((a) => a.severity === "critical").length;
   const warning = live.alerts.filter((a) => a.severity === "warning").length;
 
-  return (
-    <div className="min-h-screen flex flex-col">
-      <header className="border-b border-line px-6 pt-4 pb-0 bg-panel/40">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-[19px] font-semibold m-0">
-              Terra Invicta
-              {live.save?.faction && (
-                <> — <span className="text-accent">{live.save.faction}</span></>
-              )}
-            </h1>
-            <div className="text-dim text-[12.5px] mt-1 flex items-center gap-3 flex-wrap">
-              <span className={live.connected ? "text-mine" : "text-bad"}>
-                ● {live.connected ? t.common.live : t.common.offline}
-              </span>
-              {live.save && <span>{live.save.date} · {live.save.save}</span>}
-              {(critical > 0 || warning > 0) && (
-                <span className={critical ? "text-bad" : "text-warn"}>
-                  {critical > 0 && `${critical} ${t.severity.critical}`}
-                  {critical > 0 && warning > 0 && " · "}
-                  {warning > 0 && `${warning} ${t.severity.warning}`}
-                </span>
-              )}
-            </div>
-          </div>
+  /* L'accento dell'interfaccia è il colore che il gioco assegna alla tua
+     fazione (TIFactionTemplate.color), non una tinta scelta a tavolino. */
+  const accent = snap?.factionColors?.accent;
 
-          <div className="flex items-center gap-2 text-[12px]">
-            <label className="text-dim">{t.common.uiLanguage}</label>
-            <select value={ui}
+  return (
+    <div className="min-h-screen flex flex-col"
+      style={accent ? ({ "--accent": accent } as React.CSSProperties) : undefined}>
+
+      <header className="sticky top-0 z-20 bg-void border-b border-edge-lit">
+        {/* riga 1 — identità e stato della partita */}
+        <div className="flex items-center gap-x-5 gap-y-1 flex-wrap px-4 h-9
+                        border-b border-edge">
+          <span className="display text-[14px] uppercase tracking-[.08em] leading-none">
+            {live.save?.faction ?? "Terra Invicta"}
+          </span>
+
+          {live.save && (
+            <span className="text-dim text-[12px]">
+              {live.save.date}
+              <span className="text-faint"> · {live.save.save}</span>
+            </span>
+          )}
+
+          <span className="ml-auto flex items-center gap-4 text-[11.5px]">
+            {(critical > 0 || warning > 0) && (
+              <Link href="/" className={critical ? "text-bad" : "text-warn"}>
+                {critical > 0 && `${critical} ${t.severity.critical}`}
+                {critical > 0 && warning > 0 && " · "}
+                {warning > 0 && `${warning} ${t.severity.warning}`}
+              </Link>
+            )}
+            <span className={live.connected ? "text-good" : "text-bad"}>
+              {live.connected ? t.common.live : t.common.offline}
+            </span>
+            <select value={ui} aria-label={t.common.uiLanguage}
               onChange={(e) => {
                 const l = e.target.value as UiLang;
                 setUi(l);
@@ -67,22 +82,65 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               }}>
               {UI_LANGS.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
-            <label className="text-dim ml-2">{t.common.gameLanguage}</label>
-            <select value={game} onChange={(e) => setGame(e.target.value)}>
+            <select value={game} aria-label={t.common.gameLanguage}
+              onChange={(e) => setGame(e.target.value)}>
               {langs.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
-          </div>
+          </span>
         </div>
 
-        <nav className="flex gap-1 mt-4 -mb-px flex-wrap">
+        {/* riga 2 — risorse, come la barra superiore del gioco */}
+        {snap?.resources && (
+          <div className="flex items-center gap-6 flex-wrap px-4 h-8
+                          bg-bar-deep border-b border-edge text-[12px]">
+            {RESOURCES.map((r) => {
+              const v = snap.resources[r.key as keyof typeof snap.resources];
+              if (v == null) return null;
+              return (
+                <span key={r.key} className="flex items-baseline gap-1.5">
+                  <span className="text-faint text-[11px]">{r.label}</span>
+                  <span className={`display text-[14px] ${r.tone}`}>
+                    {Math.round(v).toLocaleString("it-IT")}
+                  </span>
+                </span>
+              );
+            })}
+            {/* la ricerca utile e' quella che entra nei progetti ogni mese,
+                non la risorsa accumulata, che a inizio partita resta a zero */}
+            <span className="flex items-baseline gap-1.5">
+              <span className="text-faint text-[11px]">Ricerca/mese</span>
+              <span className="display text-[14px] text-good">
+                {Math.round(snap.projects?.rate ?? 0)}
+              </span>
+            </span>
+            <span className="flex items-baseline gap-1.5">
+              <span className="text-faint text-[11px]">Consiglio</span>
+              <span className="display text-[14px] text-ink">{snap.council?.size ?? "—"}</span>
+            </span>
+            {snap.controlPoints && (
+              <span className="flex items-baseline gap-1.5 ml-auto">
+                <span className="text-faint text-[11px]">Punti di controllo</span>
+                <span className="display text-[14px] text-ink">
+                  {snap.controlPoints.mine}
+                  <span className="text-faint text-[12px]">/{snap.controlPoints.total}</span>
+                </span>
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* riga 3 — navigazione, schede a spigolo vivo */}
+        <nav className="flex flex-wrap">
           {TABS.map((tab) => {
             const active = path === tab.href;
             return (
               <Link key={tab.href} href={tab.href}
-                className={`px-4 py-2 text-[13px] rounded-t-md border border-b-0 transition-colors
+                aria-current={active ? "page" : undefined}
+                className={`display text-[12px] uppercase tracking-[.07em]
+                  px-4 h-8 flex items-center border-r border-edge transition-colors
                   ${active
-                    ? "bg-panel border-line text-accent"
-                    : "border-transparent text-dim hover:text-text"}`}>
+                    ? "bg-sel text-ink border-t-2 border-t-accent"
+                    : "text-dim hover:text-ink hover:bg-panel border-t-2 border-t-transparent"}`}>
                 {t.tabs[tab.key]}
               </Link>
             );
@@ -90,7 +148,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         </nav>
       </header>
 
-      <main className="p-6 max-w-[1900px] w-full">{children}</main>
+      {/* nessun limite di larghezza: è una console da secondo monitor, e un cap
+          disallineava il contenuto dall'intestazione a tutta larghezza */}
+      <main className="p-4 w-full">{children}</main>
     </div>
   );
 }

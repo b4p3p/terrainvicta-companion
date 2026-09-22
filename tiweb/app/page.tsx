@@ -2,7 +2,7 @@
 
 import { useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
-import { Bars, Empty, Panel, Stat, Tag, nf } from "@/components/ui";
+import { Bars, Empty, Panel, Tag, nf } from "@/components/ui";
 import type { Alert } from "@/lib/types";
 
 const TONE = {
@@ -14,7 +14,7 @@ const TONE = {
 function AlertCard({ a, label }: { a: Alert; label: string }) {
   const tone = TONE[a.severity];
   return (
-    <div className={`border-l-[3px] ${tone.border} bg-panel2 rounded-r px-3 py-2 mb-2`}>
+    <div className={`border-l-[3px] ${tone.border} bg-panel rounded-r px-3 py-2 mb-2`}>
       <div className="flex items-baseline gap-2">
         <span className={`text-[10.5px] uppercase tracking-wide font-bold ${tone.text}`}>
           {label}
@@ -33,25 +33,12 @@ export default function Overview() {
   if (error) return <Empty>{t.common.error}: {error}</Empty>;
   if (!snap) return <Empty>{t.common.loading}</Empty>;
 
-  const res = snap.resources;
   const net = snap.flows.net;
   const active = snap.projects.items.filter((p) => p.active);
   const cps = Object.entries(snap.controlPoints.byNation).sort((a, b) => b[1] - a[1]);
 
   return (
     <>
-      <div className="flex flex-wrap gap-3 mb-5">
-        <Stat label="Denaro" tone="mine" value={nf(res.Money, 0)} />
-        <Stat label="Influenza"
-          tone={(res.Influence ?? 0) < 15 ? "bad" : "accent"}
-          value={nf(res.Influence, 0)} />
-        <Stat label="Operazioni" value={nf(res.Operations, 0)} />
-        <Stat label={t.overview.researchRate} value={nf(snap.projects.rate, 0)} />
-        <Stat label={t.overview.controlPoints} tone="mine"
-          value={`${snap.controlPoints.mine} / ${snap.controlPoints.total}`} />
-        <Stat label="Consiglio" value={snap.council.size} />
-      </div>
-
       <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
         <div>
           <Panel title={t.overview.alerts}
@@ -73,20 +60,20 @@ export default function Overview() {
                     {Object.entries(vals)
                       .filter(([, v]) => Math.abs(v) > 0.05)
                       .map(([k, v]) => (
-                        <span key={k} className={v < 0 ? "text-bad" : "text-mine"}>
+                        <span key={k} className={v < 0 ? "text-bad" : "text-good"}>
                           {k} {v > 0 ? "+" : ""}{nf(v)}
                         </span>
                       ))}
                   </span>
                 </div>
               ))}
-              <div className="border-t border-line mt-1 pt-2 flex gap-3 text-[12.5px]">
+              <div className="border-t border-edge mt-1 pt-2 flex gap-3 text-[12.5px]">
                 <span className="w-52 shrink-0 font-semibold">{t.overview.net}</span>
                 <span className="flex gap-3 flex-wrap">
                   {Object.entries(net)
                     .filter(([, v]) => Math.abs(v) > 0.05)
                     .map(([k, v]) => (
-                      <span key={k} className={v < 0 ? "text-bad font-semibold" : "text-mine"}>
+                      <span key={k} className={v < 0 ? "text-bad font-semibold" : "text-good"}>
                         {k} {v > 0 ? "+" : ""}{nf(v)}
                       </span>
                     ))}
@@ -112,7 +99,7 @@ export default function Overview() {
                             ` · ~${Math.round(p.monthsLeft * 30)} ${t.common.days}`}
                         </span>
                       </div>
-                      <div className="h-1.5 bg-panel2 rounded-full overflow-hidden">
+                      <div className="h-1.5 bg-panel rounded-full overflow-hidden">
                         <div className="h-full rounded-full"
                           style={{
                             width: `${Math.min(pctDone, 100)}%`,

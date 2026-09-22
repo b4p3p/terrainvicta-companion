@@ -58,8 +58,8 @@ export default function PlanPage() {
                 const pctDone = hasBar ? Math.min((gl.current! / gl.total!) * 100, 100) : 0;
                 return (
                   <div key={gl.id}
-                    className={`bg-panel2 border rounded-md px-3 py-2
-                      ${gl.done ? "border-line opacity-60" : gl.late ? "border-bad/50" : "border-line"}`}>
+                    className={`bg-panel border rounded-md px-3 py-2
+                      ${gl.done ? "border-edge opacity-60" : gl.late ? "border-bad/50" : "border-edge"}`}>
                     <div className="flex justify-between items-baseline gap-2">
                       <span className={gl.done ? "line-through text-dim" : "font-semibold text-[13.5px]"}>
                         {gl.title}
@@ -73,7 +73,7 @@ export default function PlanPage() {
                       <>
                         <div className="h-1.5 bg-line rounded-full my-1.5 overflow-hidden">
                           <div className="h-full rounded-full"
-                            style={{ width: `${pctDone}%`, background: "var(--mine)" }} />
+                            style={{ width: `${pctDone}%`, background: "var(--good)" }} />
                         </div>
                         <div className="text-[11.5px] text-dim">
                           {t.plan.progress}: {nf(gl.current, 0)} / {nf(gl.total, 0)}
@@ -100,7 +100,7 @@ export default function PlanPage() {
             </div>
           )}
 
-          <div className="border-t border-line pt-3 flex flex-col gap-2">
+          <div className="border-t border-edge pt-3 flex flex-col gap-2">
             <div className="text-dim text-[12px]">{t.plan.newGoal}</div>
             <input placeholder={t.plan.goalTitle} value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })} />
@@ -147,7 +147,7 @@ export default function PlanPage() {
         {!notes?.length ? <Empty>{t.plan.noNotes}</Empty> : (
           <div className="flex flex-col gap-2 mb-4">
             {notes.map((n) => (
-              <div key={n.id} className="bg-panel2 border border-line rounded-md px-3 py-2">
+              <div key={n.id} className="bg-panel border border-edge rounded-md px-3 py-2">
                 <div className="flex justify-between items-baseline">
                   <Tag>{subjects.find((s) => s.id === n.subject)?.label ?? n.subject}</Tag>
                   <button onClick={async () => {
@@ -163,7 +163,7 @@ export default function PlanPage() {
           </div>
         )}
 
-        <div className="border-t border-line pt-3 flex flex-col gap-2">
+        <div className="border-t border-edge pt-3 flex flex-col gap-2">
           <div className="text-dim text-[12px]">{t.plan.newNote}</div>
           <select value={note.subject} onChange={(e) => setNote({ ...note, subject: e.target.value })}>
             {subjects.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}

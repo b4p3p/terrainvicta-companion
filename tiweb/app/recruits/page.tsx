@@ -16,8 +16,8 @@ const RES: { key: keyof Income; label: "resMoney" | "resInfluence" | "resResearc
   | "resOps" | "resBoost"; tone: string }[] = [
   { key: "money", label: "resMoney", tone: "text-warn" },
   { key: "influence", label: "resInfluence", tone: "text-accent" },
-  { key: "research", label: "resResearch", tone: "text-mine" },
-  { key: "ops", label: "resOps", tone: "text-free" },
+  { key: "research", label: "resResearch", tone: "text-good" },
+  { key: "ops", label: "resOps", tone: "text-other" },
   { key: "boost", label: "resBoost", tone: "text-dim" },
 ];
 
@@ -53,7 +53,7 @@ function Candidate({ c }: { c: Councilor }) {
   const gains = ATTRS.filter((a) => (gain[a] ?? 0) > 0);
 
   return (
-    <div className="bg-panel2 border border-line rounded-lg p-3">
+    <div className="bg-panel border border-edge rounded-lg p-3">
       <div className="flex justify-between items-baseline gap-2">
         <div>
           <span className="font-semibold text-[14px]">{c.name}</span>
@@ -76,11 +76,11 @@ function Candidate({ c }: { c: Councilor }) {
           return (
             <span key={a}
               className={`text-[12px] px-1.5 py-0.5 rounded border ${
-                g > 0 ? "border-mine/40 bg-mine/10" : "border-line"}`}
+                g > 0 ? "border-good/40 bg-good/10" : "border-edge"}`}
               title={g > 0 ? `+${g} sul massimo attuale del consiglio` : undefined}>
               <span className="text-dim">{SHORT[a]}</span>{" "}
               <span className={v >= 7 ? "font-semibold" : ""}>{v}</span>
-              {g > 0 && <span className="text-mine ml-1">+{g}</span>}
+              {g > 0 && <span className="text-good ml-1">+{g}</span>}
             </span>
           );
         })}
@@ -99,7 +99,7 @@ function Candidate({ c }: { c: Councilor }) {
 
       <div className="text-[12px] mb-1.5">
         <div className="text-dim mb-0.5">
-          {t.recruit.covers} <span className="text-text">({covers.length})</span>
+          {t.recruit.covers} <span className="text-ink">({covers.length})</span>
         </div>
         {covers.length === 0
           ? <div className="text-dim">{t.recruit.coversNone}</div>
@@ -162,7 +162,7 @@ export default function RecruitsPage() {
             className={`px-2 py-1 rounded border text-[12px] ${
               sort === k
                 ? "border-accent text-accent bg-accent/10"
-                : "border-line text-dim hover:text-text"}`}>
+                : "border-edge text-dim hover:text-ink"}`}>
             {label}
           </button>
         ))}

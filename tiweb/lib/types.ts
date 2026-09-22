@@ -134,6 +134,8 @@ export interface Project {
 }
 
 export interface Snapshot {
+  /* colori che il gioco assegna alla fazione (TIFactionTemplate) */
+  factionColors: { accent: string | null; background: string | null };
   faction: string;
   date: string;
   dateKey: string;

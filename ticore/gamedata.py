@@ -27,6 +27,7 @@ _TEMPLATE_FILES = {
     "councilorTypes": "TICouncilorTypeTemplate.json",
     "traits": "TITraitTemplate.json",
     "effects": "TIEffectTemplate.json",
+    "factions": "TIFactionTemplate.json",
 }
 
 
@@ -130,6 +131,23 @@ def mission_icon(data_name):
     t = templates()["missions"].get(data_name) or {}
     p = t.get("missionIconImagePath") or ""
     return p.rsplit("/", 1)[-1] or None
+
+
+@lru_cache(maxsize=None)
+def faction_colors(data_name):
+    """Colore della fazione come lo definisce il gioco.
+
+    `color` e' RGB in virgola mobile 0-1, `backgroundColor` e' gia' esadecimale.
+    Servono all'interfaccia per tingersi della fazione del giocatore invece di
+    usare un accento inventato.
+    """
+    t = templates()["factions"].get(data_name) or {}
+    c = t.get("color") or {}
+    accent = None
+    if c:
+        accent = "#%02x%02x%02x" % tuple(
+            max(0, min(255, round((c.get(k) or 0) * 255))) for k in "rgb")
+    return {"accent": accent, "background": t.get("backgroundColor")}
 
 
 def trait_name(lang, data_name):

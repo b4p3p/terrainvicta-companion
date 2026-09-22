@@ -154,6 +154,7 @@ def snapshot(g, lang="ita"):
         "dateKey": g.date_key(),
         "difficulty": g.meta.get("difficulty"),
         "campaignStart": g.campaign_key(),
+        "factionColors": gamedata.faction_colors(g.me.get("templateName")),
         "save": __import__("os").path.basename(g.path),
         "mtime": g.mtime,
         "lang": lang,

@@ -6,9 +6,9 @@ import { Empty, Panel, nf } from "@/components/ui";
 import type { HistoryPoint } from "@/lib/types";
 
 const SERIES = [
-  { key: "Money", label: "Denaro", color: "var(--mine)" },
+  { key: "Money", label: "Denaro", color: "var(--good)" },
   { key: "Influence", label: "Influenza", color: "var(--accent)" },
-  { key: "Operations", label: "Operazioni", color: "var(--free)" },
+  { key: "Operations", label: "Operazioni", color: "var(--other)" },
 ] as const;
 
 /** Grafico a linee su SVG: niente librerie, i dati sono pochi e regolari. */
@@ -38,9 +38,9 @@ function Lines({
           return (
             <g key={i}>
               <line x1={P.l} y1={y} x2={W - P.r} y2={y}
-                stroke="var(--line)" strokeDasharray="2 3" />
+                stroke="var(--edge)" strokeDasharray="2 3" />
               <text x={P.l - 6} y={y + 3} textAnchor="end"
-                fill="var(--dim)" fontSize="10">{nf(v, 0)}</text>
+                fill="var(--ink-dim)" fontSize="10">{nf(v, 0)}</text>
             </g>
           );
         })}
@@ -52,8 +52,8 @@ function Lines({
         ))}
         {points.length > 1 && (
           <>
-            <text x={P.l} y={H - 8} fill="var(--dim)" fontSize="10">{points[0].dateKey}</text>
-            <text x={W - P.r} y={H - 8} textAnchor="end" fill="var(--dim)" fontSize="10">
+            <text x={P.l} y={H - 8} fill="var(--ink-dim)" fontSize="10">{points[0].dateKey}</text>
+            <text x={W - P.r} y={H - 8} textAnchor="end" fill="var(--ink-dim)" fontSize="10">
               {points[points.length - 1].dateKey}
             </text>
           </>
@@ -83,7 +83,7 @@ export default function HistoryPage() {
             pick={(p) => p.cp} />
           <Lines points={data} label="Ricerca al mese" color="var(--accent)"
             pick={(p) => p.research} />
-          <Lines points={data} label="Consiglieri" color="var(--free)"
+          <Lines points={data} label="Consiglieri" color="var(--other)"
             pick={(p) => p.council} />
         </div>
       </Panel>

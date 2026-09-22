@@ -43,7 +43,7 @@ export default function MissionsPage() {
           {cat.map((m) => (
             <button key={m.id} onClick={() => setPicked(m.id)}
               className={`text-left px-2.5 py-1.5 rounded text-[12.5px] cursor-pointer transition-colors
-                ${picked === m.id ? "bg-accent/12 text-accent" : "hover:bg-panel2"}`}>
+                ${picked === m.id ? "bg-accent/12 text-accent" : "hover:bg-panel"}`}>
               <div className="flex justify-between items-baseline gap-2">
                 <span>{m.name}</span>
                 {m.attributeShort && (
@@ -80,7 +80,7 @@ export default function MissionsPage() {
                 <span className="text-dim">{t.missions.attribute}: </span>
                 <b>{entry.attributeShort ?? "—"}</b>
                 {plan?.councilorValue != null && (
-                  <span className="text-mine"> {plan.councilor} = {plan.councilorValue}</span>
+                  <span className="text-good"> {plan.councilor} = {plan.councilorValue}</span>
                 )}
               </span>
               <span>
@@ -146,14 +146,14 @@ export default function MissionsPage() {
                             {x.myCP === x.cp && <Tag tone="mine">{x.myCP}/{x.cp}</Tag>}
                             {x.myCP > 0 && x.myCP < x.cp && <Tag tone="warn">{x.myCP}/{x.cp}</Tag>}
                           </td>
-                          <td className={x.score > 0.5 ? "text-mine font-semibold"
+                          <td className={x.score > 0.5 ? "text-good font-semibold"
                             : x.score < 0 ? "text-dim" : ""}>{nf(x.score, 2)}</td>
-                          <td className={x.unrest >= 3 ? "text-mine" : x.unrest === 0 ? "text-dim" : ""}>
+                          <td className={x.unrest >= 3 ? "text-good" : x.unrest === 0 ? "text-dim" : ""}>
                             {nf(x.unrest, 2)}
                           </td>
                           <td>{nf(x.cohesion)}</td>
                           <td>{nf(x.democracy)}</td>
-                          <td className={x.support > 0.2 ? "text-mine" : ""}>{pct(x.support)}</td>
+                          <td className={x.support > 0.2 ? "text-good" : ""}>{pct(x.support)}</td>
                           <td>{bn(x.gdp)}</td>
                           <td>{x.myCP || "—"}</td>
                           <td style={{ textAlign: "left" }} className="text-dim text-[11.5px]">

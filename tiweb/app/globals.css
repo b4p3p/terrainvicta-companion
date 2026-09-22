@@ -1,65 +1,149 @@
 @import "tailwindcss";
 
+/* Palette campionata dagli sprite di Terra Invicta
+   (StreamingAssets/AssetBundles/ui): non è un tema inventato, sono i valori
+   che il gioco disegna davvero. Il nome fra parentesi è lo sprite di origine. */
 :root {
-  --bg: #0d1017;
-  --panel: #141924;
-  --panel2: #1a2130;
-  --line: #252d3d;
-  --text: #dde5f2;
-  --dim: #7d8ba4;
-  --accent: #6fb8ff;
-  --mine: #5ddba0;
-  --warn: #ffc266;
-  --bad: #ff7a7a;
-  --free: #9d8bff;
+  --void:      #0b1114;   /* sotto FRA_background_dark, così i pannelli si staccano */
+  --panel:     #172227;   /* FRA_background_TableItem */
+  --panel-alt: #151e23;   /* AlternateTableFill — zebra delle tabelle */
+  --raised:    #1e2c33;   /* fra FRA_background e GeneralPanelFill:
+                             il corpo del pannello sta sopra le righe */
+  --bar:       #273540;   /* FRA_background_TableHeader */
+  --bar-deep:  #1e303c;   /* FRA_popup_header */
+  --control:   #334654;   /* FRA_button */
+
+  --edge:      #32434f;   /* bordo standard */
+  --edge-lit:  #435b6e;   /* BorderFillStandard — bordo dei controlli */
+  --sel:       #2a3b46;   /* FRA_background_selected */
+  --sel-edge:  #709bba;
+
+  --ink:       #d6e2e8;
+  --ink-dim:   #7f95a1;
+  --ink-faint: #566874;
+
+  /* Accento = colore della fazione del giocatore, sovrascritto a runtime da
+     snapshot.factionColors.accent. Il default è la Resistenza. */
+  --accent:    #73a1e6;
+
+  --good:      #6fc39a;
+  --warn:      #d9a14a;
+  --bad:       #c4544f;
+  --other:     #8f7fc4;
+
+  --row-h: 27px;
 }
 
 @theme inline {
-  --color-bg: var(--bg);
+  --color-void: var(--void);
   --color-panel: var(--panel);
-  --color-panel2: var(--panel2);
-  --color-line: var(--line);
-  --color-text: var(--text);
-  --color-dim: var(--dim);
+  --color-panel-alt: var(--panel-alt);
+  --color-raised: var(--raised);
+  --color-bar: var(--bar);
+  --color-bar-deep: var(--bar-deep);
+  --color-control: var(--control);
+  --color-edge: var(--edge);
+  --color-edge-lit: var(--edge-lit);
+  --color-sel: var(--sel);
+  --color-sel-edge: var(--sel-edge);
+  --color-ink: var(--ink);
+  --color-dim: var(--ink-dim);
+  --color-faint: var(--ink-faint);
   --color-accent: var(--accent);
-  --color-mine: var(--mine);
+  --color-good: var(--good);
   --color-warn: var(--warn);
   --color-bad: var(--bad);
-  --color-free: var(--free);
+  --color-other: var(--other);
+
+  --font-display: var(--font-saira), "Saira Semi Condensed", system-ui, sans-serif;
+  --font-sans: var(--font-plex), "IBM Plex Sans", system-ui, sans-serif;
 }
 
 html, body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: "Segoe UI", system-ui, sans-serif;
-  font-size: 14px;
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  /* i dati sono quasi tutti numerici: le cifre devono incolonnarsi */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* tabella dati: densa, intestazione appiccicata, prima colonna fissa */
-table.data { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+/* Terra Invicta non ha angoli arrotondati né ombre. Nessuna eccezione:
+   è il segnale più forte, e smussarlo riporta l'aria da cruscotto generico. */
+* { border-radius: 0; box-shadow: none; }
+
+h1, h2, h3, .display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+
+/* ---------------------------------------------------------------- tabelle */
+
+table.data { border-collapse: collapse; width: 100%; font-size: 12px; }
+
 table.data th, table.data td {
-  padding: 6px 9px; text-align: right; white-space: nowrap;
-  border-bottom: 1px solid var(--line);
+  padding: 4px 10px;
+  height: var(--row-h);
+  text-align: right;
+  white-space: nowrap;
+  border-right: 1px solid color-mix(in srgb, var(--edge) 45%, transparent);
 }
+table.data th:last-child, table.data td:last-child { border-right: 0; }
+
 table.data th:first-child, table.data td:first-child {
-  text-align: left; position: sticky; left: 0; background: var(--panel);
+  text-align: left;
+  position: sticky; left: 0;
+  background: inherit;
 }
+
 table.data th {
-  position: sticky; top: 0; background: var(--panel2); cursor: pointer;
-  user-select: none; color: var(--dim); font-weight: 600; font-size: 11.5px;
-  text-transform: uppercase; letter-spacing: .3px; z-index: 2;
+  position: sticky; top: 0; z-index: 2;
+  background: var(--bar);
+  border-bottom: 1px solid var(--edge-lit);
+  color: var(--ink-dim);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
 }
-table.data th:first-child { z-index: 3; }
-table.data th:hover { color: var(--text); }
-table.data tr:hover td, table.data tr:hover td:first-child { background: var(--panel2); }
+table.data th:first-child { z-index: 3; background: var(--bar); }
+table.data th:hover { color: var(--ink); }
 
-input, select, textarea, button { font: inherit; }
+table.data tbody tr { background: var(--panel); }
+table.data tbody tr:nth-child(even) { background: var(--panel-alt); }
+table.data tbody tr:hover { background: var(--sel); }
+table.data tbody tr:hover td { color: var(--ink); }
+
+/* ---------------------------------------------------------------- controlli */
+
+input, select, textarea, button { font: inherit; font-family: var(--font-sans); }
+
 input, select, textarea {
-  background: var(--panel2); border: 1px solid var(--line); color: var(--text);
-  border-radius: 6px; padding: 7px 10px; font-size: 13px;
+  background: var(--void);
+  border: 1px solid var(--edge-lit);
+  color: var(--ink);
+  padding: 4px 8px;
+  font-size: 12px;
 }
-input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); }
+input:focus-visible, select:focus-visible, textarea:focus-visible,
+button:focus-visible, a:focus-visible {
+  outline: 1px solid var(--sel-edge);
+  outline-offset: 1px;
+}
 
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: var(--line); border-radius: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-thumb { background: var(--edge); border: 2px solid var(--void); }
+::-webkit-scrollbar-thumb:hover { background: var(--edge-lit); }
+::-webkit-scrollbar-track { background: var(--void); }
+
+::selection { background: var(--sel-edge); color: var(--void); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .01ms !important; animation: none !important; }
+}
