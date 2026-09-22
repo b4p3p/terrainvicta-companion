@@ -95,9 +95,6 @@ function Candidate({ c }: { c: Councilor }) {
       <div className="text-[12px] mb-1.5">
         <div className="text-dim mb-0.5">{t.recruit.income}</div>
         <IncomeLine income={c.income} />
-        {c.income.fromTraits && (
-          <div className="text-dim text-[11px] mt-0.5">{t.recruit.incomeFromTraits}</div>
-        )}
       </div>
 
       <div className="text-[12px] mb-1.5">
@@ -170,6 +167,9 @@ export default function RecruitsPage() {
 
       <p className="text-dim text-[11.5px] mb-3">{t.recruit.heuristic}</p>
       <p className="text-dim text-[11.5px] mb-3">{t.council.hiddenLoyalty}</p>
+      {list.some((c) => c.income.fromTraits) && (
+        <p className="text-dim text-[11.5px] mb-3">{t.recruit.incomeFromTraits}</p>
+      )}
 
       <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
         {list.map((c) => <Candidate key={c.id} c={c} />)}

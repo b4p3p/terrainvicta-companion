@@ -106,7 +106,8 @@ const it = {
     gainNone: "non alza nessun massimo",
     fixesWeak: "Sana un attributo debole",
     income: "Reddito mensile",
-    incomeFromTraits: "ricostruito dai tratti: il salvataggio non lo espone per chi non è ancora in consiglio",
+    incomeFromTraits:
+      "Il reddito è ricostruito dai tratti: il salvataggio non lo espone per chi non è ancora in consiglio.",
     noIncome: "nessun reddito",
     sortBy: "Ordina per",
     sortCovers: "missioni coperte",
@@ -294,7 +295,8 @@ const en: typeof it = {
     gainNone: "raises no maximum",
     fixesWeak: "Fixes a weak attribute",
     income: "Monthly income",
-    incomeFromTraits: "rebuilt from traits: the save does not expose it for those not yet on the council",
+    incomeFromTraits:
+      "Income is rebuilt from traits: the save does not expose it for those not yet on the council.",
     noIncome: "no income",
     sortBy: "Sort by",
     sortCovers: "missions covered",
