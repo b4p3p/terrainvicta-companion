@@ -53,6 +53,7 @@ class Game:
         self.me = self._player_faction()
         self.faction_name = {k: (v.get("displayName") or v.get("templateName") or "?")
                              for k, v in self.factions.items()}
+        self.globals = next(iter(self.state("TIGlobalValuesState").values()), {})
 
     # -- accesso ---------------------------------------------------------
 
@@ -116,3 +117,18 @@ class Game:
     def date_key(self):
         y, m, d = self.game_date()
         return "%04d-%02d-%02d" % (y, m, d)
+
+    def campaign_key(self):
+        """Identificatore unico della partita.
+
+        `realWorldCampaignStart` e' l'ora reale in cui la campagna e' stata
+        avviata: stabile per tutti i salvataggi della stessa partita, diversa
+        fra una partita e l'altra anche a parita' di fazione e difficolta'.
+        """
+        t = self.globals.get("realWorldCampaignStart") or {}
+        try:
+            return "%04d%02d%02dT%02d%02d%02d" % (
+                t["year"], t["month"], t["day"],
+                t["hour"], t["minute"], t["second"])
+        except (KeyError, TypeError):
+            return ""

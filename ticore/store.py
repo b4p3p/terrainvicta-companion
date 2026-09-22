@@ -58,8 +58,16 @@ def connect():
 
 
 def campaign_id(snap):
-    """Identifica la campagna: fazione + difficolta'. Sufficiente in pratica."""
-    return "%s|%s" % (snap.get("faction") or "?", snap.get("difficulty") or "?")
+    """Identifica la campagna: fazione + difficolta' + avvio reale.
+
+    `campaignStart` viene da `realWorldCampaignStart` nel salvataggio ed e'
+    cio' che distingue due partite giocate con la stessa fazione alla stessa
+    difficolta'. Senza, ricominciare una campagna faceva collidere lo storico
+    con quello della precedente: diff falsati e righe sovrascritte.
+    """
+    return "%s|%s|%s" % (snap.get("faction") or "?",
+                         snap.get("difficulty") or "?",
+                         snap.get("campaignStart") or "?")
 
 
 # ---------------------------------------------------------------- snapshot

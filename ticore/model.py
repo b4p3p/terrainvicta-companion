@@ -153,6 +153,7 @@ def snapshot(g, lang="ita"):
         "date": g.meta.get("gameTimeString", ""),
         "dateKey": g.date_key(),
         "difficulty": g.meta.get("difficulty"),
+        "campaignStart": g.campaign_key(),
         "save": __import__("os").path.basename(g.path),
         "mtime": g.mtime,
         "lang": lang,
