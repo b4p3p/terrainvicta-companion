@@ -1,13 +1,14 @@
-"""Estrazione delle icone dai bundle Unity dell'installazione locale.
+"""Icone delle missioni: quelle nel repo, con estrazione locale come ripiego.
 
-Le icone delle missioni non sono file su disco: stanno dentro il bundle
-`StreamingAssets/AssetBundles/councilor_missions`. Vengono estratte **dalla
-copia del gioco dell'utente**, una volta sola, in `~/.terrainvicta-companion/
-icons/`. Non fanno parte del repo e non vengono ridistribuite: sono materiale
-di Pavonis Interactive, esattamente come i template e la localizzazione che
-`ticore` legge dalla stessa installazione.
+Le icone stanno in `assets/icons/councilor_missions/`. Sono arte di Pavonis
+Interactive, fuori dalla licenza MIT del progetto: vedi `LICENSE` e
+`assets/icons/README.md`.
 
-UnityPy e' opzionale: senza, `mission_icon_file()` restituisce None e
+Se un'icona manca da li' (versione nuova del gioco, file rimosso su richiesta
+dell'avente diritto) si ricade sull'estrazione dal bundle Unity
+`StreamingAssets/AssetBundles/councilor_missions` della copia del gioco
+dell'utente, verso `~/.terrainvicta-companion/icons/`. Quel passaggio richiede
+UnityPy, che e' opzionale: senza, `mission_icon_file()` torna None e
 l'interfaccia resta testuale.
 """
 
@@ -20,8 +21,25 @@ _BUNDLE = "councilor_missions"
 _lock = threading.Lock()
 _done = False
 
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_SHIPPED = os.path.join(_REPO, "assets", "icons", _BUNDLE)
+
 
 def available():
+    """True se le icone sono servibili, comunque le si ottenga."""
+    if os.path.isdir(_SHIPPED) and os.listdir(_SHIPPED):
+        return True
+    return can_extract()
+
+
+def shipped_count():
+    try:
+        return len([f for f in os.listdir(_SHIPPED) if f.endswith(".png")])
+    except OSError:
+        return 0
+
+
+def can_extract():
     try:
         import UnityPy  # noqa: F401
     except ImportError:
@@ -84,11 +102,22 @@ def extract(force=False):
 
 
 def mission_icon_file(icon_name):
-    """Percorso del PNG di un'icona, estraendola se serve. None se assente."""
+    """Percorso del PNG di un'icona. None se non recuperabile.
+
+    Ordine: quella distribuita col progetto, poi la cache locale, poi
+    l'estrazione dall'installazione del gioco.
+    """
     if not icon_name or "/" in icon_name or "\\" in icon_name or ".." in icon_name:
         return None
-    p = os.path.join(icons_dir(), icon_name + ".png")
+    name = icon_name + ".png"
+
+    p = os.path.join(_SHIPPED, name)
     if os.path.isfile(p):
         return p
+
+    p = os.path.join(icons_dir(), name)
+    if os.path.isfile(p):
+        return p
+
     extract()
     return p if os.path.isfile(p) else None

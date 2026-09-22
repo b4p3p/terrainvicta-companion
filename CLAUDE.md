@@ -83,10 +83,12 @@ Due livelli separati:
 - **Icone**: **non sono file su disco.** `missionIconImagePath` nei template è una
   `Resources.Load` di Unity (`councilor_missions/ICO_assassinate`); le immagini stanno
   nel bundle `StreamingAssets/AssetBundles/councilor_missions`, ogni voce in variante
-  `_on` e `_off`. `tiserver/icons.py` le estrae con UnityPy **dall'installazione
-  dell'utente** in `~/.terrainvicta-companion/icons/`, alla prima richiesta. Non
-  entrano nel repo: sono materiale di Pavonis Interactive. UnityPy è opzionale
-  (`pip install -e .[icons]`); senza, l'interfaccia resta testuale.
+  `_on` e `_off`. Le 50 icone delle missioni **stanno nel repo**, in
+  `assets/icons/councilor_missions/`, con un carve-out esplicito dalla licenza: sono
+  arte di Pavonis Interactive e la MIT non le copre (vedi `LICENSE` e
+  `assets/icons/README.md`). `tiserver/icons.py` serve prima quelle, e solo se manca
+  qualcosa ricade sull'estrazione con UnityPy dall'installazione dell'utente verso
+  `~/.terrainvicta-companion/icons/`. UnityPy resta opzionale (`pip install -e .[icons]`).
 
 Struttura: `gamestates["PavonisInteractive.TerraInvicta.TIXxxState"]` è una lista di
 `{"Key":{"value":id},"Value":{…}}`. La fazione del giocatore si trova da `TIPlayerState`

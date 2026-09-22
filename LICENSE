@@ -19,3 +19,19 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+Third-party assets
+------------------
+
+The MIT license above covers the source code of this project only.
+
+The image files under `assets/icons/` are artwork from Terra Invicta,
+copyright (c) Pavonis Interactive. They are NOT covered by the MIT license,
+are not licensed to you by this project, and are included unmodified, for
+identification purposes, in a non-commercial fan tool. All rights in them
+remain with their owner. See `assets/icons/README.md`.
+
+This project is unofficial and is not affiliated with, endorsed by, or
+connected to Pavonis Interactive or Hooded Horse.

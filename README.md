@@ -40,13 +40,13 @@ and shows the raw factors next to it.
 ```bash
 git clone https://github.com/b4p3p/terrainvicta-companion.git
 cd terrainvicta-companion
-pip install -e ".[icons]"     # or `pip install -e .` to skip game icons
+pip install -e .
 cd tiweb && npm install && cd ..
 ```
 
-The optional `icons` extra pulls in UnityPy, used to read the game's own mission
-icons out of your local installation. Without it nothing breaks — the interface
-just stays textual.
+Mission icons ship with the repository, so nothing extra is needed. The optional
+`icons` extra (`pip install -e ".[icons]"`) pulls in UnityPy and is only used to
+re-extract them from your own installation — see `assets/icons/README.md`.
 
 ## Run
 
@@ -123,13 +123,17 @@ Auto-detected, no configuration needed:
   Documents folders included). If neither exists, the path is read from `savedGamesPath`
   in the game's `Player.log`.
 - **Templates and localization** — `<Steam>\steamapps\common\Terra Invicta\TerraInvicta_Data\StreamingAssets\`.
-- **Mission icons** — not files on disk: they live inside the Unity asset bundle
-  `StreamingAssets/AssetBundles/councilor_missions`. With the `icons` extra installed
-  they are extracted **from your own copy of the game** on first request and cached
-  locally. No game art is contained in or distributed with this repository.
+- **Mission icons** — shipped in `assets/icons/`. In the game they are not files on
+  disk at all: they live inside the Unity asset bundle
+  `StreamingAssets/AssetBundles/councilor_missions`. If one is missing from
+  `assets/icons/`, the server re-extracts it from your own copy of the game.
 
 Everything this tool writes lives in `~/.terrainvicta-companion/`.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Source code: MIT — see [LICENSE](LICENSE).
+
+The images under `assets/icons/` are **not** covered by it. They are Terra Invicta
+artwork, © Pavonis Interactive, included unmodified for identification in a
+non-commercial fan tool. See [assets/icons/README.md](assets/icons/README.md).

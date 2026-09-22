@@ -132,10 +132,11 @@ def health():
 
 @app.get("/api/icons/mission/{name}.png")
 def mission_icon(name: str):
-    """Icona di una missione, estratta dall'installazione locale del gioco.
+    """Icona di una missione.
 
-    Le immagini non stanno nel repo: vengono tirate fuori dai bundle Unity
-    dell'utente alla prima richiesta e messe in cache nella cartella dati.
+    Servita da `assets/icons/`, o estratta dall'installazione locale del gioco
+    se manca da li'. Arte di Pavonis Interactive, fuori dalla licenza MIT del
+    progetto: vedi LICENSE.
     """
     p = icons.mission_icon_file(name)
     if not p:
@@ -146,7 +147,12 @@ def mission_icon(name: str):
 
 @app.get("/api/icons/status")
 def icons_status():
-    return {"available": icons.available(), "dir": icons.icons_dir()}
+    return {
+        "available": icons.available(),
+        "shipped": icons.shipped_count(),
+        "canExtract": icons.can_extract(),
+        "cacheDir": icons.icons_dir(),
+    }
 
 
 @app.get("/api/snapshot")

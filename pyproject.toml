@@ -26,8 +26,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Estrae le icone del gioco dai bundle Unity dell'installazione locale.
-# Senza, l'interfaccia resta testuale: nessuna funzione si rompe.
+# Le icone sono gia' in assets/icons/. Questo extra serve solo a ri-estrarle
+# dai bundle Unity dell'installazione locale, se mancassero.
 icons = ["UnityPy>=1.20", "Pillow>=10"]
 
 [project.urls]
