@@ -125,6 +125,24 @@ def trait_name(lang, data_name):
                t.get("friendlyName", data_name))
 
 
+@lru_cache(maxsize=None)
+def trait_income(data_name):
+    """Reddito mensile concesso da un tratto.
+
+    I candidati non hanno ancora i campi `incomeX_month` popolati nel
+    salvataggio: il loro reddito va ricostruito dai tratti, che sono la sua
+    unica origine (le org dei candidati sono sempre zero).
+    """
+    t = templates()["traits"].get(data_name) or {}
+    return {
+        "money": t.get("incomeMoney") or 0,
+        "influence": t.get("incomeInfluence") or 0,
+        "research": t.get("incomeResearch") or 0,
+        "ops": t.get("incomeOps") or 0,
+        "boost": t.get("incomeBoost") or 0,
+    }
+
+
 def councilor_type_name(lang, data_name):
     t = templates()["councilorTypes"].get(data_name) or {}
     return loc(lang, "TICouncilorTypeTemplate", "displayName", data_name,

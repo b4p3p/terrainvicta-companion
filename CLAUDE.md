@@ -5,6 +5,19 @@ monitor mentre si gioca. L'utente gioca in **italiano**: rispondere in italiano 
 i nomi italiani del gioco (Persuasione, Indagine, Spionaggio, Comando, Amministrazione,
 Scienza, Sicurezza, Lealtà).
 
+## A cosa serve
+
+**Non a barare.** Terra Invicta è un gioco immenso: centinaia di nazioni, consiglieri,
+organizzazioni, progetti e missioni, ognuno con decine di campi, sparsi fra schermate
+che non si possono guardare insieme. Il companion serve a **leggere i dati che il gioco
+già mostra** e a metterli uno accanto all'altro — confronti, differenze fra un turno e
+l'altro, cosa cambia se prendo questo invece di quello.
+
+Ne discendono le regole più sotto, che non sono un dettaglio implementativo ma il punto
+del progetto: l'informazione che il gioco tiene nascosta resta nascosta, e quando un
+numero è una nostra elaborazione va detto, con i valori grezzi accanto. Uno strumento di
+analisi, non un aimbot.
+
 ## Avvio
 
 ```powershell

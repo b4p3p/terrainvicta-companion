@@ -48,6 +48,21 @@ export interface Councilor {
   apparentLoyalty: number | null;
   loyalty?: number | null;
   priorMission: string | null;
+  income: Income;
+  /* solo sui candidati: differenze rispetto al consiglio attuale */
+  covers?: { id: string; name: string; attribute: Attr | null }[];
+  gain?: Partial<Record<Attr, number>>;
+  fixesWeak?: string[];
+}
+
+export interface Income {
+  money: number;
+  influence: number;
+  research: number;
+  ops: number;
+  boost: number;
+  /* true quando e' ricostruito dai tratti perche' il salvataggio non lo espone */
+  fromTraits: boolean;
 }
 
 export interface Coverage {

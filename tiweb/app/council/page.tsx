@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
-import { Empty, Panel, Tag, nf } from "@/components/ui";
+import { Empty, Panel, Tag } from "@/components/ui";
 import { ATTRS, type Attr, type Councilor, type Org } from "@/lib/types";
 
 const SHORT: Record<Attr, string> = {
@@ -54,6 +55,9 @@ export default function CouncilPage() {
 
   const { team, coverage, missions } = snap.council;
   const maxTotal = Math.max(...coverage.map((c) => c.max), 1);
+  // il candidato che copre piu' missioni scoperte, come anteprima sulla card
+  const bestCover = snap.recruits.reduce<Councilor | null>(
+    (best, c) => ((c.covers?.length ?? 0) > (best?.covers?.length ?? 0) ? c : best), null);
 
   return (
     <>
@@ -125,6 +129,28 @@ export default function CouncilPage() {
               </div>
             </div>
           ))}
+
+          <Link href="/recruits"
+            className="bg-panel2 border border-line border-dashed rounded-lg p-3
+                       flex flex-col justify-center items-start gap-1
+                       hover:border-accent hover:bg-accent/5 transition-colors">
+            <span className="font-semibold text-[14px] text-accent">
+              {t.council.recruitCard}
+            </span>
+            <span className="text-dim text-[12px]">
+              {snap.recruits.length} {t.council.recruitCardHint}
+            </span>
+            {bestCover && (
+              <span className="text-[12px]">
+                <span className="text-dim">{t.council.recruitBestCoverage}:</span>{" "}
+                {bestCover.name}
+                <span className="text-mine ml-1">
+                  {bestCover.covers?.length}/{missions.missing.length}
+                </span>
+              </span>
+            )}
+            <span className="text-accent text-[12px] mt-1">{t.council.recruitOpen} →</span>
+          </Link>
         </div>
       </Panel>
 
@@ -203,39 +229,6 @@ export default function CouncilPage() {
         </div>
       </Panel>
 
-      <Panel title={t.council.recruits} sub={t.council.hiddenLoyalty}>
-        <div className="overflow-auto">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>{t.common.nation}</th>
-                <th style={{ textAlign: "left" }}>Tipo</th>
-                {ATTRS.map((a) => <th key={a}>{SHORT[a]}</th>)}
-                <th>LLT</th>
-                <th style={{ textAlign: "left" }}>{t.council.traits}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {snap.recruits.map((c) => (
-                <tr key={c.id}>
-                  <td>{c.name} <span className="text-dim">({c.nationality})</span></td>
-                  <td style={{ textAlign: "left" }} className="text-dim">{c.typeName}</td>
-                  {ATTRS.map((a) => {
-                    const v = c.attributes[a] ?? 0;
-                    return <td key={a} className={v >= 7 ? "text-mine font-semibold" : ""}>{v}</td>;
-                  })}
-                  <td className={(c.apparentLoyalty ?? 9) <= 6 ? "text-bad" : ""}>
-                    {c.apparentLoyalty ?? "?"}
-                  </td>
-                  <td style={{ textAlign: "left" }} className="text-dim text-[11.5px]">
-                    {c.traits.map((x) => x.name).join(", ")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
     </>
   );
 }

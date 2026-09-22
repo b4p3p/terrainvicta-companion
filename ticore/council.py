@@ -73,6 +73,37 @@ def can_hold(org, nationality, traits):
     return (not why), why
 
 
+# sotto questa soglia nessuno del consiglio e' credibile su un attributo
+WEAK_AT = 4
+
+
+def income_of(c, traits):
+    """Reddito mensile del consigliere.
+
+    Per chi e' gia' in consiglio il salvataggio espone `incomeX_month`. Per i
+    candidati quei campi sono vuoti, quindi il reddito si ricostruisce dai
+    tratti — che ne sono comunque l'unica origine, visto che i candidati non
+    hanno org. `fromTraits` dice quale delle due strade e' stata usata.
+    """
+    keys = (("money", "incomeMoney_month"),
+            ("influence", "incomeInfluence_month"),
+            ("research", "incomeResearch_month"),
+            ("ops", "incomeOps_month"),
+            ("boost", "incomeBoost_month"))
+    saved = {k: c.get(f) or 0 for k, f in keys}
+    if any(saved.values()):
+        saved["fromTraits"] = False
+        return saved
+
+    out = {k: 0 for k, _ in keys}
+    for t in traits:
+        for k, v in gamedata.trait_income(t).items():
+            if k in out:
+                out[k] += v
+    out["fromTraits"] = True
+    return out
+
+
 def councilor_view(g, c, lang="ita", known=True):
     """Un consigliere: attributi base ed effettivi, org, missioni, tratti.
 
@@ -110,11 +141,7 @@ def councilor_view(g, c, lang="ita", known=True):
         "missions": sorted(missions),
         "apparentLoyalty": attrs.get("ApparentLoyalty"),
         "priorMission": c.get("priorMissionTemplateName"),
-        "income": {
-            "money": c.get("incomeMoney_month"),
-            "influence": c.get("incomeInfluence_month"),
-            "research": c.get("incomeResearch_month"),
-        },
+        "income": income_of(c, traits),
     }
     if known:
         out["loyalty"] = attrs.get("Loyalty")
@@ -168,8 +195,7 @@ def analyse(g, lang="ita"):
                     if best else None,
             "total": sum(vals),
             "max": max(vals) if vals else 0,
-            # sotto 4 nessuno del consiglio e' credibile su quell'attributo
-            "weak": (max(vals) if vals else 0) < 4,
+            "weak": (max(vals) if vals else 0) < WEAK_AT,
         }
 
     have = set()
@@ -205,9 +231,32 @@ def analyse(g, lang="ita"):
 
 
 def recruits(g, lang="ita", include_hidden=False):
+    """Candidati sul mercato, confrontati col consiglio attuale.
+
+    A ogni candidato si aggiunge cosa cambierebbe prendendolo: quali missioni
+    scoperte sbloccherebbe, di quanto alzerebbe il massimo di ogni attributo e
+    quali attributi deboli sanerebbe. Sono differenze rispetto allo stato
+    attuale, non un punteggio: la scelta resta all'utente.
+    """
+    team = [councilor_view(g, c, lang) for c in g.my_councilors()]
+    have = set()
+    for c in team:
+        have.update(c["missions"])
+    missing = gamedata.player_missions() - have
+    best_now = {a: max([c["attributes"].get(a, 0) for c in team] or [0]) for a in ATTRS}
+
     out = []
     for c in g.available_councilors():
         v = councilor_view(g, c, lang, known=include_hidden)
+        cov = sorted(missing & set(v["missions"]))
+        v["covers"] = [{"id": m, "name": gamedata.mission_name(lang, m),
+                        "attribute": gamedata.mission_attribute(m)} for m in cov]
+        v["gain"] = {a: v["attributes"].get(a, 0) - best_now[a]
+                     for a in ATTRS if v["attributes"].get(a, 0) > best_now[a]}
+        # WEAK_AT: sotto questa soglia nessuno del consiglio e' credibile
+        v["fixesWeak"] = sorted(
+            ATTR_SHORT[a] for a in ATTRS
+            if best_now[a] < WEAK_AT <= v["attributes"].get(a, 0))
         out.append(v)
     return out
 
