@@ -103,6 +103,25 @@ export function ResourceIcon(p: { icon: string | null | undefined; size?: number
   return <GameIcon bundle="icons_2d" {...p} />;
 }
 
+/** Glifo del gioco per ogni attributo del consigliere. */
+export const ATTR_ICONS: Record<string, string> = {
+  Persuasion: "ICO_persuasion",
+  Investigation: "ICO_investigation",
+  Espionage: "ICO_espionage",
+  Command: "ICO_command",
+  Administration: "ICO_administration",
+  Science: "ICO_science",
+  Security: "ICO_security",
+  Loyalty: "ICO_loyalty",
+};
+
+export function AttrIcon({
+  attr, size = 14, title,
+}: { attr: string | null | undefined; size?: number; title?: string }) {
+  return <GameIcon bundle="icons_2d" icon={attr ? ATTR_ICONS[attr] : null}
+    size={size} title={title} />;
+}
+
 /** Sparkline: verde se l'ultimo valore è sopra il primo, rossa altrimenti. */
 export function Spark({ data, w = 54, h = 14 }: { data: number[]; w?: number; h?: number }) {
   if (!data || data.length < 2) return null;

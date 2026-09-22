@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
-import { Empty, MissionIcon, Panel, Tag } from "@/components/ui";
+import { AttrIcon, Empty, MissionIcon, Panel, ResourceIcon, Tag } from "@/components/ui";
 import { ATTRS, type Attr, type Councilor, type Org } from "@/lib/types";
 
 const SHORT: Record<Attr, string> = {
@@ -22,9 +22,12 @@ function AttrRow({ c }: { c: Councilor }) {
         return (
           <span key={a}
             title={bonus ? `base ${base} + ${bonus} da organizzazioni` : `base ${base}`}
-            className={`px-1.5 py-0.5 rounded text-[11.5px] tabular-nums
-              ${strong ? "bg-good/15 text-good" : v <= 2 ? "bg-panel text-dim" : "bg-panel"}`}>
-            {SHORT[a]} <b>{v}</b>
+            className={`px-1.5 py-0.5 text-[11.5px] tabular-nums inline-flex
+              items-center gap-1 border
+              ${strong ? "border-good/40 bg-good/10 text-good"
+                : v <= 2 ? "border-edge bg-panel text-dim" : "border-edge bg-panel"}`}>
+            <AttrIcon attr={a} size={13} title={SHORT[a]} />
+            <span className="text-faint">{SHORT[a]}</span><b>{v}</b>
             {bonus > 0 && <sup className="text-accent">+{bonus}</sup>}
           </span>
         );
@@ -67,12 +70,15 @@ export default function CouncilPage() {
             <div key={c.attribute}
               className={`rounded-md px-3 py-2 border ${c.weak ? "border-bad/40" : "border-edge"} bg-panel`}>
               <div className="flex justify-between items-baseline">
-                <span className="font-semibold">{c.short}</span>
+                <span className="font-semibold flex items-center gap-1.5">
+                  <AttrIcon attr={c.attribute} size={16} title={c.short} />
+                  {c.short}
+                </span>
                 <span className={`text-[18px] font-semibold ${c.weak ? "text-bad" : "text-accent"}`}>
                   {c.max}
                 </span>
               </div>
-              <div className="h-1 bg-line rounded-full my-1.5 overflow-hidden">
+              <div className="h-1 bg-edge my-1.5 overflow-hidden">
                 <div className="h-full rounded-full"
                   style={{
                     width: `${(c.max / maxTotal) * 100}%`,
@@ -166,8 +172,10 @@ export default function CouncilPage() {
                   <span className="font-semibold text-[13.5px]">{m.name}</span>
                   {m.attributeShort && <Tag tone="warn">{m.attributeShort}</Tag>}
                   {m.cost?.resource && (
-                    <span className="text-dim text-[12px]">
-                      {m.cost.value ?? "~"} {m.cost.resource}
+                    <span className="text-dim text-[12px] inline-flex items-center gap-1">
+                      <ResourceIcon icon={m.cost.icon} size={13}
+                        title={m.cost.resourceName} />
+                      {m.cost.value ?? "~"} {m.cost.resourceName}
                     </span>
                   )}
                 </div>

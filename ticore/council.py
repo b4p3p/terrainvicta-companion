@@ -172,7 +172,9 @@ def mission_view(lang, name, team):
         "icon": gamedata.mission_icon(name),
         "attribute": attr,
         "attributeShort": ATTR_SHORT.get(attr),
-        "cost": {"resource": res, "value": val} if res else None,
+        "cost": ({"resource": res, "value": val,
+                  "resourceName": gamedata.resource_name(lang, res),
+                  "icon": gamedata.RESOURCE_ICONS.get(res)} if res else None),
         "covered": bool(holders),
         "holders": [c["name"] for c in holders],
         "best": {"name": best["name"], "value": best["attributes"].get(attr, 0)}

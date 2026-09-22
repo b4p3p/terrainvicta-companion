@@ -86,7 +86,7 @@ export default function MissionsPage() {
               <span>
                 <span className="text-dim">{t.missions.cost}: </span>
                 {entry.cost
-                  ? `${entry.cost.value ?? "~"} ${entry.cost.resource}${entry.cost.value == null ? ` (${t.missions.scales})` : ""}`
+                  ? `${entry.cost.value ?? "~"} ${entry.cost.resourceName}${entry.cost.value == null ? ` (${t.missions.scales})` : ""}`
                   : "—"}
               </span>
               <span>

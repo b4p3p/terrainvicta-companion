@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
-import { Empty, MissionIcon, Panel, Tag, nf } from "@/components/ui";
+import { AttrIcon, Empty, MissionIcon, Panel, Tag, nf } from "@/components/ui";
 import { ATTRS, type Attr, type Councilor, type Income } from "@/lib/types";
 
 const SHORT: Record<Attr, string> = {
@@ -75,10 +75,11 @@ function Candidate({ c }: { c: Councilor }) {
           const g = gain[a] ?? 0;
           return (
             <span key={a}
-              className={`text-[12px] px-1.5 py-0.5 rounded border ${
+              className={`text-[12px] px-1.5 py-0.5 border inline-flex items-center gap-1 ${
                 g > 0 ? "border-good/40 bg-good/10" : "border-edge"}`}
               title={g > 0 ? `+${g} sul massimo attuale del consiglio` : undefined}>
-              <span className="text-dim">{SHORT[a]}</span>{" "}
+              <AttrIcon attr={a} size={13} title={SHORT[a]} />
+              <span className="text-faint">{SHORT[a]}</span>
               <span className={v >= 7 ? "font-semibold" : ""}>{v}</span>
               {g > 0 && <span className="text-good ml-1">+{g}</span>}
             </span>
@@ -109,7 +110,13 @@ function Candidate({ c }: { c: Councilor }) {
                 <Tag key={m.id} tone="mine">
                   <span className="inline-flex items-center gap-1">
                     <MissionIcon icon={m.icon} size={16} title={m.name} />
-                    {m.name}{m.attribute ? ` · ${SHORT[m.attribute]}` : ""}
+                    {m.name}
+                    {m.attribute && (
+                      <>
+                        <AttrIcon attr={m.attribute} size={12} title={SHORT[m.attribute]} />
+                        <span className="text-faint">{SHORT[m.attribute]}</span>
+                      </>
+                    )}
                   </span>
                 </Tag>
               ))}

@@ -81,7 +81,10 @@ export interface MissionInfo {
   icon: string | null;
   attribute: Attr | null;
   attributeShort: string | null;
-  cost: { resource: string; value: number | null } | null;
+  cost: {
+    resource: string; value: number | null;
+    resourceName: string; icon: string | null;
+  } | null;
   covered: boolean;
   holders: string[];
   best: { name: string; value: number } | null;
@@ -220,7 +223,10 @@ export interface CatalogueEntry {
   name: string;
   attribute: Attr | null;
   attributeShort: string | null;
-  cost: { resource: string; value: number | null } | null;
+  cost: {
+    resource: string; value: number | null;
+    resourceName: string; icon: string | null;
+  } | null;
   target: string;
   supportsTargeting: boolean;
   holders: string[];
