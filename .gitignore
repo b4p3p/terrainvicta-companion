@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Node / Next.js
+tiweb/node_modules/
+tiweb/.next/
+tiweb/out/
+*.tsbuildinfo
+
+# Dati locali
+PARTITA.local.md
+*.db
+*.sqlite3
+.env
+.env.*
+
+# Strumenti
+.playwright-mcp/
+.idea/
+.vscode/
+
+# OS
+Thumbs.db
+.DS_Store
