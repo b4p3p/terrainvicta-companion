@@ -9,12 +9,16 @@ Scienza, Sicurezza, Lealtà).
 
 ```powershell
 .\start.ps1          # API + interfaccia + browser
+.\start.ps1 -NoReload    # senza auto-reload dell'API
 ```
+
+L'API parte con `--reload` su `ticore/` e `tiserver/` — non su `tiweb/` (ci pensa
+Next) né sulla cartella dei salvataggi, che la farebbe ripartire a ogni autosave.
 
 Oppure separatamente:
 
 ```bash
-python -m uvicorn tiserver.main:app --port 8732   # API
+python -m uvicorn tiserver.main:app --port 8732 --reload --reload-dir ticore --reload-dir tiserver
 cd tiweb && npm run dev                            # interfaccia su :3000
 ```
 
@@ -38,12 +42,13 @@ ti.py       CLI sottile sopra ticore (utile senza browser).
 | `missions.py` | fattori reali di una missione e bersagli ordinati |
 | `model.py` | `snapshot()`: il payload completo |
 | `alerts.py` | motore di regole sul confronto fra snapshot |
-| `store.py` | SQLite in `~/.terrainvicta-companion/`: storico, note, obiettivi |
+| `store.py` | SQLite in `~/.terrainvicta-companion/`: storico, note, obiettivi. La campagna è identificata da **fazione + difficoltà + `realWorldCampaignStart`** |
 
 ### API
 `/api/snapshot?lang=` · `/api/alerts` · `/api/missions` · `/api/missions/{id}/plan`
-· `/api/nations` (dentro snapshot) · `/api/history` · `/api/diff` · `/api/goals`
-· `/api/notes` · `/api/languages` · `/api/stream` (SSE) · `/api/health`
+· `/api/nations` (dentro snapshot) · `/api/history` · `/api/campaigns` · `/api/diff`
+· `/api/goals` · `/api/notes` · `/api/saves` · `/api/languages` · `/api/stream` (SSE)
+· `/api/health`
 
 Il watcher controlla la mtime ogni 3 s, ricarica, archivia lo snapshot, rivaluta le
 allerte e le spinge via SSE. Il frontend non fa polling.
@@ -95,6 +100,13 @@ con `isAI == false`.
 - Le **tecnologie** sono globali (le prendono tutte le fazioni), i **progetti** no.
 - Gli **stati separatisti non ancora nati** hanno punti di controllo ma PIL e coesione a
   zero: vanno filtrati o falsano ogni classifica.
+- **Identità di una partita**: `TIGlobalValuesState.realWorldCampaignStart` è l'ora
+  reale in cui la campagna è stata avviata — stabile per tutti i salvataggi della
+  stessa partita, diversa fra partite. È l'unico modo per distinguerle: fazione e
+  difficoltà non bastano, perché ricominciare con la stessa fazione produce la stessa
+  coppia. Il gioco **non azzera gli slot di autosave** quando ricominci: `Autosave3.gz`
+  può appartenere alla campagna precedente. Per capire di che partita è un `.gz`,
+  leggere quel campo, non il nome del file né la data di gioco.
 
 ## Regole di progetto
 
