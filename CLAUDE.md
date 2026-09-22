@@ -61,7 +61,7 @@ ti.py       CLI sottile sopra ticore (utile senza browser).
 `/api/snapshot?lang=` · `/api/alerts` · `/api/missions` · `/api/missions/{id}/plan`
 · `/api/nations` (dentro snapshot) · `/api/history` · `/api/campaigns` · `/api/diff`
 · `/api/goals` · `/api/notes` · `/api/saves` · `/api/languages` · `/api/stream` (SSE)
-· `/api/health`
+· `/api/health` · `/api/icons/mission/{icona}.png` · `/api/icons/status`
 
 Il watcher controlla la mtime ogni 3 s, ricarica, archivia lo snapshot, rivaluta le
 allerte e le spinge via SSE. Il frontend non fa polling.
@@ -80,6 +80,13 @@ Due livelli separati:
 - **Template**: `…\Steam\steamapps\common\Terra Invicta\TerraInvicta_Data\StreamingAssets\Templates\*.json`
 - **Localizzazione**: `…\StreamingAssets\Localization\<lang>\*.<lang>`, righe
   `TIMissionTemplate.displayName.GainInfluence=Controlla nazione`.
+- **Icone**: **non sono file su disco.** `missionIconImagePath` nei template è una
+  `Resources.Load` di Unity (`councilor_missions/ICO_assassinate`); le immagini stanno
+  nel bundle `StreamingAssets/AssetBundles/councilor_missions`, ogni voce in variante
+  `_on` e `_off`. `tiserver/icons.py` le estrae con UnityPy **dall'installazione
+  dell'utente** in `~/.terrainvicta-companion/icons/`, alla prima richiesta. Non
+  entrano nel repo: sono materiale di Pavonis Interactive. UnityPy è opzionale
+  (`pip install -e .[icons]`); senza, l'interfaccia resta testuale.
 
 Struttura: `gamestates["PavonisInteractive.TerraInvicta.TIXxxState"]` è una lista di
 `{"Key":{"value":id},"Value":{…}}`. La fazione del giocatore si trova da `TIPlayerState`

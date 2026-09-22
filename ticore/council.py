@@ -169,6 +169,7 @@ def mission_view(lang, name, team):
     return {
         "id": name,
         "name": gamedata.mission_name(lang, name),
+        "icon": gamedata.mission_icon(name),
         "attribute": attr,
         "attributeShort": ATTR_SHORT.get(attr),
         "cost": {"resource": res, "value": val} if res else None,
@@ -250,6 +251,7 @@ def recruits(g, lang="ita", include_hidden=False):
         v = councilor_view(g, c, lang, known=include_hidden)
         cov = sorted(missing & set(v["missions"]))
         v["covers"] = [{"id": m, "name": gamedata.mission_name(lang, m),
+                        "icon": gamedata.mission_icon(m),
                         "attribute": gamedata.mission_attribute(m)} for m in cov]
         v["gain"] = {a: v["attributes"].get(a, 0) - best_now[a]
                      for a in ATTRS if v["attributes"].get(a, 0) > best_now[a]}

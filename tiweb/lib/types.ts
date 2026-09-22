@@ -50,7 +50,7 @@ export interface Councilor {
   priorMission: string | null;
   income: Income;
   /* solo sui candidati: differenze rispetto al consiglio attuale */
-  covers?: { id: string; name: string; attribute: Attr | null }[];
+  covers?: { id: string; name: string; icon: string | null; attribute: Attr | null }[];
   gain?: Partial<Record<Attr, number>>;
   fixesWeak?: string[];
 }
@@ -77,6 +77,8 @@ export interface Coverage {
 export interface MissionInfo {
   id: string;
   name: string;
+  /* nome dell'icona del gioco, servita da /api/icons/mission/<icon>.png */
+  icon: string | null;
   attribute: Attr | null;
   attributeShort: string | null;
   cost: { resource: string; value: number | null } | null;

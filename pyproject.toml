@@ -25,6 +25,11 @@ dependencies = [
     "pydantic>=2.0",
 ]
 
+[project.optional-dependencies]
+# Estrae le icone del gioco dai bundle Unity dell'installazione locale.
+# Senza, l'interfaccia resta testuale: nessuna funzione si rompe.
+icons = ["UnityPy>=1.20", "Pillow>=10"]
+
 [project.urls]
 Homepage = "https://github.com/b4p3p/terrainvicta-companion"
 Issues = "https://github.com/b4p3p/terrainvicta-companion/issues"

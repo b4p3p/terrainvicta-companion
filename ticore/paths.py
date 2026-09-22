@@ -85,6 +85,12 @@ def localization_dir():
     return p if p and os.path.isdir(p) else None
 
 
+def bundle_dir():
+    g = game_dir()
+    p = os.path.join(g, _STREAMING, "AssetBundles") if g else None
+    return p if p and os.path.isdir(p) else None
+
+
 def data_dir():
     """Dove il companion tiene il suo database (fuori dalla cartella di gioco)."""
     d = os.path.join(os.path.expanduser("~"), ".terrainvicta-companion")

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import { API } from "@/lib/api";
 
 export const nf = (v: number | null | undefined, d = 1) =>
   v == null || Number.isNaN(v)
@@ -63,6 +64,28 @@ export function Tag({
     <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-semibold ${map[tone]}`}>
       {children}
     </span>
+  );
+}
+
+/** Icona di missione del gioco, servita dall'installazione locale.
+ *  Se manca (UnityPy assente, o gioco non installato) non lascia un buco:
+ *  semplicemente non compare e resta il testo accanto. */
+export function MissionIcon({
+  icon, size = 18, title,
+}: { icon: string | null | undefined; size?: number; title?: string }) {
+  const [broken, setBroken] = useState(false);
+  if (!icon || broken) return null;
+  return (
+    // PNG di 16-20px serviti dall'API locale: next/image non avrebbe nulla da
+    // ottimizzare e richiederebbe di dichiarare l'origine esterna.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`${API}/api/icons/mission/${encodeURIComponent(icon)}.png`}
+      alt="" title={title} width={size} height={size}
+      onError={() => setBroken(true)}
+      className="inline-block align-text-bottom shrink-0"
+      style={{ width: size, height: size }}
+    />
   );
 }
 

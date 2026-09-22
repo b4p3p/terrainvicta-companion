@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
-import { Empty, Panel, Tag } from "@/components/ui";
+import { Empty, MissionIcon, Panel, Tag } from "@/components/ui";
 import { ATTRS, type Attr, type Councilor, type Org } from "@/lib/types";
 
 const SHORT: Record<Attr, string> = {
@@ -162,6 +162,7 @@ export default function CouncilPage() {
             {missions.missing.map((m) => (
               <div key={m.id} className="bg-panel2 border border-line rounded-md px-3 py-2">
                 <div className="flex items-baseline gap-2 flex-wrap">
+                  <MissionIcon icon={m.icon} size={20} title={m.name} />
                   <span className="font-semibold text-[13.5px]">{m.name}</span>
                   {m.attributeShort && <Tag tone="warn">{m.attributeShort}</Tag>}
                   {m.cost?.resource && (

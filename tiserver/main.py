@@ -15,13 +15,14 @@ import time
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import ticore                                    # noqa: E402
 from ticore import alerts, gamedata, missions, paths, store  # noqa: E402
+from . import icons                             # noqa: E402
 
 app = FastAPI(title="TerraInvictaCompanion", version="1.0")
 app.add_middleware(
@@ -127,6 +128,25 @@ def health():
         "date": (state.snapshot or {}).get("date"),
         "lang": state.lang,
     }
+
+
+@app.get("/api/icons/mission/{name}.png")
+def mission_icon(name: str):
+    """Icona di una missione, estratta dall'installazione locale del gioco.
+
+    Le immagini non stanno nel repo: vengono tirate fuori dai bundle Unity
+    dell'utente alla prima richiesta e messe in cache nella cartella dati.
+    """
+    p = icons.mission_icon_file(name)
+    if not p:
+        raise HTTPException(404, "icona non disponibile")
+    return FileResponse(p, media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/api/icons/status")
+def icons_status():
+    return {"available": icons.available(), "dir": icons.icons_dir()}
 
 
 @app.get("/api/snapshot")

@@ -119,6 +119,19 @@ def mission_cost(data_name):
     return c.get("resourceType"), c.get("value")
 
 
+@lru_cache(maxsize=None)
+def mission_icon(data_name):
+    """Nome dell'icona della missione, senza cartella ne' estensione.
+
+    Nei template e' `councilor_missions/ICO_assassinate`: una `Resources.Load`
+    di Unity, non un file su disco. Le immagini stanno nel bundle
+    `councilor_missions`, dove ogni voce esiste in variante `_on` e `_off`.
+    """
+    t = templates()["missions"].get(data_name) or {}
+    p = t.get("missionIconImagePath") or ""
+    return p.rsplit("/", 1)[-1] or None
+
+
 def trait_name(lang, data_name):
     t = templates()["traits"].get(data_name) or {}
     return loc(lang, "TITraitTemplate", "displayName", data_name,

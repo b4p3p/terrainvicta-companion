@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
-import { Empty, Panel, Tag, nf } from "@/components/ui";
+import { Empty, MissionIcon, Panel, Tag, nf } from "@/components/ui";
 import { ATTRS, type Attr, type Councilor, type Income } from "@/lib/types";
 
 const SHORT: Record<Attr, string> = {
@@ -107,7 +107,10 @@ function Candidate({ c }: { c: Councilor }) {
             <div className="flex gap-1 flex-wrap">
               {covers.map((m) => (
                 <Tag key={m.id} tone="mine">
-                  {m.name}{m.attribute ? ` · ${SHORT[m.attribute]}` : ""}
+                  <span className="inline-flex items-center gap-1">
+                    <MissionIcon icon={m.icon} size={16} title={m.name} />
+                    {m.name}{m.attribute ? ` · ${SHORT[m.attribute]}` : ""}
+                  </span>
                 </Tag>
               ))}
             </div>

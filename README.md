@@ -40,9 +40,13 @@ and shows the raw factors next to it.
 ```bash
 git clone https://github.com/b4p3p/terrainvicta-companion.git
 cd terrainvicta-companion
-pip install -e .
+pip install -e ".[icons]"     # or `pip install -e .` to skip game icons
 cd tiweb && npm install && cd ..
 ```
+
+The optional `icons` extra pulls in UnityPy, used to read the game's own mission
+icons out of your local installation. Without it nothing breaks — the interface
+just stays textual.
 
 ## Run
 
@@ -119,6 +123,10 @@ Auto-detected, no configuration needed:
   Documents folders included). If neither exists, the path is read from `savedGamesPath`
   in the game's `Player.log`.
 - **Templates and localization** — `<Steam>\steamapps\common\Terra Invicta\TerraInvicta_Data\StreamingAssets\`.
+- **Mission icons** — not files on disk: they live inside the Unity asset bundle
+  `StreamingAssets/AssetBundles/councilor_missions`. With the `icons` extra installed
+  they are extracted **from your own copy of the game** on first request and cached
+  locally. No game art is contained in or distributed with this repository.
 
 Everything this tool writes lives in `~/.terrainvicta-companion/`.
 
