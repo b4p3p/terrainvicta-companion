@@ -18,8 +18,18 @@ RESOURCES = ["Money", "Influence", "Operations", "Research", "Projects",
              "Boost", "MissionControl"]
 
 
-def _last(v, default=None):
-    return v[-1] if isinstance(v, list) and v else default
+# Le serie `historyXxx` delle nazioni sono dal PIU' RECENTE al piu' vecchio:
+# l'indice 0 coincide col valore attuale (verificato su PIL, disordini,
+# coesione, democrazia, istruzione e disuguaglianza di tutte le nazioni).
+
+def _now(v, default=None):
+    """Valore attuale di una serie storica del salvataggio."""
+    return v[0] if isinstance(v, list) and v else default
+
+
+def _chrono(v):
+    """Serie storica in ordine cronologico, dal piu' vecchio all'attuale."""
+    return list(reversed(v)) if isinstance(v, list) else []
 
 
 def nations(g):
@@ -41,17 +51,17 @@ def nations(g):
             else:
                 taken += 1
                 owners.append(g.faction_name.get(fid, "?"))
-        pop = _last(n.get("historyPopulation")) or 0
+        pop = _now(n.get("historyPopulation")) or 0
         gdp = n.get("GDP") or 0
-        hist = [round(x, 1) for x in (n.get("historyResearch") or [])][-32:]
-        op = _last(n.get("historyPublicOpinion")) or n.get("publicOpinion") or {}
+        hist = [round(x, 1) for x in _chrono(n.get("historyResearch"))][-32:]
+        op = _now(n.get("historyPublicOpinion")) or n.get("publicOpinion") or {}
         out.append({
             "name": name,
             "eu": name in EU,
             "gdp": gdp,
             "pop": pop,
             "gdpPc": (gdp / (pop * 1e6)) if pop else 0,
-            "research": _last(n.get("historyResearch")) or 0,
+            "research": _now(n.get("historyResearch")) or 0,
             "histResearch": hist,
             "resTrend": (hist[-1] - hist[0]) if len(hist) > 1 else 0,
             "ip": n.get("baseInvestmentPoints_month") or 0,
@@ -71,6 +81,49 @@ def nations(g):
             "owners": sorted(set(owners)),
         })
     return out
+
+
+# indicatore -> (serie storica del salvataggio, divisore). Sono le serie che il
+# gioco disegna nei grafici della nazione: niente che il giocatore non veda.
+TREND_FIELDS = {
+    "gdp": ("historyGDP", 1e9),
+    "pop": ("historyPopulation", 1),
+    "research": ("historyResearch", 1),
+    "ip": ("historyInvestmentPoints", 1),
+    "education": ("historyEducation", 1),
+    "democracy": ("historyDemocracy", 1),
+    "cohesion": ("historyCohesion", 1),
+    "unrest": ("historyUnrest", 1),
+    "inequality": ("historyInequality", 1),
+    "miltech": ("historyMiltech", 1),
+    "nukes": ("historyNukes", 1),
+}
+
+
+def _series(values, div=1):
+    return [round(x / div, 3) for x in values if isinstance(x, (int, float))]
+
+
+def nation_trends(g):
+    """Serie storiche per nazione, con le stesse nazioni di `nations()`.
+
+    Fuori dallo snapshot apposta: sono ~30 punti per 12 indicatori per ~200
+    nazioni, e lo snapshot viene archiviato a ogni salvataggio. Il gioco non
+    documenta ogni quanto registra un punto: sono «le ultime N rilevazioni».
+    """
+    me_key = (g.me.get("templateName") or "").replace("Council", "")
+    out, points = {}, 0
+    for n in g.nations.values():
+        name = n.get("displayName")
+        if not name or not n.get("controlPoints"):
+            continue
+        s = {k: _series(_chrono(n.get(f)), d) for k, (f, d) in TREND_FIELDS.items()}
+        s["support"] = [round(op.get(me_key, 0), 4)
+                        for op in _chrono(n.get("historyPublicOpinion"))
+                        if isinstance(op, dict)]
+        points = max(points, *(len(v) for v in s.values()))
+        out[name] = s
+    return {"points": points, "nations": out}
 
 
 def flows(g, months_back=1, lang="ita"):
