@@ -1,7 +1,7 @@
 [
   {
     "dataName": "TIC_Ricerca",
-    "friendlyName": "Ricerca e economia",
+    "friendlyName": "- Ricerca e economia",
     "nationalAIOption": false,
     "economySetting": 3,
     "knowledgeSetting": 3,
@@ -10,7 +10,7 @@
   },
   {
     "dataName": "TIC_Spazio",
-    "friendlyName": "Ricerca e spazio",
+    "friendlyName": "- Ricerca e spazio",
     "nationalAIOption": false,
     "economySetting": 2,
     "knowledgeSetting": 3,
@@ -22,7 +22,7 @@
   },
   {
     "dataName": "TIC_ResistiSenzaArmi",
-    "friendlyName": "Resisti senza riarmo",
+    "friendlyName": "- Resisti senza riarmo",
     "nationalAIOption": false,
     "economySetting": 2,
     "knowledgeSetting": 3,
