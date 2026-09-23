@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
-import { AttrIcon, Empty, MissionIcon, Panel, Tag, nf } from "@/components/ui";
+import { AttrIcon, Empty, MissionIcon, Panel, ResourceIcon, Tag, nf } from "@/components/ui";
 import { Guide } from "@/components/Guide";
 import type { Dict } from "@/lib/i18n";
 import {
@@ -18,12 +18,13 @@ const SHORT: Record<Attr, string> = {
 
 type ResLabel = "resMoney" | "resInfluence" | "resResearch" | "resOps" | "resBoost";
 
-const RES: { key: keyof Omit<Income, "fromTraits">; label: ResLabel; tone: string }[] = [
-  { key: "money", label: "resMoney", tone: "text-warn" },
-  { key: "influence", label: "resInfluence", tone: "text-accent" },
-  { key: "research", label: "resResearch", tone: "text-good" },
-  { key: "ops", label: "resOps", tone: "text-other" },
-  { key: "boost", label: "resBoost", tone: "text-dim" },
+// icone del gioco, le stesse della barra delle risorse in cima
+const RES: { key: keyof Omit<Income, "fromTraits">; label: ResLabel; tone: string; icon: string }[] = [
+  { key: "money", label: "resMoney", tone: "text-warn", icon: "ICO_currency" },
+  { key: "influence", label: "resInfluence", tone: "text-accent", icon: "ICO_influence" },
+  { key: "research", label: "resResearch", tone: "text-good", icon: "ICO_research" },
+  { key: "ops", label: "resOps", tone: "text-other", icon: "ICO_ops" },
+  { key: "boost", label: "resBoost", tone: "text-dim", icon: "ICO_boost" },
 ];
 
 const RES_LABEL = Object.fromEntries(RES.map((r) => [r.key, r.label])) as
@@ -48,8 +49,10 @@ function IncomeLine({ income }: { income: Income }) {
       {parts.map((r) => {
         const v = income[r.key];
         return (
-          <span key={r.key} className={v < 0 ? "text-bad" : r.tone}>
-            {signed(v)} {t.recruit[r.label]}
+          <span key={r.key} className={`inline-flex items-center gap-1 ${v < 0 ? "text-bad" : r.tone}`}
+            title={t.recruit[r.label]}>
+            <ResourceIcon icon={r.icon} size={14} title={t.recruit[r.label]} />
+            {signed(v)} <span className="text-dim">{t.recruit[r.label]}</span>
           </span>
         );
       })}
@@ -97,19 +100,30 @@ const TONE = { good: "text-good", bad: "text-bad", dim: "text-dim" } as const;
 function Traits({ c }: { c: Councilor }) {
   const { t } = useSettings();
   return (
-    // flex-wrap: ogni tratto e' un blocco coi suoi effetti, e i blocchi vanno a capo
-    <div className="flex flex-wrap gap-x-3 gap-y-1">
-      {c.traits.map((tr) => {
+    // un tratto per riga: nome in colonna, effetti accanto. In fila uno
+    // dietro l'altro il nome di un tratto finiva attaccato agli effetti
+    // del precedente
+    <div className="grid grid-cols-[max-content_1fr] gap-x-2.5 text-[11.5px]">
+      {c.traits.map((tr, i) => {
         const fx = (tr.effects ?? []).map((e) => describe(e, t));
+        const line = i ? "border-t border-edge" : "";
         return (
-          <div key={tr.id} className="flex flex-wrap items-baseline gap-x-1.5">
-            <Tag>{tr.name}</Tag>
-            {fx.map((f, i) => (
-              <span key={i} className={`text-[11.5px] ${TONE[f.tone]}`}
-                title={f.conditional ? t.recruit.conditional : undefined}>
-                {f.text}{f.conditional && "*"}{i < fx.length - 1 ? "," : ""}
+          <div key={tr.id} className="contents">
+            <div className={`py-[3px] ${line}`} title={tr.description ?? undefined}>
+              <Tag>{tr.name}</Tag>
+            </div>
+            <div className={`py-[3px] ${line} flex items-center`}>
+              <span className="leading-snug">
+                {/* senza effetti leggibili resta la descrizione del gioco */}
+                {fx.length === 0 && <span className="text-faint italic">{tr.description ?? "—"}</span>}
+                {fx.map((f, j) => (
+                  <span key={j} className={TONE[f.tone]}
+                    title={f.conditional ? t.recruit.conditional : undefined}>
+                    {f.text}{f.conditional && "*"}{j < fx.length - 1 ? ", " : ""}
+                  </span>
+                ))}
               </span>
-            ))}
+            </div>
           </div>
         );
       })}
@@ -270,7 +284,9 @@ function Compare({ picked, coverage, onClear }: {
       vals: picked.map((c) => c.attributes[a] ?? 0),
     })),
     ...RES.filter((r) => picked.some((c) => c.income[r.key] !== 0)).map((r) => ({
-      label: t.recruit[r.label],
+      label: <span className="inline-flex items-center gap-1">
+        <ResourceIcon icon={r.icon} size={13} />{t.recruit[r.label]}
+      </span>,
       vals: picked.map((c) => c.income[r.key]),
       fmt: signed,
     })),

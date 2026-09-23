@@ -77,6 +77,8 @@ export type TraitEffect =
 export interface Trait {
   id: string;
   name: string;
+  /** testo del gioco (TITraitTemplate.description); null se manca */
+  description?: string | null;
   effects?: TraitEffect[];
 }
 

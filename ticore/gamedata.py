@@ -231,6 +231,12 @@ def trait_name(lang, data_name):
 
 
 @lru_cache(maxsize=None)
+def trait_description(lang, data_name):
+    """Descrizione del tratto come la mostra il gioco. None se manca."""
+    d = loc(lang, "TITraitTemplate", "description", data_name, "")
+    return d or None
+
+
 def trait_income(data_name):
     """Reddito mensile concesso da un tratto.
 

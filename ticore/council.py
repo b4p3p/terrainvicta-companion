@@ -152,6 +152,7 @@ def councilor_view(g, c, lang="ita", known=True):
         "base": {a: attrs.get(a, 0) for a in ATTRS},
         "attributes": effective,
         "traits": [{"id": t, "name": gamedata.trait_name(lang, t),
+                    "description": gamedata.trait_description(lang, t),
                     "effects": gamedata.trait_effects(lang, t)} for t in traits],
         "orgs": orgs,
         "missions": sorted(missions),
