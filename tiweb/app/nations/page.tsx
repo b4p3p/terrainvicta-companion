@@ -5,7 +5,7 @@ import { useApi, useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { usePersistentState } from "@/lib/persist";
 import {
-  Column, DataTable, Empty, GameIcon, Panel, Spark, Tag, bn, nf, pct,
+  Column, DataTable, Empty, GameIcon, Panel, Spark, Tag, TrendArrow, bn, nf, pct,
 } from "@/components/ui";
 import type { Nation, NationTrends, TrendKey } from "@/lib/types";
 
@@ -20,6 +20,8 @@ const isBool = (v: unknown): v is boolean => typeof v === "boolean";
 interface Metric {
   key: TrendKey;
   title: string;
+  /** icona del gioco per l'intestazione; senza, resta il titolo */
+  icon?: string;
   value: (n: Nation) => number;
   fmt: (v: number) => string;
   fmtDelta: (d: number) => string;
@@ -34,37 +36,54 @@ const dec = (digits: number) => ({
 
 const METRICS: Metric[] = [
   // la serie del PIL arriva gia' in miliardi; la colonna usa bn() sul valore grezzo
-  { key: "gdp", title: "PIL mld", value: (n) => n.gdp / 1e9, ...dec(0) },
-  { key: "pop", title: "Pop. mln", value: (n) => n.pop, ...dec(1) },
-  { key: "research", title: "Ricerca/m", value: (n) => n.research, ...dec(0) },
-  { key: "ip", title: "Investim.", value: (n) => n.ip, ...dec(1) },
-  { key: "education", title: "Istruz.", value: (n) => n.education, ...dec(1) },
-  { key: "democracy", title: "Democr.", value: (n) => n.democracy, ...dec(1) },
-  { key: "cohesion", title: "Coesione", value: (n) => n.cohesion, ...dec(1) },
-  { key: "unrest", title: "Disordini", value: (n) => n.unrest, ...dec(2), upIsBad: true },
-  { key: "inequality", title: "Disugu.", value: (n) => n.inequality, ...dec(1), upIsBad: true },
+  { key: "gdp", title: "PIL mld", icon: "ICO_economy_priority", value: (n) => n.gdp / 1e9, ...dec(0) },
+  // la popolazione si muove di poco: variazione a 2 decimali (decine di migliaia)
+  { key: "pop", title: "Pop. mln", icon: "ICO_population", value: (n) => n.pop, fmt: dec(1).fmt, fmtDelta: dec(2).fmtDelta },
+  { key: "research", title: "Ricerca/m", icon: "ICO_research", value: (n) => n.research, ...dec(0) },
+  { key: "ip", title: "Investim.", icon: "ICO_investments", value: (n) => n.ip, ...dec(1) },
+  { key: "education", title: "Istruz.", icon: "ICO_education", value: (n) => n.education, ...dec(1) },
+  { key: "democracy", title: "Democr.", icon: "ICO_gov_type", value: (n) => n.democracy, ...dec(1) },
+  { key: "cohesion", title: "Coesione", icon: "ICO_Cohesion_mid", value: (n) => n.cohesion, ...dec(1) },
+  { key: "unrest", title: "Disordini", icon: "ICO_Unrest_mid", value: (n) => n.unrest, ...dec(2), upIsBad: true },
+  { key: "inequality", title: "Disugu.", icon: "ICO_inequality", value: (n) => n.inequality, ...dec(1), upIsBad: true },
   {
     key: "support", title: "Sostegno", value: (n) => n.support,
     fmt: (v) => pct(v), fmtDelta: (d) => signed(nf(d * 100, 1), d) + " pt",
   },
-  { key: "miltech", title: "Miltech", value: (n) => n.miltech, ...dec(1) },
-  { key: "nukes", title: "Atomiche", value: (n) => n.nukes, ...dec(0) },
+  { key: "miltech", title: "Miltech", icon: "tech_military_icon", value: (n) => n.miltech, ...dec(1) },
+  { key: "nukes", title: "Atomiche", icon: "ICO_nukes", value: (n) => n.nukes, ...dec(0) },
 ];
 const METRIC = Object.fromEntries(METRICS.map((m) => [m.key, m])) as Record<TrendKey, Metric>;
 const isMetric = (v: unknown): v is TrendKey => typeof v === "string" && v in METRIC;
 
+/** Variazione su tutta la finestra: serve alla sparkline e al suo ordinamento. */
 const deltaOf = (s: number[] | undefined) =>
   s && s.length > 1 ? s[s.length - 1] - s[0] : 0;
 
-/** Variazione accanto al valore: verde se migliora, rossa se peggiora. */
+/** Ultima variazione: il valore attuale meno il piu' recente diverso da lui.
+ *  E' quella che il gioco segna con la freccia; la serie resta piatta per piu'
+ *  rilevazioni di fila, quindi il punto precedente e' spesso identico. */
+const lastChange = (s: number[] | undefined) => {
+  if (!s || s.length < 2) return 0;
+  const now = s[s.length - 1];
+  for (let i = s.length - 2; i >= 0; i--) if (s[i] !== now) return now - s[i];
+  return 0;
+};
+
+/** Ultima variazione accanto al valore, con la freccia del gioco: la
+ *  direzione dice se sale o scende, il colore se è un bene o un male. */
 function Delta({ m, series }: { m: Metric; series: number[] | undefined }) {
-  const d = deltaOf(series);
-  // sotto la precisione mostrata la variazione e' rumore di arrotondamento
-  if (m.fmtDelta(d).replace(/[^1-9]/g, "") === "") return null;
+  const d = lastChange(series);
+  if (Math.abs(d) < 1e-9) return null;
   const good = (d > 0) !== !!m.upIsBad;
+  const text = m.fmtDelta(d);
+  // la freccia c'e' sempre; il numero solo se a questa precisione non e' zero
+  const visible = text.replace(/[^1-9]/g, "") !== "";
   return (
-    <span className={`ml-1 text-[10.5px] ${good ? "text-good" : "text-bad"}`}>
-      {m.fmtDelta(d)}
+    <span className={`ml-1 text-[10.5px] leading-none inline-flex items-center gap-0.5 [&>img]:align-middle ${
+      good ? "text-good" : "text-bad"}`}>
+      <TrendArrow up={d > 0} good={good} title={text} />
+      {visible && text}
     </span>
   );
 }
@@ -89,7 +108,9 @@ function Detail({ name, series, onClose }: {
           return (
             <div key={m.key} className="text-[11.5px]">
               <div className="flex items-baseline justify-between">
-                <span className="text-dim">{m.title}</span>
+                <span className="text-dim inline-flex items-center gap-1">
+                  <GameIcon bundle="icons_2d" icon={m.icon} size={14} />{m.title}
+                </span>
                 <Delta m={m} series={s} />
               </div>
               <Spark data={s} w={200} h={30} upIsBad={m.upIsBad} />
@@ -141,13 +162,14 @@ export default function NationsPage() {
 
   /** Colonna numerica con la variazione accanto, se richiesta. */
   const num = (k: TrendKey, render: (n: Nation) => ReactNode): Column<Nation> => ({
-    key: k, title: METRIC[k].title,
+    key: k, title: METRIC[k].title, icon: METRIC[k].icon,
     sort: (n) => METRIC[k].value(n),
+    // flex centrato: valore, freccia e numero sulla stessa linea mediana
     render: (n) => (
-      <>
+      <span className="inline-flex items-center justify-end">
         {render(n)}
         {showDelta && <Delta m={METRIC[k]} series={seriesOf(n, k)} />}
-      </>
+      </span>
     ),
   });
 
@@ -171,7 +193,7 @@ export default function NationsPage() {
       ),
     },
     num("gdp", (r) => bn(r.gdp)),
-    { key: "gdpPc", title: "PIL/ab $", render: (r) => nf(r.gdpPc, 0) },
+    { key: "gdpPc", title: "PIL/ab $", icon: "ICO_per_capita_GDP", render: (r) => nf(r.gdpPc, 0) },
     num("pop", (r) => nf(r.pop)),
     num("research", (r) => nf(r.research, 0)),
     {
@@ -192,9 +214,9 @@ export default function NationsPage() {
       <span className={r.support > 0.2 ? "text-good" : ""}>{pct(r.support)}</span>
     )),
     { key: "difficulty", title: "Difficoltà", render: (r) => nf(r.difficulty) },
-    { key: "spaceFunding", title: "Fondi sp.", render: (r) => nf(r.spaceFunding, 0) },
+    { key: "spaceFunding", title: "Fondi sp.", icon: "ICO_funding_priority", render: (r) => nf(r.spaceFunding, 0) },
     {
-      key: "space", title: "Prog.sp.", sort: (r) => (r.space ? 1 : 0),
+      key: "space", title: "Prog.sp.", icon: "ICO_spaceflightProgram_priority", sort: (r) => (r.space ? 1 : 0),
       // l'icona del gioco per il programma spaziale; se manca resta il testo
       render: (r) => (r.space
         ? <span title={t.common.yes}>

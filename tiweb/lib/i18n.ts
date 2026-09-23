@@ -197,7 +197,7 @@ const it = {
     trendOf: "Andamento di",
     showDelta: "mostra variazioni",
     trendHint:
-      "Andamenti e variazioni vengono dalle serie che il gioco salva per ogni nazione (le stesse dei suoi grafici): sono le ultime {n} rilevazioni, e il gioco non dice ogni quanto ne registra una. La variazione è ultimo meno primo punto.",
+      "Andamenti e variazioni vengono dalle serie che il gioco salva per ogni nazione (le stesse dei suoi grafici): sono le ultime {n} rilevazioni, e il gioco non dice ogni quanto ne registra una. Freccia e numero sono l'ultima variazione, come nel gioco; la sparkline mostra tutta la finestra.",
     detailHint: "Clicca il nome di una nazione per vedere tutti i suoi andamenti.",
     detailClose: "chiudi",
     first: "primo",
@@ -425,7 +425,7 @@ const en: typeof it = {
     trendOf: "Trend of",
     showDelta: "show changes",
     trendHint:
-      "Trends and changes come from the series the game stores for each nation (the same as its charts): the last {n} readings, and the game doesn't say how often it records one. The change is last minus first point.",
+      "Trends and changes come from the series the game stores for each nation (the same as its charts): the last {n} readings, and the game doesn't say how often it records one. Arrow and number are the latest change, as in game; the sparkline shows the whole window.",
     detailHint: "Click a nation's name to see all its trends.",
     detailClose: "close",
     first: "first",

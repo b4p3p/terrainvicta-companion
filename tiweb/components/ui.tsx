@@ -74,23 +74,26 @@ export function Tag({
 /** Icona del gioco, servita dal repo o estratta dall'installazione locale.
  *  Se manca non lascia un buco: sparisce e resta il testo accanto. */
 export function GameIcon({
-  bundle, icon, size = 18, title,
+  bundle, icon, size = 18, height, title,
 }: {
   bundle: "councilor_missions" | "icons_2d";
   icon: string | null | undefined; size?: number; title?: string;
+  /** per le icone non quadrate; di default uguale a `size` */
+  height?: number;
 }) {
   const [broken, setBroken] = useState(false);
   if (!icon || broken) return null;
+  const h = height ?? size;
   return (
     // PNG di 14-20px serviti dall'API locale: next/image non avrebbe nulla da
     // ottimizzare e richiederebbe di dichiarare l'origine esterna.
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={`${API}/api/icons/${bundle}/${encodeURIComponent(icon)}.png`}
-      alt="" title={title} width={size} height={size}
+      alt="" title={title} width={size} height={h}
       onError={() => setBroken(true)}
-      className="inline-block align-text-bottom shrink-0"
-      style={{ width: size, height: size }}
+      className="inline-block align-text-bottom shrink-0 object-contain"
+      style={{ width: size, height: h }}
     />
   );
 }
@@ -120,6 +123,16 @@ export function AttrIcon({
 }: { attr: string | null | undefined; size?: number; title?: string }) {
   return <GameIcon bundle="icons_2d" icon={attr ? ATTR_ICONS[attr] : null}
     size={size} title={title} />;
+}
+
+/** Freccia di tendenza del gioco: la direzione dice se sale o scende, il
+ *  colore se è un bene o un male. Le icone originali sono 44×39. */
+export function TrendArrow({
+  up, good, size = 11, title,
+}: { up: boolean; good: boolean; size?: number; title?: string }) {
+  const icon = `ICO_arrow_${good ? "green" : "red"}${up ? "" : "_down"}`;
+  return <GameIcon bundle="icons_2d" icon={icon} size={size}
+    height={Math.round((size * 39) / 44)} title={title} />;
 }
 
 /** Sparkline: verde se l'ultimo valore è sopra il primo, rossa altrimenti.
@@ -178,6 +191,8 @@ export interface Column<T> {
   render: (r: T) => ReactNode;
   sort?: (r: T) => number | string;
   align?: "left" | "right";
+  /** icona del gioco (bundle icons_2d) al posto del titolo; il titolo resta nel tooltip */
+  icon?: string;
 }
 
 /** Tabella ordinabile. L'ordinamento usa `sort` se c'è, altrimenti la chiave. */
@@ -209,12 +224,14 @@ export function DataTable<T extends Record<string, unknown>>({
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c.key}
+              <th key={c.key} title={c.icon ? c.title : undefined}
                 onClick={() => {
                   if (c.key === sortKey) setAsc(!asc);
                   else { setSortKey(c.key); setAsc(false); }
                 }}>
-                {c.title}
+                {c.icon
+                  ? <GameIcon bundle="icons_2d" icon={c.icon} size={20} title={c.title} />
+                  : c.title}
                 {c.key === sortKey && <span className="text-accent ml-1">{asc ? "▴" : "▾"}</span>}
               </th>
             ))}

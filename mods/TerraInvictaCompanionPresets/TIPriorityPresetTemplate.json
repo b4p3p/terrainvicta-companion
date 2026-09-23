@@ -1,0 +1,36 @@
+[
+  {
+    "dataName": "TIC_Ricerca",
+    "friendlyName": "Ricerca e economia",
+    "nationalAIOption": false,
+    "economySetting": 3,
+    "knowledgeSetting": 3,
+    "governmentSetting": 2,
+    "environmentSetting": 1
+  },
+  {
+    "dataName": "TIC_Spazio",
+    "friendlyName": "Ricerca e spazio",
+    "nationalAIOption": false,
+    "economySetting": 2,
+    "knowledgeSetting": 3,
+    "governmentSetting": 1,
+    "spaceProgramSetting": 3,
+    "initSpaceProgramSetting": 3,
+    "boostSetting": 3,
+    "missionControlSetting": 3
+  },
+  {
+    "dataName": "TIC_ResistiSenzaArmi",
+    "friendlyName": "Resisti senza riarmo",
+    "nationalAIOption": false,
+    "economySetting": 2,
+    "knowledgeSetting": 3,
+    "governmentSetting": 2,
+    "spaceProgramSetting": 3,
+    "initSpaceProgramSetting": 3,
+    "boostSetting": 3,
+    "missionControlSetting": 3,
+    "spaceDefenseSetting": 1
+  }
+]
