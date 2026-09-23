@@ -315,19 +315,17 @@ export function CouncilorCard({ c, variant, action, sortAttr, highlighted }: {
         </>
       )}
 
-      <Section title={
-        <span title={recruit ? t.recruit.missionsNewHint : undefined}>
-          {t.recruit.missions} <span className="text-ink">({missions.length})</span>
-          {fresh > 0 && <span className="text-good"> · {fresh} {t.recruit.compareMissionsNew}</span>}
-        </span>
-      }>
+      {/* niente intestazione: quante sono, e quante nuove, lo dicono già i
+          riquadri in alto; le nuove restano in verde */}
+      <div className="text-[12px] mt-2">
         {missions.length === 0
           ? <div className="text-dim">—</div>
           : (
             <div className="flex gap-1 flex-wrap">
               {missions.map((m) => (
                 <Tag key={m.id} tone={m.new ? "mine" : "dim"}>
-                  <span className="inline-flex items-center gap-1">
+                  <span className="inline-flex items-center gap-1"
+                    title={m.new ? t.recruit.missionsNewHint : undefined}>
                     <MissionIcon icon={m.icon} size={16} title={m.name} />
                     {m.name}
                     {m.attribute && <AttrIcon attr={m.attribute} size={12} title={SHORT[m.attribute]} />}
@@ -336,7 +334,7 @@ export function CouncilorCard({ c, variant, action, sortAttr, highlighted }: {
               ))}
             </div>
           )}
-      </Section>
+      </div>
 
       <Section title={t.council.traits}><Traits c={c} /></Section>
     </div>
