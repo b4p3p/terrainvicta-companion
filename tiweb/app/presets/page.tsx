@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { API, api } from "@/lib/api";
 import { usePersistentState } from "@/lib/persist";
 import { useSettings } from "@/lib/settings";
-import { Button, Empty, GameIcon, Panel, Tag, nf } from "@/components/ui";
+import { Button, Empty, GameIcon, Panel, Tag, barFill, nf } from "@/components/ui";
 
 interface Priority {
   id: string;
@@ -83,15 +83,18 @@ function familyShares(p: { priorities: Slice[] }) {
 
 /** Una barra impilata: un segmento per priorità, raggruppati per famiglia,
  *  separati da 2px di fondo. L'etichetta di ogni segmento sta nel tooltip. */
-function ShareBar({ p, height = 14 }: { p: { priorities: Slice[] }; height?: number }) {
+function ShareBar({ p, height = 16 }: { p: { priorities: Slice[] }; height?: number }) {
+  // dentro una famiglia i segmenti alternano un tono più scuro: stessi colori,
+  // ma due voci vicine non si fondono in un blocco unico
   const ordered = FAMILIES.flatMap((f) =>
-    p.priorities.filter((s) => FAMILY_OF[s.id]?.key === f.key));
+    p.priorities.filter((s) => FAMILY_OF[s.id]?.key === f.key)
+      .map((s, i) => ({ ...s, shade: i % 2 ? 0.16 : 0 })));
   return (
     <div className="flex gap-[2px] w-full bg-panel" style={{ height }} role="img"
       aria-label={ordered.map((s) => `${s.name} ${pc(s.share)}`).join(", ")}>
       {ordered.map((s) => (
         <div key={s.id} title={`${s.name} · peso ${s.weight} · ${pc(s.share)}`}
-          style={{ width: `${s.share * 100}%`, background: FAMILY_OF[s.id].color }}
+          style={{ width: `${s.share * 100}%`, background: barFill(FAMILY_OF[s.id].color, s.shade) }}
           className="h-full min-w-[2px] hover:brightness-125" />
       ))}
     </div>
@@ -103,7 +106,7 @@ function Legend({ t, knowledge }: { t: Labels; knowledge: string }) {
     <div className="flex gap-3 flex-wrap text-[11.5px] text-dim">
       {FAMILIES.map((f) => (
         <span key={f.key} className="inline-flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5" style={{ background: f.color }} />
+          <span className="inline-block w-2.5 h-2.5" style={{ background: barFill(f.color) }} />
           {f.key === "knowledge" ? knowledge : t.fam[f.key]}
         </span>
       ))}
