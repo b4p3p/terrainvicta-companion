@@ -109,6 +109,24 @@ def income_of(c, traits):
     return out
 
 
+# Eta', verificato sull'IL di Assembly-CSharp.dll (TIGlobalConfig e
+# TIFactionState). L'eta' serve in due punti soli:
+# - AddAvailableCouncilor: all'assunzione +initialXPPerYearAge (2) XP per ogni
+#   anno oltre minAgeForXPBonus (30). Essere piu' vecchi e' un vantaggio;
+# - AgeCouncilors: da 65 anni (soglia spostata da alcuni effetti, e con un
+#   ramo per genere) un tiro che cresce con (eta'-65)^1.2 puo' dare il tratto
+#   Declining (-1 IND, -1 CMD, esperienza piu' cara) e un secondo tiro puo'
+#   uccidere il consigliere.
+AGE_XP_FROM = 30
+AGE_XP_PER_YEAR = 2
+AGE_DECLINE_AT = 65
+
+
+def hire_xp(age):
+    """XP che il gioco regala all'assunzione per l'eta'."""
+    return AGE_XP_PER_YEAR * max(0, age - AGE_XP_FROM) if age is not None else 0
+
+
 def age_of(g, c):
     """Anni compiuti alla data di gioco, da `dateBorn`. None se manca."""
     born = c.get("dateBorn") or {}
@@ -149,6 +167,7 @@ def councilor_view(g, c, lang="ita", known=True):
         "location": g.region_label((c.get("location") or {}).get("value")),
         "xp": c.get("XP") or 0,
         "age": age_of(g, c),
+        "declineAt": AGE_DECLINE_AT,
         "base": {a: attrs.get(a, 0) for a in ATTRS},
         "attributes": effective,
         "traits": [{"id": t, "name": gamedata.trait_name(lang, t),
@@ -157,8 +176,17 @@ def councilor_view(g, c, lang="ita", known=True):
         "orgs": orgs,
         "missions": sorted(missions),
         "apparentLoyalty": attrs.get("ApparentLoyalty"),
-        "priorMission": c.get("priorMissionTemplateName"),
+        # nome del gioco, non il dataName: «GainInfluence» e' «Controlla nazione»
+        "priorMission": (gamedata.mission_name(lang, c["priorMissionTemplateName"])
+                         if c.get("priorMissionTemplateName") else None),
         "income": income_of(c, traits),
+        # le standard le ha chiunque: elencarle non distingue nessuno
+        "missionList": [
+            {"id": m, "name": gamedata.mission_name(lang, m),
+             "icon": gamedata.mission_icon(m),
+             "attribute": gamedata.mission_attribute(m), "new": False}
+            for m in sorted(missions - gamedata.base_missions(),
+                            key=lambda m: gamedata.mission_name(lang, m))],
     }
     if known:
         out["loyalty"] = attrs.get("Loyalty")
@@ -266,7 +294,6 @@ def recruits(g, lang="ita", include_hidden=False):
     best_now = {a: max([c["attributes"].get(a, 0) for c in team] or [0]) for a in ATTRS}
     strong_now = {a: sum(1 for c in team if c["attributes"].get(a, 0) >= STRONG_AT)
                   for a in ATTRS}
-    base = gamedata.base_missions()
 
     out = []
     for c in g.available_councilors():
@@ -284,13 +311,9 @@ def recruits(g, lang="ita", include_hidden=False):
         # quanti consiglieri forti su quell'attributo, prima e dopo
         v["depth"] = {a: {"now": strong_now[a], "after": strong_now[a] + 1}
                       for a in ATTRS if v["attributes"].get(a, 0) >= STRONG_AT}
-        # le missioni standard le ha chiunque: elencarle non distingue nessuno
-        v["missionList"] = [
-            {"id": m, "name": gamedata.mission_name(lang, m),
-             "icon": gamedata.mission_icon(m),
-             "attribute": gamedata.mission_attribute(m), "new": m in missing}
-            for m in sorted(set(v["missions"]) - base,
-                            key=lambda m: gamedata.mission_name(lang, m))]
+        for m in v["missionList"]:
+            m["new"] = m["id"] in missing
+        v["hireXp"] = hire_xp(v["age"])
         out.append(v)
     return out
 

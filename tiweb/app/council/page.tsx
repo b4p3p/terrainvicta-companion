@@ -4,50 +4,8 @@ import Link from "next/link";
 import { useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { AttrIcon, Empty, MissionIcon, Panel, ResourceIcon, Tag } from "@/components/ui";
-import { ATTRS, type Attr, type Councilor, type Org } from "@/lib/types";
-
-const SHORT: Record<Attr, string> = {
-  Persuasion: "PER", Investigation: "IND", Espionage: "SPI", Command: "CMD",
-  Administration: "AMM", Science: "SCI", Security: "SIC",
-};
-
-function AttrRow({ c }: { c: Councilor }) {
-  return (
-    <div className="flex gap-1.5 flex-wrap">
-      {ATTRS.map((a) => {
-        const v = c.attributes[a] ?? 0;
-        const base = c.base[a] ?? 0;
-        const bonus = v - base;
-        const strong = v >= 7;
-        return (
-          <span key={a}
-            title={bonus ? `base ${base} + ${bonus} da organizzazioni` : `base ${base}`}
-            className={`px-1.5 py-0.5 text-[11.5px] tabular-nums inline-flex
-              items-center gap-1 border
-              ${strong ? "border-good/40 bg-good/10 text-good"
-                : v <= 2 ? "border-edge bg-panel text-dim" : "border-edge bg-panel"}`}>
-            <AttrIcon attr={a} size={13} title={SHORT[a]} />
-            <span className="text-faint">{SHORT[a]}</span><b>{v}</b>
-            {bonus > 0 && <sup className="text-accent">+{bonus}</sup>}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
-function OrgLine({ o }: { o: Org }) {
-  const bits: string[] = [];
-  for (const [k, v] of Object.entries(o.income)) if (v) bits.push(`${v > 0 ? "+" : ""}${v} ${k}`);
-  for (const [k, v] of Object.entries(o.attributes)) if (v) bits.push(`+${v} ${SHORT[k as Attr]}`);
-  if (o.projectSlots) bits.push(`+${o.projectSlots} slot`);
-  return (
-    <div className="text-[12px]">
-      <span className="text-ink">{o.name}</span>{" "}
-      <span className="text-dim">{bits.join(", ") || "—"}</span>
-    </div>
-  );
-}
+import { CouncilorCard, SHORT } from "@/components/CouncilorCard";
+import type { Attr, Councilor } from "@/lib/types";
 
 export default function CouncilPage() {
   const { t, game, live } = useSettings();
@@ -96,44 +54,7 @@ export default function CouncilPage() {
       <Panel title={t.council.team}>
         <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
           {team.map((c) => (
-            <div key={c.id} className="bg-panel border border-edge rounded-lg p-3">
-              <div className="flex justify-between items-baseline gap-2">
-                <div>
-                  <span className="font-semibold text-[14px]">{c.name}</span>
-                  <span className="text-dim text-[12px] ml-2">{c.typeName}</span>
-                </div>
-                <Tag tone={(c.apparentLoyalty ?? 9) <= 6 ? "bad" : "dim"}>
-                  {t.council.loyaltyApparent} {c.apparentLoyalty ?? "?"}
-                </Tag>
-              </div>
-
-              <div className="my-2"><AttrRow c={c} /></div>
-
-              <dl className="text-[12px] grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-dim">
-                <dt>{t.council.location}</dt><dd className="text-ink">{c.location ?? "—"}</dd>
-                <dt>{t.council.nationality}</dt><dd className="text-ink">{c.nationality ?? "—"}</dd>
-                <dt>XP</dt><dd className="text-ink">{c.xp}</dd>
-                <dt>{t.council.lastMission}</dt><dd className="text-ink">{c.priorMission ?? "—"}</dd>
-              </dl>
-
-              <div className="mt-2 text-[12px]">
-                <div className="text-dim mb-0.5">{t.council.traits}</div>
-                <div className="flex gap-1 flex-wrap">
-                  {c.traits.map((tr) => <Tag key={tr.id}>{tr.name}</Tag>)}
-                </div>
-              </div>
-
-              <div className="mt-2">
-                <div className="text-dim text-[12px] mb-0.5">{t.council.orgs}</div>
-                {c.orgs.length === 0
-                  ? <div className="text-dim text-[12px]">{t.council.noOrgs}</div>
-                  : c.orgs.map((o) => <OrgLine key={o.id} o={o} />)}
-              </div>
-
-              <div className="mt-2 text-[11.5px] text-dim">
-                {c.missions.length} {t.council.missionsKnown}
-              </div>
-            </div>
+            <CouncilorCard key={c.id} c={c} variant="council" />
           ))}
 
           <Link href="/recruits"

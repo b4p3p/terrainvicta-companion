@@ -4,31 +4,10 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
-import { AttrIcon, Empty, MissionIcon, Panel, ResourceIcon, Tag, nf } from "@/components/ui";
+import { AttrIcon, Empty, Panel, ResourceIcon } from "@/components/ui";
 import { Guide } from "@/components/Guide";
-import type { Dict } from "@/lib/i18n";
-import {
-  ATTRS, type Attr, type Councilor, type Coverage, type Income, type TraitEffect,
-} from "@/lib/types";
-
-const SHORT: Record<Attr, string> = {
-  Persuasion: "PER", Investigation: "IND", Espionage: "SPI", Command: "CMD",
-  Administration: "AMM", Science: "SCI", Security: "SIC",
-};
-
-type ResLabel = "resMoney" | "resInfluence" | "resResearch" | "resOps" | "resBoost";
-
-// icone del gioco, le stesse della barra delle risorse in cima
-const RES: { key: keyof Omit<Income, "fromTraits">; label: ResLabel; tone: string; icon: string }[] = [
-  { key: "money", label: "resMoney", tone: "text-warn", icon: "ICO_currency" },
-  { key: "influence", label: "resInfluence", tone: "text-accent", icon: "ICO_influence" },
-  { key: "research", label: "resResearch", tone: "text-good", icon: "ICO_research" },
-  { key: "ops", label: "resOps", tone: "text-other", icon: "ICO_ops" },
-  { key: "boost", label: "resBoost", tone: "text-dim", icon: "ICO_boost" },
-];
-
-const RES_LABEL = Object.fromEntries(RES.map((r) => [r.key, r.label])) as
-  Record<string, ResLabel>;
+import { CouncilorCard, RES, SHORT, signed } from "@/components/CouncilorCard";
+import { ATTRS, type Attr, type Councilor, type Coverage, type Income } from "@/lib/types";
 
 const MAX_COMPARE = 3;
 
@@ -36,232 +15,6 @@ const MAX_COMPARE = 3;
  *  commensurabili, quindi non viene mai mostrata come punteggio. */
 function incomeWeight(i: Income) {
   return i.money + i.influence + i.research + i.ops + i.boost;
-}
-
-const signed = (v: number) => `${v > 0 ? "+" : ""}${nf(v, 0)}`;
-
-function IncomeLine({ income }: { income: Income }) {
-  const { t } = useSettings();
-  const parts = RES.filter((r) => income[r.key] !== 0);
-  if (parts.length === 0) return <span className="text-dim">—</span>;
-  return (
-    <span className="flex gap-2 flex-wrap">
-      {parts.map((r) => {
-        const v = income[r.key];
-        return (
-          <span key={r.key} className={`inline-flex items-center gap-1 ${v < 0 ? "text-bad" : r.tone}`}
-            title={t.recruit[r.label]}>
-            <ResourceIcon icon={r.icon} size={14} title={t.recruit[r.label]} />
-            {signed(v)} <span className="text-dim">{t.recruit[r.label]}</span>
-          </span>
-        );
-      })}
-    </span>
-  );
-}
-
-/** Un effetto del tratto in parole, col suo colore: verde aiuta, rosso costa. */
-function describe(e: TraitEffect, t: Dict): { text: string; tone: "good" | "bad" | "dim";
-  conditional?: boolean } {
-  const r = t.recruit;
-  const byValue = (v: number): "good" | "bad" | "dim" => (v > 0 ? "good" : v < 0 ? "bad" : "dim");
-  switch (e.kind) {
-    case "stat":
-      return { text: `${signed(e.value)} ${SHORT[e.stat] ?? e.stat}`,
-        tone: byValue(e.value), conditional: e.conditional };
-    case "statFixed":
-      return { text: `${e.stat} = ${e.value}`, tone: "dim", conditional: e.conditional };
-    case "loyalty":
-      return { text: `${signed(e.value)} ${r.fxLoyalty}`, tone: byValue(e.value),
-        conditional: e.conditional };
-    case "apparentLoyalty":
-      return { text: `${signed(e.value)} ${r.fxApparentLoyalty}`, tone: "dim",
-        conditional: e.conditional };
-    case "transparent":
-      return { text: r.fxTransparent, tone: "good" };
-    case "income":
-      return { text: `${signed(e.value)} ${r[RES_LABEL[e.resource]]}`, tone: byValue(e.value) };
-    case "xp":
-      // negativo = l'esperienza costa meno, quindi e' un vantaggio
-      return { text: `${r.fxXp} ${signed(e.value * 100)}%`, tone: byValue(-e.value) };
-    case "mission":
-      return { text: `${r.fxGrants} ${e.name}`, tone: "good" };
-    case "restricted":
-      return { text: `${r.fxRestricted} ${e.name}`, tone: "bad" };
-    case "rule":
-      return r.rules[e.rule]
-        ? { text: r.rules[e.rule], tone: "bad" }
-        : { text: `${r.fxRule}: ${e.rule}`, tone: "dim" };
-  }
-}
-
-const TONE = { good: "text-good", bad: "text-bad", dim: "text-dim" } as const;
-
-function Traits({ c }: { c: Councilor }) {
-  const { t } = useSettings();
-  return (
-    // un tratto per riga: nome in colonna, effetti accanto. In fila uno
-    // dietro l'altro il nome di un tratto finiva attaccato agli effetti
-    // del precedente
-    <div className="grid grid-cols-[max-content_1fr] gap-x-2.5 text-[11.5px]">
-      {c.traits.map((tr, i) => {
-        const fx = (tr.effects ?? []).map((e) => describe(e, t));
-        const line = i ? "border-t border-edge" : "";
-        return (
-          <div key={tr.id} className="contents">
-            <div className={`py-[3px] ${line}`} title={tr.description ?? undefined}>
-              <Tag>{tr.name}</Tag>
-            </div>
-            <div className={`py-[3px] ${line} flex items-center`}>
-              <span className="leading-snug">
-                {/* senza effetti leggibili resta la descrizione del gioco */}
-                {fx.length === 0 && <span className="text-faint italic">{tr.description ?? "—"}</span>}
-                {fx.map((f, j) => (
-                  <span key={j} className={TONE[f.tone]}
-                    title={f.conditional ? t.recruit.conditional : undefined}>
-                    {f.text}{f.conditional && "*"}{j < fx.length - 1 ? ", " : ""}
-                  </span>
-                ))}
-              </span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function KeyFigure({ label, value, tone, title }: {
-  label: string; value: string; tone?: "good" | "faint"; title?: string;
-}) {
-  return (
-    <div className="bg-void/40 border border-edge px-2 py-1" title={title}>
-      <div className="text-[10.5px] text-faint uppercase tracking-[.05em]">{label}</div>
-      <div className={`display text-[20px] leading-none mt-0.5 ${
-        tone === "good" ? "text-good" : tone === "faint" ? "text-faint" : "text-ink"}`}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function Candidate({ c, sortAttr, picked, canPick, onPick }: {
-  c: Councilor; sortAttr: Attr | null; picked: boolean; canPick: boolean;
-  onPick: () => void;
-}) {
-  const { t } = useSettings();
-  const gain = c.gain ?? {};
-  const weak = c.fixesWeak ?? [];
-  const depth = c.depth ?? {};
-  const missions = c.missionList ?? [];
-  const fresh = missions.filter((m) => m.new).length;
-  const depthAttrs = ATTRS.filter((a) => depth[a]);
-
-  return (
-    <div className={`bg-panel border rounded-lg p-3 ${picked ? "border-accent" : "border-edge"}`}>
-      <div className="flex justify-between items-baseline gap-2">
-        <div>
-          <span className="font-semibold text-[14px]">{c.name}</span>
-          <span className="text-dim text-[12px] ml-2">{c.typeName}</span>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <Tag tone={(c.apparentLoyalty ?? 9) <= 6 ? "bad" : "dim"}>
-            {t.council.loyaltyApparent} {c.apparentLoyalty ?? "?"}
-          </Tag>
-          <button onClick={onPick} disabled={!picked && !canPick}
-            className={`px-1.5 py-[1px] border text-[11px] disabled:opacity-40 ${
-              picked ? "border-accent text-accent bg-accent/10"
-                : "border-edge text-dim hover:text-ink"}`}>
-            {picked ? "✓ " : ""}{t.recruit.compare}
-          </button>
-        </div>
-      </div>
-
-      <div className="text-dim text-[12px] mt-0.5">
-        {c.nationality ?? "—"} · {c.location ?? "—"}
-      </div>
-
-      {/* i tre numeri che decidono: si leggono prima di tutto il resto */}
-      <div className="grid grid-cols-3 gap-[2px] mt-2">
-        <KeyFigure label={t.recruit.newMissions} tone={fresh ? "good" : "faint"}
-          value={fresh ? `+${fresh}` : "0"} title={t.recruit.missionsNewHint} />
-        <KeyFigure label={t.recruit.totalMissions} value={String(missions.length)} />
-        <KeyFigure label={t.recruit.age} value={c.age != null ? String(c.age) : "—"}
-          title={t.recruit.ageHint} />
-      </div>
-
-      {/* attributi: valore grezzo, col guadagno sul massimo del consiglio accanto */}
-      <div className="flex gap-1 flex-wrap my-2">
-        {ATTRS.map((a) => {
-          const v = c.attributes[a] ?? 0;
-          const g = gain[a] ?? 0;
-          return (
-            <span key={a}
-              className={`text-[12px] px-1.5 py-0.5 border inline-flex items-center gap-1 ${
-                g > 0 ? "border-good/40 bg-good/10" : "border-edge"} ${
-                sortAttr === a ? "outline outline-1 outline-accent" : ""}`}
-              title={g > 0 ? `+${g} sul massimo attuale del consiglio` : undefined}>
-              <AttrIcon attr={a} size={13} title={SHORT[a]} />
-              <span className="text-faint">{SHORT[a]}</span>
-              <span className={v >= 7 ? "font-semibold" : ""}>{v}</span>
-              {g > 0 && <span className="text-good ml-1">+{g}</span>}
-            </span>
-          );
-        })}
-      </div>
-
-      {(weak.length > 0 || depthAttrs.length > 0) && (
-        <div className="text-[12px] mb-1.5 flex gap-1 flex-wrap items-center">
-          {weak.length > 0 && <Tag tone="mine">{t.recruit.fixesWeak}: {weak.join(", ")}</Tag>}
-          {depthAttrs.length > 0 && (
-            <span className="text-dim" title={t.recruit.depthHint}>{t.recruit.depth}:</span>
-          )}
-          {depthAttrs.map((a) => (
-            <Tag key={a}>
-              <span className="inline-flex items-center gap-1" title={t.recruit.depthHint}>
-                <AttrIcon attr={a} size={12} title={SHORT[a]} />
-                {SHORT[a]} {depth[a]!.now} → <span className="text-good">{depth[a]!.after}</span>
-              </span>
-            </Tag>
-          ))}
-        </div>
-      )}
-
-      <div className="text-[12px] mb-1.5">
-        <div className="text-dim mb-0.5">{t.recruit.income}</div>
-        <IncomeLine income={c.income} />
-      </div>
-
-      <div className="text-[12px] mb-1.5">
-        <div className="text-dim mb-0.5" title={t.recruit.missionsNewHint}>
-          {t.recruit.missions} <span className="text-ink">({missions.length})</span>
-          {fresh > 0 && <span className="text-good"> · {fresh} {t.recruit.compareMissionsNew}</span>}
-        </div>
-        {missions.length === 0
-          ? <div className="text-dim">—</div>
-          : (
-            <div className="flex gap-1 flex-wrap">
-              {missions.map((m) => (
-                <Tag key={m.id} tone={m.new ? "mine" : "dim"}>
-                  <span className="inline-flex items-center gap-1">
-                    <MissionIcon icon={m.icon} size={16} title={m.name} />
-                    {m.name}
-                    {m.attribute && (
-                      <AttrIcon attr={m.attribute} size={12} title={SHORT[m.attribute]} />
-                    )}
-                  </span>
-                </Tag>
-              ))}
-            </div>
-          )}
-      </div>
-
-      <div className="text-[12px]">
-        <div className="text-dim mb-0.5">{t.council.traits}</div>
-        <Traits c={c} />
-      </div>
-    </div>
-  );
 }
 
 /** Tabella affiancata: una colonna per candidato, il massimo del consiglio come riferimento. */
@@ -387,6 +140,7 @@ export default function RecruitsPage() {
             t.council.hiddenLoyalty,
             list.some((c) => c.income.fromTraits) && t.recruit.incomeFromTraits,
           ] },
+          { title: t.recruit.guideAge, body: [t.recruit.guideAgeBody] },
           { title: t.recruit.compareTitle, body: [t.recruit.compareHint] },
         ]} />
       }>
@@ -419,10 +173,18 @@ export default function RecruitsPage() {
 
       <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
         {list.map((c) => (
-          <Candidate key={c.id} c={c} sortAttr={sortAttr}
-            picked={pickedIds.includes(c.id)}
-            canPick={pickedIds.length < MAX_COMPARE}
-            onPick={() => toggle(c.id)} />
+          <CouncilorCard key={c.id} c={c} variant="recruit" sortAttr={sortAttr}
+            highlighted={pickedIds.includes(c.id)}
+            action={(() => {
+              const on = pickedIds.includes(c.id);
+              return (
+                <button onClick={() => toggle(c.id)} disabled={!on && pickedIds.length >= MAX_COMPARE}
+                  className={`px-1.5 py-[1px] border text-[11px] disabled:opacity-40 ${
+                    on ? "border-accent text-accent bg-accent/10" : "border-edge text-dim hover:text-ink"}`}>
+                  {on ? "✓ " : ""}{t.recruit.compare}
+                </button>
+              );
+            })()} />
         ))}
       </div>
     </Panel>

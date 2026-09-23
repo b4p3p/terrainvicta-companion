@@ -42,6 +42,10 @@ export interface Councilor {
   xp: number;
   /** anni compiuti alla data di gioco, da dateBorn */
   age: number | null;
+  /** da quest'età il gioco può dare il tratto «In fase di declino» e ucciderlo */
+  declineAt: number;
+  /** solo sui candidati: XP che il gioco regala all'assunzione per l'età */
+  hireXp?: number;
   base: Record<Attr, number>;
   attributes: Record<Attr, number>;
   traits: Trait[];
@@ -57,8 +61,8 @@ export interface Councilor {
   fixesWeak?: string[];
   /* consiglieri forti (euristica STRONG_AT) su quell'attributo, prima e dopo */
   depth?: Partial<Record<Attr, { now: number; after: number }>>;
-  /* missioni non standard del candidato; `new` = oggi nessuno la sa fare */
-  missionList?: { id: string; name: string; icon: string | null;
+  /* missioni non standard; `new` (solo candidati) = oggi nessuno la sa fare */
+  missionList: { id: string; name: string; icon: string | null;
     attribute: Attr | null; new: boolean }[];
 }
 
