@@ -26,13 +26,15 @@ export default function CouncilPage() {
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {coverage.map((c) => (
             <div key={c.attribute}
-              className={`rounded-md px-3 py-2 border ${c.weak ? "border-bad/40" : "border-edge"} bg-panel`}>
+              className={`px-3 py-2 border ${c.weak ? "border-bad/40" : "border-edge"} bg-panel ${
+                c.used ? "" : "opacity-55"}`}>
               <div className="flex justify-between items-baseline">
                 <span className="font-semibold flex items-center gap-1.5">
                   <AttrIcon attr={c.attribute} size={16} title={c.short} />
                   {c.short}
                 </span>
-                <span className={`text-[18px] font-semibold ${c.weak ? "text-bad" : "text-accent"}`}>
+                <span className={`text-[18px] font-semibold ${
+                  c.weak ? "text-bad" : c.used ? "text-accent" : "text-dim"}`}>
                   {c.max}
                 </span>
               </div>
@@ -40,11 +42,16 @@ export default function CouncilPage() {
                 <div className="h-full rounded-full"
                   style={{
                     width: `${(c.max / maxTotal) * 100}%`,
-                    background: c.weak ? "var(--bad)" : "var(--accent)",
+                    background: c.weak ? "var(--bad)" : c.used ? "var(--accent)" : "var(--ink-faint)",
                   }} />
               </div>
               <div className="text-[11.5px] text-dim">
                 {c.weak ? t.council.weak : `${t.council.best}: ${c.best?.name ?? "—"}`}
+              </div>
+              <div className="text-[11px] text-faint mt-0.5" title={t.council.useHint}>
+                {c.used
+                  ? t.council.use.replace("{a}", String(c.attack)).replace("{d}", String(c.defense))
+                  : t.council.unused}
               </div>
             </div>
           ))}

@@ -102,6 +102,11 @@ export interface Coverage {
   best: { name: string; value: number } | null;
   total: number;
   max: number;
+  /** missioni del giocatore che lo usano: in attacco (chi la fa) e in difesa */
+  attack: number;
+  defense: number;
+  /** false = nessuna missione lo usa (oggi la Scienza): non può essere un buco */
+  used: boolean;
   weak: boolean;
 }
 

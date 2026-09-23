@@ -76,6 +76,12 @@ def can_hold(org, nationality, traits):
 # sotto questa soglia nessuno del consiglio e' credibile su un attributo
 WEAK_AT = 4
 
+
+def used_attr(a):
+    """True se almeno una missione del giocatore usa l'attributo."""
+    u = gamedata.attribute_use()[a]
+    return bool(u["attack"] or u["defense"])
+
 # da questa soglia in su un consigliere e' una scelta seria per le missioni che
 # tirano su quell'attributo. Euristica nostra, non del gioco: serve a contare
 # quanti tentativi paralleli il consiglio puo' fare, non a dare un voto.
@@ -233,9 +239,11 @@ def analyse(g, lang="ita"):
 
     # punti di forza e debolezza per attributo
     coverage = {}
+    use = gamedata.attribute_use()
     for a in ATTRS:
         best = max(team, key=lambda c: c["attributes"].get(a, 0)) if team else None
         vals = [c["attributes"].get(a, 0) for c in team]
+        used = bool(use[a]["attack"] or use[a]["defense"])
         coverage[a] = {
             "attribute": a,
             "short": ATTR_SHORT[a],
@@ -243,7 +251,12 @@ def analyse(g, lang="ita"):
                     if best else None,
             "total": sum(vals),
             "max": max(vals) if vals else 0,
-            "weak": (max(vals) if vals else 0) < WEAK_AT,
+            "attack": use[a]["attack"],
+            "defense": use[a]["defense"],
+            "used": used,
+            # debole solo se serve: un attributo che nessuna missione usa non
+            # e' un buco, anche a zero
+            "weak": used and (max(vals) if vals else 0) < WEAK_AT,
         }
 
     have = set()
@@ -307,7 +320,7 @@ def recruits(g, lang="ita", include_hidden=False):
         # WEAK_AT: sotto questa soglia nessuno del consiglio e' credibile
         v["fixesWeak"] = sorted(
             ATTR_SHORT[a] for a in ATTRS
-            if best_now[a] < WEAK_AT <= v["attributes"].get(a, 0))
+            if best_now[a] < WEAK_AT <= v["attributes"].get(a, 0) and used_attr(a))
         # quanti consiglieri forti su quell'attributo, prima e dopo
         v["depth"] = {a: {"now": strong_now[a], "after": strong_now[a] + 1}
                       for a in ATTRS if v["attributes"].get(a, 0) >= STRONG_AT}

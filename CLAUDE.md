@@ -131,6 +131,18 @@ con `isAI == false`.
 - Le **tecnologie** sono globali (le prendono tutte le fazioni), i **progetti** no.
 - Gli **stati separatisti non ancora nati** hanno punti di controllo ma PIL e coesione a
   zero: vanno filtrati o falsano ogni classifica.
+- **Attributi e missioni** (`gamedata.attribute_use()`): la **Scienza non la usa nessuna
+  missione umana**, né in attacco né in difesa (solo due missioni aliene). La
+  **Sicurezza** non tira mai ma difende da ~10 missioni nemiche. Un attributo che nessuna
+  missione usa non è un «buco» del consiglio.
+- **Età dei consiglieri** (IL di `TIGlobalConfig`/`TIFactionState`): all'assunzione
+  +2 XP per anno oltre i 30; da **65** anni `AgeCouncilors` può dare il tratto
+  «In fase di declino» (−1 IND, −1 CMD) e poi uccidere, con probabilità crescente.
+  Il 65 non compare nei testi del gioco: è una regola letta dal codice, non stato
+  nascosto della partita.
+- **Costo di reclutamento**: 60 influenza; 30 se il tipo ha affinità con la fazione
+  (`affinities` in `TICouncilorTypeTemplate`: l'Agente sul campo con la Resistenza),
+  120 se ha anti-affinità.
 - **Identità di una partita**: `TIGlobalValuesState.realWorldCampaignStart` è l'ora
   reale in cui la campagna è stata avviata — stabile per tutti i salvataggi della
   stessa partita, diversa fra partite. È l'unico modo per distinguerle: fazione e

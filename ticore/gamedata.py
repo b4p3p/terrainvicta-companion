@@ -152,6 +152,33 @@ def mission_attribute(data_name):
     return None
 
 
+_ATTRS = ("Persuasion", "Investigation", "Espionage", "Command",
+          "Administration", "Science", "Security")
+
+
+@lru_cache(maxsize=1)
+def attribute_use():
+    """Per ogni attributo, quante missioni del giocatore lo usano in attacco
+    (il consigliere che la fa) e in difesa (contro chi la subisce).
+
+    Letto dai modificatori di risoluzione. Serve a non chiamare «debole» un
+    attributo che nessuna missione usa: la Scienza, verificato sui template,
+    non compare in nessuna missione umana, ne' in attacco ne' in difesa (solo
+    in due missioni aliene); la Sicurezza non tira mai, ma difende da una
+    decina di missioni nemiche.
+    """
+    ms = templates()["missions"]
+    out = {a: {"attack": 0, "defense": 0} for a in _ATTRS}
+    for k in player_missions():
+        rm = (ms.get(k) or {}).get("resolutionMethod") or {}
+        for side, key in (("attack", "attackingModifiers"), ("defense", "defendingModifiers")):
+            txt = json.dumps(rm.get(key) or [])
+            for a in _ATTRS:
+                if '"%s"' % a in txt:
+                    out[a][side] += 1
+    return out
+
+
 def mission_cost(data_name):
     """(risorsa, valore) — valore None se scala col bersaglio."""
     t = templates()["missions"].get(data_name) or {}
