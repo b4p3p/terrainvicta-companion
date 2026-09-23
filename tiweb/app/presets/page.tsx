@@ -101,15 +101,20 @@ function Row({ p, base, t, knowledge, onEdit, onDuplicate, isDefault }: {
         </span>
       </div>
 
-      {compare ? (
-        /* le due barre una sopra l'altra, stessa scala: il confronto si vede
-           prima di leggere un numero */
+      {base ? (
+        /* col confronto acceso tutte le righe usano la stessa griglia, anche
+           quella del riferimento: così le barre partono tutte dallo stesso
+           punto e si confrontano a colpo d'occhio, a pari scala */
         <div className="mt-1.5 grid grid-cols-[150px_1fr] gap-x-2 gap-y-[3px]
                         items-center text-[11px]">
           <span className="text-dim truncate">{p.name}</span>
           <ShareBar p={p} weightLabel={t.weight} />
-          <span className="text-faint truncate">{base.name}</span>
-          <div className="opacity-60"><ShareBar p={base} height={8} weightLabel={t.weight} /></div>
+          {compare && (
+            <>
+              <span className="text-faint truncate">{base.name}</span>
+              <div className="opacity-60"><ShareBar p={base} height={8} weightLabel={t.weight} /></div>
+            </>
+          )}
         </div>
       ) : (
         <div className="mt-1.5"><ShareBar p={p} weightLabel={t.weight} /></div>
