@@ -28,6 +28,8 @@ from . import gamedata, paths
 
 TEMPLATE = "TIPriorityPresetTemplate.json"
 PREFIX = "TIC_"                 # marca le voci nostre: mai toccare le altre
+USER_PREFIX = PREFIX + "U_"     # ...e fra le nostre, quelle create dall'utente
+MARK = "- "                     # davanti al nome, solo nella lista del gioco
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _SOURCE = os.path.join(_REPO, "assets", "presets", TEMPLATE)
 
@@ -73,24 +75,127 @@ def analyse(preset):
     }
 
 
-def custom():
-    """I preset che il companion sa installare."""
+def shipped():
+    """I preset distribuiti col progetto."""
     try:
         return _read(_SOURCE)
     except (OSError, ValueError):
         return []
 
 
-def view(preset, lang="ita", installed=False):
+def user_file():
+    return os.path.join(paths.data_dir(), "presets.json")
+
+
+def user():
+    """I preset creati dall'utente: suoi, quindi fuori dal repo."""
+    try:
+        data = _read(user_file())
+    except (OSError, ValueError):
+        return []
+    return [o for o in data if isinstance(o, dict)
+            and str(o.get("dataName", "")).startswith(USER_PREFIX)]
+
+
+def custom():
+    """I preset che il companion sa installare: distribuiti piu' personali."""
+    return shipped() + user()
+
+
+def view(preset, lang="ita", installed=False, stale=False):
     name = gamedata.loc(lang, "TIPriorityPresetTemplate", "displayName",
                         preset["dataName"],
                         preset.get("friendlyName") or preset["dataName"])
-    return dict(analyse(preset),
+    mine = preset["dataName"].startswith(PREFIX)
+    if mine and name.startswith(MARK):
+        name = name[len(MARK):]           # il trattino serve solo in partita
+    a = analyse(preset)
+    order = list(gamedata.PRIORITIES)
+    rank = {k: i for i, k in enumerate(order)}
+    prio = sorted(a["weights"].items(),
+                  key=lambda kv: (-kv[1], rank.get(kv[0], len(order))))
+    return dict(a,
                 id=preset["dataName"],
                 name=name,
                 faction=preset.get("factionName"),
-                mine=preset["dataName"].startswith(PREFIX),
-                installed=installed)
+                mine=mine,
+                editable=preset["dataName"].startswith(USER_PREFIX),
+                installed=installed,
+                stale=stale,
+                priorities=[dict(gamedata.priority_view(lang, k), weight=w,
+                                 share=w / a["total"]) for k, w in prio])
+
+
+def catalog(lang="ita"):
+    """Tutte le priorita' che un preset puo' accendere, nell'ordine del gioco."""
+    return [gamedata.priority_view(lang, k) for k in gamedata.PRIORITIES]
+
+
+def _slug(text):
+    out = "".join(c if c.isalnum() else "_" for c in text.strip())
+    return "_".join(p for p in out.split("_") if p)[:40] or "Preset"
+
+
+def save_user(name, weights, data_name=None):
+    """Crea o aggiorna un preset dell'utente. Torna la voce scritta.
+
+    I pesi validi sono 1-3; 0 o assente spegne la priorita', come nel gioco.
+    """
+    name = (name or "").strip()
+    if not name:
+        raise ValueError("Il preset deve avere un nome.")
+    clean = {}
+    for k, v in (weights or {}).items():
+        if k not in gamedata.PRIORITIES:
+            raise ValueError("Priorita' sconosciuta: %s" % k)
+        try:
+            v = int(v)
+        except (TypeError, ValueError):
+            raise ValueError("Peso non numerico per %s" % k)
+        if not 0 <= v <= 3:
+            raise ValueError("Il peso di %s deve stare fra 0 e 3" % k)
+        if v:
+            clean[k] = v
+    if not clean:
+        raise ValueError("Il preset deve accendere almeno una priorita'.")
+
+    mine = user()
+    if data_name:
+        if not any(o["dataName"] == data_name for o in mine):
+            raise KeyError(data_name)
+    else:
+        taken = {o["dataName"] for o in custom()}
+        base = USER_PREFIX + _slug(name)
+        data_name, i = base, 2
+        while data_name in taken:
+            data_name, i = "%s_%d" % (base, i), i + 1
+
+    entry = {"dataName": data_name, "friendlyName": MARK + name,
+             "nationalAIOption": False}
+    # nell'ordine del gioco, cosi' il file resta leggibile
+    for k in gamedata.PRIORITIES:
+        if k in clean:
+            entry[k + "Setting"] = clean[k]
+
+    out = [o for o in mine if o["dataName"] != data_name]
+    at = next((i for i, o in enumerate(mine) if o["dataName"] == data_name),
+              len(out))
+    out.insert(at, entry)
+    _write_user(out)
+    return entry
+
+
+def delete_user(data_name):
+    mine = user()
+    kept = [o for o in mine if o["dataName"] != data_name]
+    if len(kept) == len(mine):
+        raise KeyError(data_name)
+    _write_user(kept)
+
+
+def _write_user(data):
+    os.makedirs(paths.data_dir(), exist_ok=True)
+    _write_atomic(user_file(), data)
 
 
 def status(lang="ita"):
@@ -105,14 +210,21 @@ def status(lang="ita"):
         return {"ok": False, "error": str(e), "path": path,
                 "presets": [], "pending": []}
 
-    have = {o.get("dataName") for o in data}
+    have = {o.get("dataName"): o for o in data}
     # solo i preset del giocatore: le opzioni dell'AI nazionale non si scelgono.
     # I nostri restano fuori: hanno gia' la loro sezione, e una volta installati
     # comparirebbero due volte.
     listed = [view(o, lang, installed=True) for o in data
               if not o.get("nationalAIOption")
               and not str(o.get("dataName", "")).startswith(PREFIX)]
-    pending = [view(o, lang, installed=o["dataName"] in have) for o in custom()]
+    ours = custom()
+    # `stale`: nel gioco c'e' una versione diversa, va reinstallato
+    pending = [view(o, lang, installed=o["dataName"] in have,
+                    stale=o["dataName"] in have and have[o["dataName"]] != o)
+               for o in ours]
+    # voci nostre rimaste nel gioco dopo che l'utente le ha cancellate
+    names = {o["dataName"] for o in ours}
+    orphans = [n for n in have if str(n).startswith(PREFIX) and n not in names]
     return {
         "ok": True,
         "error": None,
@@ -120,6 +232,8 @@ def status(lang="ita"):
         "writable": os.access(path, os.W_OK),
         "backup": os.path.isfile(path + ".ti-companion.bak"),
         "installed": sum(1 for p in pending if p["installed"]),
+        "stale": sum(1 for p in pending if p["stale"]) + len(orphans),
+        "priorities": catalog(lang),
         "presets": listed,
         "pending": pending,
     }
@@ -128,8 +242,9 @@ def status(lang="ita"):
 def install(lang="ita"):
     """Aggiunge i nostri preset al template del gioco. Idempotente.
 
-    Non modifica nessuna voce esistente: sostituisce solo quelle col nostro
-    prefisso e aggiunge le mancanti in coda.
+    Non tocca nessuna voce altrui: sostituisce quelle col nostro prefisso,
+    aggiunge le mancanti in coda e toglie le nostre che non esistono piu'
+    (preset personali cancellati dall'utente).
     """
     path = template_file()
     if not path:
@@ -142,6 +257,12 @@ def install(lang="ita"):
     backup = path + ".ti-companion.bak"
     if not os.path.isfile(backup):
         shutil.copy2(path, backup)
+
+    wanted = {p.get("dataName") for p in mine}
+    before = len(data)
+    data = [o for o in data if not str(o.get("dataName", "")).startswith(PREFIX)
+            or o.get("dataName") in wanted]
+    removed = before - len(data)
 
     by_name = {o["dataName"]: i for i, o in enumerate(data) if o.get("dataName")}
     added = updated = 0
@@ -156,7 +277,8 @@ def install(lang="ita"):
             added += 1
 
     _write_atomic(path, data)
-    return {"added": added, "updated": updated, "backup": backup}
+    return {"added": added, "updated": updated, "removed": removed,
+            "backup": backup}
 
 
 def restore():

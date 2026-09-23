@@ -160,6 +160,44 @@ def restore_presets(lang: str = Query(None)):
     return dict(res, status=presets.status(lang or state.lang))
 
 
+class PresetIn(BaseModel):
+    name: str
+    weights: dict[str, int]
+
+
+@app.post("/api/presets/custom")
+def create_preset(p: PresetIn, lang: str = Query(None)):
+    """Nuovo preset personale, in ~/.terrainvicta-companion/presets.json.
+
+    Non tocca il gioco: per portarlo in partita serve reinstallare.
+    """
+    try:
+        entry = presets.save_user(p.name, p.weights)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"id": entry["dataName"], "status": presets.status(lang or state.lang)}
+
+
+@app.put("/api/presets/custom/{data_name}")
+def update_preset(data_name: str, p: PresetIn, lang: str = Query(None)):
+    try:
+        presets.save_user(p.name, p.weights, data_name)
+    except KeyError:
+        raise HTTPException(404, "Preset personale non trovato.")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"id": data_name, "status": presets.status(lang or state.lang)}
+
+
+@app.delete("/api/presets/custom/{data_name}")
+def delete_preset(data_name: str, lang: str = Query(None)):
+    try:
+        presets.delete_user(data_name)
+    except KeyError:
+        raise HTTPException(404, "Preset personale non trovato.")
+    return {"status": presets.status(lang or state.lang)}
+
+
 @app.get("/api/icons/{bundle}/{name}.png")
 def game_icon(bundle: str, name: str):
     """Icona di una missione.

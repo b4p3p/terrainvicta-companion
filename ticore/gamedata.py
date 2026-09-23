@@ -176,6 +176,54 @@ def resource_view(lang, key):
             "icon": RESOURCE_ICONS.get(key)}
 
 
+# Priorita' nazionali: campo `<chiave>Setting` di TIPriorityPresetTemplate ->
+# (voce di PriorityType, icona in icons_2d). Nell'ordine del gioco.
+#
+# I nomi dei campi non dicono tutto: `spaceProgram` sono i Finanziamenti,
+# `boost` la Capacita' di lancio, `initNuclearWeapons` lo sviluppo della bomba
+# e `nuclearProgram` la costruzione delle testate. Verificato sull'IL di
+# `TIPriorityPresetTemplate.SetAllPresets`, che assegna ogni campo all'indice
+# `PriorityType - 1`.
+PRIORITIES = {
+    "economy": ("Economy", "ICO_economy_priority"),
+    "welfare": ("Welfare", "ICO_welfare_priority"),
+    "environment": ("Environment", "ICO_environment_priority"),
+    "knowledge": ("Knowledge", "ICO_knowledge_priority"),
+    "government": ("Government", "ICO_government_priority"),
+    "unity": ("Unity", "ICO_unity_priority"),
+    "oppression": ("Oppression", "ICO_oppression_priority"),
+    "spaceProgram": ("Funding", "ICO_funding_priority"),
+    "spoils": ("Spoils", "ICO_spoils_priority"),
+    "initSpaceProgram": ("Civilian_InitiateSpaceflightProgram",
+                         "ICO_spaceflightProgram_priority"),
+    "boost": ("LaunchFacilities", "ICO_launchFacilities_Priority"),
+    "missionControl": ("MissionControl", "ICO_missionControl_priority"),
+    "foundMilitary": ("Military_FoundMilitary", "ICO_found_military_priority"),
+    "military": ("Military", "ICO_military_priority"),
+    "army": ("Military_BuildArmy", "ICO_buildArmy_priority"),
+    "navy": ("Military_BuildNavy", "ICO_buildNavy_priority"),
+    "initNuclearWeapons": ("Military_InitiateNuclearProgram",
+                           "ICO_develop_atomic_bomb_priority"),
+    "nuclearProgram": ("Military_BuildNuclearWeapons",
+                       "ICO_buildNuclearWeapons_priority"),
+    "spaceDefense": ("Military_BuildSpaceDefenses",
+                     "ICO_buildSpaceDefenses_priority"),
+    "sto": ("Military_BuildSTOSquadron", "ICO_buildSTOSquadron_priority"),
+}
+
+
+def priority_name(lang, key):
+    """Nome in partita di una priorita', da `UI.Nation.Priority_<tipo>`."""
+    kind = PRIORITIES.get(key, (key, None))[0]
+    return loc(lang, "UI", "Nation", "Priority_" + kind, key)
+
+
+def priority_view(lang, key):
+    kind, icon = PRIORITIES.get(key, (key, None))
+    return {"id": key, "type": kind, "name": priority_name(lang, key),
+            "icon": icon}
+
+
 def trait_name(lang, data_name):
     t = templates()["traits"].get(data_name) or {}
     return loc(lang, "TITraitTemplate", "displayName", data_name,
