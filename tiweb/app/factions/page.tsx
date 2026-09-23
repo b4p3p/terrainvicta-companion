@@ -27,9 +27,52 @@ interface Faction {
   };
 }
 
+/** Fazione mai contattata: l'API non manda nome, colore né id veri. */
+interface Unknown { id: string; unknown: true }
+type Column = Faction | Unknown;
+const isUnknown = (c: Column): c is Unknown => "unknown" in c;
+
 interface Compare {
   gates: Record<Field, Gate>;
-  factions: Faction[];
+  factions: Column[];
+}
+
+/** Lunghezze pseudo-casuali ma stabili: la censura non deve tremare a ogni
+ *  ricaricamento, e due celle vicine non devono sembrare fotocopie. */
+function bars(seed: string, n: number) {
+  let h = 2166136261;
+  for (const c of seed) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return Array.from({ length: n }, (_, i) => 38 + (((h >>> (i * 5)) & 31) * 55) / 31);
+}
+
+/** Cella di un dossier riservato: barre di censura al posto dei dati. */
+function Redacted({ seed, lines = 1 }: { seed: string; lines?: number }) {
+  const { t } = useSettings();
+  return (
+    <div className="flex flex-col gap-[5px] py-[3px]" title={t.factions.noContact}
+      aria-label={t.factions.noContact}>
+      {bars(seed, lines).map((w, i) => (
+        <span key={i} className="redacted block h-[10px]" style={{ width: `${w}%` }} />
+      ))}
+    </div>
+  );
+}
+
+/** Intestazione del dossier: niente nome, un timbro e un numero di pratica. */
+function DossierHeader({ n, total }: { n: number; total: number }) {
+  const { t } = useSettings();
+  return (
+    <div className="relative pl-2 border-l-2 border-dashed border-edge-lit">
+      <div className="flex items-center gap-1.5">
+        <span className="dossier-glyph display text-[13px] text-dim">?</span>
+        <span className="redacted inline-block h-[11px] w-[88px]" />
+      </div>
+      <div className="text-faint text-[10.5px] mt-1 tracking-[.08em] uppercase">
+        {t.factions.file} {String(n).padStart(2, "0")}/{String(total).padStart(2, "0")}
+      </div>
+      <span className="dossier-stamp display">{t.factions.classified}</span>
+    </div>
+  );
 }
 
 /** Cella chiusa: dire che non si sa, e quanto manca, è informazione anch'esso. */
@@ -43,14 +86,20 @@ function Locked({ f, gate }: { f: Faction; gate: Gate }) {
   );
 }
 
-function Row({ label, factions, field, render }: {
-  label: ReactNode; factions: Faction[]; field: Field;
+function Row({ label, factions, field, render, lines, seed }: {
+  label: ReactNode; factions: Column[]; field: Field;
   render: (f: Faction) => ReactNode;
+  /** righe di censura nelle colonne sconosciute */
+  lines?: number; seed: string;
 }) {
   return (
     <tr className="border-t border-edge align-top">
       <th className="text-left font-normal text-dim py-1.5 pr-3 whitespace-nowrap">{label}</th>
-      {factions.map((f) => (
+      {factions.map((f) => isUnknown(f) ? (
+        <td key={f.id} className="py-1.5 px-3 dossier">
+          <Redacted seed={`${seed}-${f.id}`} lines={lines} />
+        </td>
+      ) : (
         <td key={f.id} className={`py-1.5 px-3 ${f.mine ? "bg-sel/40" : ""}`}>
           {f.locked[field] ? <Locked f={f} gate={f.locked[field]!} /> : render(f)}
         </td>
@@ -65,7 +114,9 @@ export default function FactionsPage() {
   if (error) return <Empty>{error}</Empty>;
   if (!data) return <Empty>{t.common.loading}</Empty>;
   const fs = data.factions;
-  const resIds = fs.find((f) => f.resources)?.resources?.map((r) => r) ?? [];
+  const known = fs.filter((f): f is Faction => !isUnknown(f));
+  const resIds = known.find((f) => f.resources)?.resources ?? [];
+  const unknownIds = fs.filter(isUnknown).map((f) => f.id);
 
   return (
     <Panel title={t.factions.title}
@@ -92,7 +143,11 @@ export default function FactionsPage() {
           <thead>
             <tr>
               <th />
-              {fs.map((f) => (
+              {fs.map((f) => isUnknown(f) ? (
+                <th key={f.id} className="text-left px-3 pb-2 pt-1 font-normal dossier">
+                  <DossierHeader n={known.length + unknownIds.indexOf(f.id) + 1} total={fs.length} />
+                </th>
+              ) : (
                 <th key={f.id} className={`text-left px-3 pb-2 font-normal ${f.mine ? "bg-sel/40" : ""}`}>
                   <div className="display text-[13px] uppercase tracking-[.04em] border-l-2 pl-2"
                     style={{ borderColor: f.colors?.accent ?? "var(--edge-lit)" }}>
@@ -112,7 +167,7 @@ export default function FactionsPage() {
           </thead>
           <tbody>
             {resIds.map((r) => (
-              <Row key={r.id} field="resources" factions={fs}
+              <Row key={r.id} field="resources" factions={fs} seed={r.id}
                 label={<span className="inline-flex items-center gap-1.5">
                   <ResourceIcon icon={r.icon} size={14} />{r.name}
                 </span>}
@@ -130,9 +185,9 @@ export default function FactionsPage() {
                   );
                 }} />
             ))}
-            <Row field="unassignedOrgs" factions={fs} label={t.factions.fields.unassignedOrgs}
+            <Row field="unassignedOrgs" factions={fs} seed="orgs" label={t.factions.fields.unassignedOrgs}
               render={(f) => f.unassignedOrgs ?? 0} />
-            <Row field="objectives" factions={fs} label={t.factions.fields.objectives}
+            <Row field="objectives" factions={fs} seed="obj" lines={4} label={t.factions.fields.objectives}
               render={(f) => (
                 <div className="text-[11.5px]">
                   <div className="text-faint mb-0.5">
@@ -145,7 +200,7 @@ export default function FactionsPage() {
                   </ul>
                 </div>
               )} />
-            <Row field="projects" factions={fs} label={t.factions.fields.projects}
+            <Row field="projects" factions={fs} seed="proj" lines={3} label={t.factions.fields.projects}
               render={(f) => (
                 <div className="text-[11.5px]">
                   <div className="text-dim mb-0.5">{t.factions.finished}: {f.projects!.finished}</div>

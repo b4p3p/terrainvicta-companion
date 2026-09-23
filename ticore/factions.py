@@ -117,18 +117,24 @@ def _view(g, f, lang, level, highest, mine):
 def compare(g, lang="ita"):
     """La nostra fazione e quelle che conosciamo, nell'ordine del gioco.
 
-    Una fazione compare solo se l'abbiamo incontrata: `highestIntel` > 0.
-    Quelle mai contattate non esistono, per il giocatore, e qui nemmeno.
+    Una fazione compare coi suoi dati solo se l'abbiamo incontrata:
+    `highestIntel` > 0. Le altre sono segnaposto senza identita'.
     """
     now = _intel_map(g.me, "intel")
     top = _intel_map(g.me, "highestIntel")
     out = [_view(g, g.me, lang, 1.0, 1.0, True)]
+    unknown = 0
     for fid, f in g.factions.items():
         if f is g.me or f.get("defeated"):
             continue
         highest = top.get(fid, 0)
         if highest <= 0:
+            unknown += 1
             continue
         out.append(_view(g, f, lang, now.get(fid, 0), highest, False))
+    # Le mai contattate diventano segnaposto anonimi: si sa che esistono (il
+    # consiglio e' di otto, lo dice la schermata iniziale del gioco) ma non
+    # chi sono. Niente nome, colore o id: nemmeno l'API li espone.
+    out += [{"id": "unknown-%d" % i, "unknown": True} for i in range(unknown)]
     return {"gates": {k: {"need": v[0], "measure": v[1]} for k, v in GATES.items()},
             "factions": out}

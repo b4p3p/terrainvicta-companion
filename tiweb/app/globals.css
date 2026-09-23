@@ -144,6 +144,34 @@ button:focus-visible, a:focus-visible {
 
 ::selection { background: var(--sel-edge); color: var(--void); }
 
+/* Dossier riservato: le fazioni mai contattate nella scheda Fazioni.
+   Cartellina a strisce, barre di censura, timbro storto. */
+.dossier {
+  background: repeating-linear-gradient(135deg,
+    transparent 0 9px, rgba(255, 255, 255, .018) 9px 18px);
+}
+.redacted {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 3px, rgba(255, 255, 255, .025) 3px 4px),
+    #05090b;
+  outline: 1px solid #0d1519; outline-offset: -1px;
+}
+.dossier-stamp {
+  position: absolute; right: -2px; top: -2px;
+  transform: rotate(-9deg);
+  border: 1.5px solid color-mix(in oklab, var(--bad), transparent 35%);
+  color: color-mix(in oklab, var(--bad), transparent 25%);
+  font-size: 9.5px; letter-spacing: .14em; padding: 0 5px; line-height: 15px;
+  text-transform: uppercase; pointer-events: none;
+  mix-blend-mode: screen;
+}
+.dossier-glyph { animation: dossier-flicker 4.2s steps(1) infinite; }
+@keyframes dossier-flicker {
+  0%, 91%, 96%, 100% { opacity: 1; }
+  93%  { opacity: .25; }
+  98%  { opacity: .55; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: .01ms !important; animation: none !important; }
 }
