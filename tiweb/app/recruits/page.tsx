@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { AttrIcon, Empty, MissionIcon, Panel, Tag, nf } from "@/components/ui";
+import { Guide } from "@/components/Guide";
 import type { Dict } from "@/lib/i18n";
 import {
   ATTRS, type Attr, type Councilor, type Coverage, type Income, type TraitEffect,
@@ -334,7 +335,20 @@ export default function RecruitsPage() {
     active ? "border-accent text-accent bg-accent/10" : "border-edge text-dim hover:text-ink"}`;
 
   return (
-    <Panel title={t.recruit.title} sub={t.recruit.sub}>
+    <Panel title={t.recruit.title} sub={t.recruit.sub}
+      right={
+        // le note di metodo stanno qui: sopra le schede occupavano mezza pagina
+        <Guide title={t.recruit.title} sections={[
+          { title: t.recruit.guideRead, body: [
+            t.recruit.heuristic, t.recruit.depthHint, t.recruit.traitsHint,
+          ] },
+          { title: t.recruit.guideHidden, body: [
+            t.council.hiddenLoyalty,
+            list.some((c) => c.income.fromTraits) && t.recruit.incomeFromTraits,
+          ] },
+          { title: t.recruit.compareTitle, body: [t.recruit.compareHint] },
+        ]} />
+      }>
       <div className="flex items-center gap-2 mb-3 text-[12px] flex-wrap">
         <Link href="/council" className="text-accent hover:underline">
           ← {t.recruit.backToCouncil}
@@ -356,18 +370,10 @@ export default function RecruitsPage() {
         ))}
       </div>
 
-      <p className="text-dim text-[11.5px] mb-3">{t.recruit.heuristic}</p>
-      <p className="text-dim text-[11.5px] mb-3">{t.council.hiddenLoyalty}</p>
-      <p className="text-dim text-[11.5px] mb-3">{t.recruit.traitsHint}</p>
-      <p className="text-dim text-[11.5px] mb-3">{t.recruit.depthHint}</p>
-      {list.some((c) => c.income.fromTraits) && (
-        <p className="text-dim text-[11.5px] mb-3">{t.recruit.incomeFromTraits}</p>
+      {picked.length > 0 && (
+        <Compare picked={picked} coverage={snap.council.coverage}
+          onClear={() => setPickedIds([])} />
       )}
-
-      {picked.length > 0
-        ? <Compare picked={picked} coverage={snap.council.coverage}
-            onClear={() => setPickedIds([])} />
-        : <p className="text-dim text-[11.5px] mb-3">{t.recruit.compareHint}</p>}
 
       <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
         {list.map((c) => (

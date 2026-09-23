@@ -169,21 +169,21 @@ export default function FactionsPage() {
   return (
     <Panel title={t.factions.title}
       right={
-        <Guide title={t.factions.title} label={t.presets.guide}>
-          <p>{t.factions.guideIntro}</p>
-          <h4>{t.factions.guideGatesTitle}</h4>
-          <p>{t.factions.guideGates}</p>
-          <ul className="mb-3 list-disc pl-5">
-            {(Object.keys(data.gates) as Field[]).map((k) => (
-              <li key={k}>
-                {t.factions.fields[k]}: {nf(data.gates[k].need, 2)} ·{" "}
-                {data.gates[k].measure === "highest" ? t.factions.measureHighest : t.factions.measureNow}
-              </li>
-            ))}
-          </ul>
-          <h4>{t.factions.guideIncomeTitle}</h4>
-          <p>{t.factions.guideIncome}</p>
-        </Guide>
+        <Guide title={t.factions.title} sections={[
+          { body: [t.factions.guideIntro] },
+          { title: t.factions.guideGatesTitle, body: [
+            t.factions.guideGates,
+            <ul key="g" className="list-disc pl-5">
+              {(Object.keys(data.gates) as Field[]).map((k) => (
+                <li key={k}>
+                  {t.factions.fields[k]}: {nf(data.gates[k].need, 2)} ·{" "}
+                  {data.gates[k].measure === "highest" ? t.factions.measureHighest : t.factions.measureNow}
+                </li>
+              ))}
+            </ul>,
+          ] },
+          { title: t.factions.guideIncomeTitle, body: [t.factions.guideIncome] },
+        ]} />
       }>
       <p className="text-faint text-[11.5px] mb-3">{t.factions.sub}</p>
 

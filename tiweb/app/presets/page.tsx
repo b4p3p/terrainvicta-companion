@@ -326,18 +326,15 @@ export default function PresetsPage() {
     <>
       <Panel title={t.title}
         right={
-          <Guide title={t.title} label={t.guide}>
-            <h4>{t.guideWhyTitle}</h4>
-            <p>{t.why}</p>
-            <h4>{t.guideAchTitle}</h4>
-            <p>{t.achievements}</p>
-            <h4>{t.guideReadTitle}</h4>
-            <p>{t.familiesHint}</p>
-            <p>{t.compareHint}</p>
-            <h4>{t.guideEditTitle}</h4>
-            <p>{t.editorHint}</p>
-            <p className="break-all text-faint">{t.file}: {st.path}</p>
-          </Guide>
+          <Guide title={t.title} sections={[
+            { title: t.guideWhyTitle, body: [t.why] },
+            { title: t.guideAchTitle, body: [t.achievements] },
+            { title: t.guideReadTitle, body: [t.familiesHint, t.compareHint] },
+            { title: t.guideEditTitle, body: [
+              t.editorHint,
+              <span key="f" className="break-all text-faint">{t.file}: {st.path}</span>,
+            ] },
+          ]} />
         }>
         <p className="text-warn text-[12px] mb-3">{t.achievementsShort}</p>
 

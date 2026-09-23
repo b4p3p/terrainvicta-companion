@@ -8,6 +8,7 @@ import { usePersistentState } from "@/lib/persist";
 import {
   Column, DataTable, Empty, GameIcon, Panel, Spark, Tag, TrendArrow, bn, nf, pct,
 } from "@/components/ui";
+import { Guide } from "@/components/Guide";
 import type { Nation, NationTrends, TrendKey } from "@/lib/types";
 
 const SCOPES = ["all", "eu", "mine", "full", "partial", "free", "contested"] as const;
@@ -253,7 +254,6 @@ function Detail({ name, series, onClose }: {
           <h3 className="display text-[12px] uppercase tracking-[.06em] text-dim mt-4 mb-1">
             {t.nations.why}
           </h3>
-          <p className="text-faint text-[11.5px] mb-2">{t.nations.whyHint}</p>
           <Reasons d={why} />
         </>
       )}
@@ -376,7 +376,16 @@ export default function NationsPage() {
   const detail = selected ? trends?.nations[selected] : undefined;
 
   return (
-    <Panel title={t.nations.title} sub={`${rows.length} / ${snap.nations.length}`}>
+    <Panel title={t.nations.title} sub={`${rows.length} / ${snap.nations.length}`}
+      right={
+        <Guide title={t.nations.title} sections={[
+          { title: t.nations.guideTrends, body: [
+            t.nations.trendHint.replace("{n}", String(trends?.points ?? "…")),
+          ] },
+          { title: t.nations.why, body: [t.nations.whyHint] },
+          { title: t.nations.myPriorities, body: [t.nations.guidePriorities] },
+        ]} />
+      }>
       <div className="flex gap-2.5 flex-wrap items-center mb-3.5">
         <input type="search" placeholder={t.common.search}
           value={q} onChange={(e) => setQ(e.target.value)} className="min-w-[220px]" />
@@ -404,9 +413,6 @@ export default function NationsPage() {
         </label>
       </div>
 
-      <p className="text-faint text-[11.5px] mb-1">
-        {t.nations.trendHint.replace("{n}", String(trends?.points ?? "…"))}
-      </p>
       <p className="text-faint text-[11.5px] mb-3">{t.nations.detailHint}</p>
 
       {selected && detail && (
