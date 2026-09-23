@@ -130,6 +130,12 @@ con `isAI == false`.
   può appartenere alla campagna precedente. Per capire di che partita è un `.gz`,
   leggere quel campo, non il nome del file né la data di gioco.
 
+## Cosa c'e' in cantiere
+
+`ROADMAP.md` tiene le cose decise e non ancora fatte, col perche' di ognuna.
+Guardarlo prima di proporre lavoro nuovo: potrebbe gia' esserci, con il contesto
+che serve per riprenderlo.
+
 ## Regole di progetto
 
 - **Niente informazione nascosta nell'interfaccia.** Lealtà reali, intel non acquisita e
