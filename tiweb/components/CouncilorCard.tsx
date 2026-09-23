@@ -122,8 +122,9 @@ function Traits({ c }: { c: Councilor }) {
 
 type FigureTone = "good" | "faint" | "warn" | "bad";
 
-function KeyFigure({ label, value, tone, title, note }: {
+function KeyFigure({ label, value, tone, title, note, footer }: {
   label: string; value: string; tone?: FigureTone; title?: string; note?: ReactNode;
+  footer?: ReactNode;
 }) {
   const color = { good: "text-good", faint: "text-faint", warn: "text-warn", bad: "text-bad" };
   return (
@@ -137,31 +138,52 @@ function KeyFigure({ label, value, tone, title, note }: {
         </span>
         {note && <span className="text-[10.5px] leading-tight">{note}</span>}
       </div>
+      {footer}
     </div>
   );
 }
 
 /** Età nel linguaggio del gioco: da `declineAt` (65) può arrivare il tratto
- *  «In fase di declino» e poi la morte; i 5 anni prima sono un preavviso
- *  nostro. Ai candidati, sotto quella soglia, l'età porta solo XP. */
+ *  «In fase di declino» e poi la morte. Prima di quella soglia l'età non
+ *  pesa, anzi all'assunzione porta XP: quello che conta è quanti anni di
+ *  servizio restano, e quello si mostra sempre, anche con una barra. */
+const SPAN = 35;   // la linea del tempo va da 30 (inizio del bonus XP) a 65
+
 function AgeFigure({ c, recruit }: { c: Councilor; recruit: boolean }) {
   const { t } = useSettings();
   const r = t.recruit;
   if (c.age == null) return <KeyFigure label={r.age} value="—" />;
-  const old = c.age >= c.declineAt;
-  const near = !old && c.age >= c.declineAt - 5;
-  const note = old
-    ? <span className="text-bad">⚠ {r.ageOld}</span>
-    : near
-      ? <span className="text-warn">{r.ageNear.replace("{n}", String(c.declineAt - c.age)).replace("{at}", String(c.declineAt))}</span>
-      : recruit && c.hireXp
-        ? <span className="text-good">+{c.hireXp} XP</span>
-        : null;
+  const left = c.declineAt - c.age;
+  const old = left <= 0;
+  const near = !old && left <= 5;           // preavviso nostro, non del gioco
+  const tone = old ? "bad" : near ? "warn" : undefined;
+  const bar = old ? "var(--bad)" : near ? "var(--warn)" : "var(--accent)";
+  const pos = Math.max(0, Math.min(1, (c.age - (c.declineAt - SPAN)) / SPAN));
   return (
-    <KeyFigure label={r.age} value={String(c.age)} tone={old ? "bad" : near ? "warn" : undefined}
-      note={note}
+    <KeyFigure label={r.age} value={String(c.age)} tone={tone}
       title={r.ageHint.replace("{decline}", String(c.declineAt))
-        + (recruit && c.hireXp ? ` ${r.ageXpHint.replace("{xp}", String(c.hireXp))}` : "")} />
+        + (recruit && c.hireXp ? ` ${r.ageXpHint.replace("{xp}", String(c.hireXp))}` : "")}
+      note={
+        <span className="flex flex-col">
+          <span className={old ? "text-bad" : near ? "text-warn" : "text-dim"}>
+            {old ? `⚠ ${r.ageOld}` : r.ageLeft.replace("{n}", String(left)).replace("{at}", String(c.declineAt))}
+          </span>
+          {recruit && !old && c.hireXp ? <span className="text-good">+{c.hireXp} XP</span> : null}
+        </span>
+      }
+      footer={
+        // linea del tempo 30 → 65: il segno è l'età. Più sta a sinistra, più
+        // anni di servizio restano prima che il gioco cominci a tirare
+        <div className="flex items-center gap-1 mt-1 text-[9.5px] text-faint" aria-hidden="true">
+          <span>{c.declineAt - SPAN}</span>
+          <div className="relative flex-1 h-[3px] bg-edge">
+            <div className="absolute inset-y-0 left-0" style={{ width: `${pos * 100}%`, background: bar, opacity: .45 }} />
+            <div className="absolute top-1/2 w-[7px] h-[7px] -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `${pos * 100}%`, background: bar }} />
+          </div>
+          <span className={old ? "text-bad" : ""}>{c.declineAt}</span>
+        </div>
+      } />
   );
 }
 
