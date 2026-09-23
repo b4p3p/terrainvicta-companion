@@ -4,19 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { API, api } from "@/lib/api";
 import { usePersistentState } from "@/lib/persist";
 import { useSettings } from "@/lib/settings";
-import { Button, Empty, GameIcon, Panel, Tag, nf } from "@/components/ui";
-
-interface Priority {
-  id: string;
-  type: string;
-  name: string;
-  icon: string | null;
-}
-
-interface Slice extends Priority {
-  weight: number;
-  share: number;
-}
+import { Button, Empty, GameIcon, Panel, Tag } from "@/components/ui";
+import { Combo, type ComboOption } from "@/components/Combo";
+import { Guide } from "@/components/Guide";
+import {
+  COLOR_OF, FAMILIES, Legend, ShareBar, WeightChips, familyShares, pc, pp,
+  type Priority, type Slice,
+} from "@/components/priorities";
 
 interface Preset {
   id: string;
@@ -47,116 +41,7 @@ interface Status {
   pending: Preset[];
 }
 
-/* Famiglie di priorità: un raggruppamento NOSTRO, non del gioco, che serve
-   solo a leggere la barra. Venti colori non si distinguono; cinque sì.
-   Colori validati (scripts/validate_palette.js della skill dataviz) contro
-   --panel, nell'ordine in cui compaiono nella barra: gli adiacenti restano
-   distinguibili anche per chi non vede rosso/verde. */
-type Family = "knowledge" | "civil" | "space" | "power" | "military";
-const FAMILIES: { key: Family; color: string; members: string[] }[] = [
-  { key: "knowledge", color: "#3987e5", members: ["knowledge"] },
-  { key: "civil", color: "#d95926",
-    members: ["economy", "welfare", "environment", "government", "unity"] },
-  { key: "space", color: "#199e70",
-    members: ["spaceProgram", "initSpaceProgram", "boost", "missionControl"] },
-  { key: "power", color: "#c98500", members: ["oppression", "spoils"] },
-  { key: "military", color: "#d55181",
-    members: ["foundMilitary", "military", "army", "navy", "initNuclearWeapons",
-      "nuclearProgram", "spaceDefense", "sto"] },
-];
-const FAMILY_OF: Record<string, (typeof FAMILIES)[number]> = Object.fromEntries(
-  FAMILIES.flatMap((f) => f.members.map((m) => [m, f])),
-);
-
-/* Ogni priorità ha un tono suo: la tinta dice la famiglia, la luce la voce.
-   Rampa dal chiaro allo scuro nell'ordine fisso di `members`, così il colore
-   segue la priorità e non la sua posizione nella barra: Esercito ha lo
-   stesso tono in ogni preset. */
-function ramp(color: string, i: number, n: number): string {
-  if (n < 2) return color;
-  const t = i / (n - 1);                       // 0 = più chiaro, 1 = più scuro
-  const span = n > 5 ? 44 : 34;                // più voci, rampa più larga
-  const light = Math.round(span * (1 - 2 * t)); // +span% bianco … −span% nero
-  return light >= 0
-    ? `color-mix(in oklab, ${color}, white ${light}%)`
-    : `color-mix(in oklab, ${color}, black ${-light}%)`;
-}
-const COLOR_OF: Record<string, string> = Object.fromEntries(
-  FAMILIES.flatMap((f) => f.members.map((m, i) => [m, ramp(f.color, i, f.members.length)])),
-);
-/** campione di legenda: tutta la rampa della famiglia */
-const swatch = (f: (typeof FAMILIES)[number]) =>
-  f.members.length < 2 ? f.color
-    : `linear-gradient(to right, ${f.members.map((m) => COLOR_OF[m]).join(", ")})`;
-
-const pc = (v: number) => `${nf(v * 100, 1)}%`;
-/** differenza in punti percentuali, col segno */
-const pp = (v: number) => (Math.abs(v) < 0.0005 ? "=" : `${v > 0 ? "+" : "−"}${nf(Math.abs(v) * 100, 1)}`);
-
-function familyShares(p: { priorities: Slice[] }) {
-  const out = Object.fromEntries(FAMILIES.map((f) => [f.key, 0])) as Record<Family, number>;
-  for (const s of p.priorities) {
-    const f = FAMILY_OF[s.id];
-    if (f) out[f.key] += s.share;
-  }
-  return out;
-}
-
-/** Una barra impilata: un segmento per priorità, raggruppati per famiglia,
- *  separati da 2px di fondo. L'etichetta di ogni segmento sta nel tooltip. */
-function ShareBar({ p, height = 14 }: { p: { priorities: Slice[] }; height?: number }) {
-  // dentro la famiglia, nell'ordine della rampa: dal tono chiaro allo scuro
-  const ordered = FAMILIES.flatMap((f) =>
-    f.members.map((m) => p.priorities.find((s) => s.id === m)).filter((s) => s != null));
-  return (
-    <div className="flex gap-[2px] w-full bg-panel" style={{ height }} role="img"
-      aria-label={ordered.map((s) => `${s.name} ${pc(s.share)}`).join(", ")}>
-      {ordered.map((s) => (
-        <div key={s.id} title={`${s.name} · peso ${s.weight} · ${pc(s.share)}`}
-          style={{ width: `${s.share * 100}%`, background: COLOR_OF[s.id] }}
-          className="h-full min-w-[2px] hover:brightness-125" />
-      ))}
-    </div>
-  );
-}
-
-function Legend({ t, knowledge }: { t: Labels; knowledge: string }) {
-  return (
-    <div className="flex gap-3 flex-wrap text-[11.5px] text-dim">
-      {FAMILIES.map((f) => (
-        <span key={f.key} className="inline-flex items-center gap-1.5">
-          <span className="inline-block w-5 h-2.5" style={{ background: swatch(f) }} />
-          {f.key === "knowledge" ? knowledge : t.fam[f.key]}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-/** I pesi grezzi, in ordine di peso: la ripartizione vera del bilancio. */
-function Weights({ p, base }: { p: Preset; base: Preset | null }) {
-  const baseShare = new Map(base?.priorities.map((s) => [s.id, s.share]));
-  return (
-    <div className="flex gap-1 flex-wrap">
-      {p.priorities.map((s) => {
-        const d = base && base.id !== p.id ? s.share - (baseShare.get(s.id) ?? 0) : null;
-        return (
-          <span key={s.id} className="text-[11px] border border-edge px-1.5 py-[1px]
-                                      inline-flex items-center gap-1">
-            <span className="inline-block w-1.5 h-1.5"
-              style={{ background: COLOR_OF[s.id] }} />
-            <GameIcon bundle="icons_2d" icon={s.icon} size={14} />
-            <span className={s.id === "knowledge" ? "text-ink" : "text-dim"}>{s.name}</span>
-            <span className="text-faint">{s.weight}</span>
-            <span className="text-faint">·</span>
-            <span>{pc(s.share)}</span>
-            {d != null && <span className="text-faint">({pp(d)})</span>}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
+type Labels = ReturnType<typeof useSettings>["t"]["presets"];
 
 /** Quanto prende ogni famiglia, e quanto cambia rispetto al riferimento. */
 function FamilyDelta({ p, base, t, knowledge }: {
@@ -167,14 +52,13 @@ function FamilyDelta({ p, base, t, knowledge }: {
   return (
     <div className="flex gap-3 flex-wrap text-[11.5px]">
       {FAMILIES.map((f) => {
-        const d = a[f.key] - b[f.key];
         if (!a[f.key] && !b[f.key]) return null;
         return (
           <span key={f.key} className="inline-flex items-baseline gap-1">
             <span className="inline-block w-2 h-2 self-center" style={{ background: f.color }} />
             <span className="text-dim">{f.key === "knowledge" ? knowledge : t.fam[f.key]}</span>
             <span>{pc(a[f.key])}</span>
-            <span className="text-faint">{pp(d)}</span>
+            <span className="text-faint">{pp(a[f.key] - b[f.key])}</span>
           </span>
         );
       })}
@@ -187,6 +71,7 @@ function Row({ p, base, t, knowledge, onEdit, onDuplicate, onDelete }: {
   onEdit?: () => void; onDuplicate: () => void; onDelete?: () => void;
 }) {
   const isBase = base?.id === p.id;
+  const compare = base && !isBase;
   return (
     <div className={`bg-panel border px-3 py-2 mb-[2px] ${
       isBase ? "border-sel-edge" : p.mine ? "border-accent/50" : "border-edge"}`}>
@@ -217,14 +102,25 @@ function Row({ p, base, t, knowledge, onEdit, onDuplicate, onDelete }: {
           )}
         </span>
       </div>
-      <div className="mt-1.5"><ShareBar p={p} /></div>
-      {base && !isBase && (
-        <div className="mt-1.5 flex gap-2 items-baseline flex-wrap">
-          <span className="text-faint text-[11px]">{t.vs} {base.name}:</span>
-          <FamilyDelta p={p} base={base} t={t} knowledge={knowledge} />
+
+      {compare ? (
+        /* le due barre una sopra l'altra, stessa scala: il confronto si vede
+           prima di leggere un numero */
+        <div className="mt-1.5 grid grid-cols-[150px_1fr] gap-x-2 gap-y-[3px]
+                        items-center text-[11px]">
+          <span className="text-dim truncate">{p.name}</span>
+          <ShareBar p={p} weightLabel={t.weight} />
+          <span className="text-faint truncate">{base.name}</span>
+          <div className="opacity-60"><ShareBar p={base} height={8} weightLabel={t.weight} /></div>
         </div>
+      ) : (
+        <div className="mt-1.5"><ShareBar p={p} weightLabel={t.weight} /></div>
       )}
-      <div className="mt-1.5"><Weights p={p} base={base} /></div>
+
+      {compare && (
+        <div className="mt-1.5"><FamilyDelta p={p} base={base} t={t} knowledge={knowledge} /></div>
+      )}
+      <div className="mt-1.5"><WeightChips p={p} base={compare ? base : null} /></div>
     </div>
   );
 }
@@ -268,8 +164,8 @@ function Editor({ draft, setDraft, catalog, t, knowledge, busy, onSave, onCancel
         </span>
       </div>
       <p className="text-faint text-[11.5px] mb-2">{t.editorHint}</p>
-      <div className="mb-2"><ShareBar p={preview} height={18} /></div>
-      <div className="mb-3"><Legend t={t} knowledge={knowledge} /></div>
+      <div className="mb-2"><ShareBar p={preview} height={18} weightLabel={t.weight} /></div>
+      <div className="mb-3"><Legend names={t.fam} knowledge={knowledge} /></div>
       <div className="grid gap-x-4 gap-y-[2px]"
         style={{ gridTemplateColumns: "repeat(auto-fill, minmax(330px, 1fr))" }}>
         {catalog.map((c) => {
@@ -300,8 +196,6 @@ function Editor({ draft, setDraft, catalog, t, knowledge, busy, onSave, onCancel
   );
 }
 
-type Labels = ReturnType<typeof useSettings>["t"]["presets"];
-
 export default function PresetsPage() {
   const { t: all } = useSettings();
   const t = all.presets;
@@ -311,6 +205,8 @@ export default function PresetsPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [baseId, setBaseId] = usePersistentState<string>(
     "presets.base", "", (v): v is string => typeof v === "string");
+  const [comparing, setComparing] = usePersistentState<boolean>(
+    "presets.compare", false, (v): v is boolean => typeof v === "boolean");
 
   const load = useCallback(() => {
     api<Status>("/api/presets").then(setSt).catch((e) => setMsg(String(e)));
@@ -365,11 +261,21 @@ export default function PresetsPage() {
   if (!st) return <Empty>{msg ?? all.common.loading}</Empty>;
   if (!st.ok) return <Empty>{st.error}</Empty>;
 
-  const everything = [...st.pending, ...st.presets];
-  const base = everything.find((p) => p.id === baseId) ?? st.presets[0] ?? null;
-  const knowledge = st.priorities.find((p) => p.id === "knowledge")?.name ?? "knowledge";
-  const shipped = st.pending.filter((p) => !p.editable);
   const personal = st.pending.filter((p) => p.editable);
+  const shipped = st.pending.filter((p) => !p.editable);
+  const everything = [...personal, ...shipped, ...st.presets];
+  const chosen = everything.find((p) => p.id === baseId) ?? st.presets[0] ?? null;
+  const base = comparing ? chosen : null;
+  const knowledge = st.priorities.find((p) => p.id === "knowledge")?.name ?? "knowledge";
+
+  // i preset nostri e personali separati da quelli del gioco, anche nella combo
+  const options: ComboOption[] = [
+    ...personal.map((p) => ({ id: p.id, label: p.name, group: t.personal })),
+    ...shipped.map((p) => ({ id: p.id, label: p.name, group: t.ours })),
+    ...st.presets.map((p) => ({
+      id: p.id, label: p.name, group: t.builtin, hint: p.faction ?? undefined,
+    })),
+  ];
 
   const rowProps = (p: Preset) => ({
     p, base, t, knowledge,
@@ -382,9 +288,22 @@ export default function PresetsPage() {
 
   return (
     <>
-      <Panel title={t.title} sub={t.sub}>
-        <p className="text-dim text-[12px] mb-3 max-w-[90ch]">{t.why}</p>
-        <p className="text-warn text-[12px] mb-3 max-w-[90ch]">{t.achievements}</p>
+      <Panel title={t.title}
+        right={
+          <Guide title={t.title} label={t.guide}>
+            <h4>{t.guideWhyTitle}</h4>
+            <p>{t.why}</p>
+            <h4>{t.guideAchTitle}</h4>
+            <p>{t.achievements}</p>
+            <h4>{t.guideReadTitle}</h4>
+            <p>{t.familiesHint}</p>
+            <p>{t.compareHint}</p>
+            <h4>{t.guideEditTitle}</h4>
+            <p>{t.editorHint}</p>
+            <p className="break-all text-faint">{t.file}: {st.path}</p>
+          </Guide>
+        }>
+        <p className="text-warn text-[12px] mb-3">{t.achievementsShort}</p>
 
         <div className="flex items-center gap-2 flex-wrap mb-3">
           <Button onClick={() => act("install")} tone="primary"
@@ -397,21 +316,21 @@ export default function PresetsPage() {
           </Button>
           {msg && <span className="text-[12px] text-dim">{msg}</span>}
         </div>
-
         {st.stale > 0 && <p className="text-warn text-[12px] mb-3">{t.staleMsg}</p>}
         {!st.writable && <p className="text-bad text-[12px] mb-3">{t.notWritable}</p>}
-        <p className="text-faint text-[11.5px] mb-4 break-all">{t.file}: {st.path}</p>
 
-        <div className="flex items-center gap-3 flex-wrap mb-3">
-          <label className="text-[12px] text-dim flex items-center gap-2">
+        <div className="flex items-center gap-3 flex-wrap mb-4 border-t border-edge pt-3">
+          <label className="text-[12px] text-dim flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" checked={comparing} className="p-0"
+              onChange={(e) => setComparing(e.target.checked)} />
             {t.compareTo}
-            <select value={base?.id ?? ""} onChange={(e) => setBaseId(e.target.value)}>
-              {everything.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
           </label>
-          <Legend t={t} knowledge={knowledge} />
+          <div className={comparing ? "" : "opacity-40 pointer-events-none"}>
+            <Combo value={chosen?.id ?? null} onChange={setBaseId} options={options}
+              placeholder={all.common.search} />
+          </div>
+          <span className="ml-auto"><Legend names={t.fam} knowledge={knowledge} /></span>
         </div>
-        <p className="text-faint text-[11.5px] mb-4 max-w-[90ch]">{t.familiesHint}</p>
 
         <div className="flex items-baseline justify-between mb-1.5">
           <h3 className="display text-[12px] uppercase tracking-[.06em] text-dim m-0">

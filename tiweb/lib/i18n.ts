@@ -157,9 +157,9 @@ const it = {
     title: "Preset di priorità",
     sub: "Aggiunge preset al gioco, così restano disponibili anche in una partita nuova.",
     why:
-      "I preset che crei in partita vivono in `customPresets`, un campo dentro il salvataggio: muoiono con la partita. Questi vengono scritti nei template, che il gioco rilegge a ogni avvio.",
+      "I preset che crei in partita vivono in «customPresets», un campo dentro il salvataggio: muoiono con la partita. Questi vengono scritti nei template, che il gioco rilegge a ogni avvio.",
     achievements:
-      "Non passa dal sistema dei mod: in Terra Invicta attivare i mod disattiva gli achievement, e basta la casella nel menu. Qui le voci si aggiungono al template, `playedWithMods` resta falso. Un aggiornamento di Steam o «verifica integrità file» riscrive i template: in quel caso basta reinstallare da qui.",
+      "Non passa dal sistema dei mod: in Terra Invicta attivare i mod disattiva gli achievement, e basta la casella nel menu. Qui le voci si aggiungono al template, «playedWithMods» resta falso. Un aggiornamento di Steam o «verifica integrità file» riscrive i template: in quel caso basta reinstallare da qui.",
     install: "Aggiungi al gioco",
     reinstall: "Riscrivi nel gioco",
     restore: "Rimuovi dal gioco",
@@ -171,6 +171,16 @@ const it = {
     builtin: "Preset del gioco",
     builtinHint:
       "Ordinati per quota di ricerca. Il valore della Conoscenza è quasi sempre 3: quello che cambia è su quante voci si divide il bilancio.",
+    guide: "Guida",
+    guideWhyTitle: "A cosa serve",
+    guideAchTitle: "Achievement",
+    guideReadTitle: "Come leggere le barre",
+    guideEditTitle: "Preset personali",
+    achievementsShort:
+      "Non usa i mod, quindi gli achievement restano attivi. Dopo un aggiornamento di Steam va riscritto: dettagli nella guida.",
+    compareHint:
+      "Con «Confronta con» acceso, sotto la barra di ogni preset compare, più sottile, quella del riferimento, sulla stessa scala. I numeri accanto alle quote sono la differenza in punti percentuali; le voci tratteggiate sono quelle che il riferimento accende e questo preset no.",
+    weight: "peso",
     inGame: "nel gioco",
     notInGame: "non ancora nel gioco",
     staleTag: "da riscrivere",
@@ -429,9 +439,9 @@ const en: typeof it = {
     title: "Priority presets",
     sub: "Adds presets to the game so they survive into a new campaign.",
     why:
-      "Presets you create in game live in `customPresets`, a field inside the save file: they die with the campaign. These are written into the templates, which the game reloads on every launch.",
+      "Presets you create in game live in «customPresets», a field inside the save file: they die with the campaign. These are written into the templates, which the game reloads on every launch.",
     achievements:
-      "This does not use the mod system: in Terra Invicta enabling mods disables achievements, and merely ticking the box is enough. Here the entries are appended to the template and `playedWithMods` stays false. A Steam update or \"verify integrity of game files\" rewrites the templates — just reinstall from here.",
+      "This does not use the mod system: in Terra Invicta enabling mods disables achievements, and merely ticking the box is enough. Here the entries are appended to the template and «playedWithMods» stays false. A Steam update or \"verify integrity of game files\" rewrites the templates — just reinstall from here.",
     install: "Add to the game",
     reinstall: "Rewrite into the game",
     restore: "Remove from the game",
@@ -443,6 +453,16 @@ const en: typeof it = {
     builtin: "Game presets",
     builtinHint:
       "Sorted by research share. Knowledge is almost always 3: what changes is how many entries split the budget.",
+    guide: "Guide",
+    guideWhyTitle: "What it is for",
+    guideAchTitle: "Achievements",
+    guideReadTitle: "Reading the bars",
+    guideEditTitle: "Personal presets",
+    achievementsShort:
+      "No mods involved, so achievements stay enabled. After a Steam update it must be rewritten: see the guide.",
+    compareHint:
+      "With “Compare with” on, each preset's bar is followed by a thinner bar for the reference, on the same scale. The numbers next to the shares are the difference in percentage points; dashed entries are those the reference turns on and this preset does not.",
+    weight: "weight",
     inGame: "in game",
     notInGame: "not in game yet",
     staleTag: "needs rewrite",
