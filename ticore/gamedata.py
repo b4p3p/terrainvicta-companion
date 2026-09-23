@@ -200,6 +200,71 @@ def trait_income(data_name):
     }
 
 
+_TRAIT_INCOME = (("incomeMoney", "money"), ("incomeInfluence", "influence"),
+                 ("incomeResearch", "research"), ("incomeOps", "ops"),
+                 ("incomeBoost", "boost"))
+
+
+def _num(s):
+    try:
+        f = float(s)
+    except (TypeError, ValueError):
+        return None
+    return int(f) if f.is_integer() else f
+
+
+def trait_effects(lang, data_name):
+    """Cosa fa un tratto, letto dal suo template: codici, non frasi.
+
+    L'interfaccia li traduce. Restano fuori i campi di cui non abbiamo
+    verificato il significato (bonus di rilevamento, di tecnologia, di
+    priorita'): meglio un effetto in meno che uno descritto male.
+
+    Gli effetti sugli attributi sono quelli dichiarati dal tratto. Il
+    salvataggio non distingue il valore base da quello modificato, quindi non
+    vanno sommati a quanto mostrato: sono il perche' di un numero, non un'aggiunta.
+    """
+    t = templates()["traits"].get(data_name) or {}
+    out = []
+    for m in t.get("statMods") or []:
+        stat, op = m.get("stat"), m.get("operation")
+        if not stat:
+            continue
+        cond = bool(m.get("condition"))
+        if op == "SetToAnotherAttribute":
+            if stat == "ApparentLoyalty" and m.get("strValue") == "Loyalty":
+                out.append({"kind": "transparent"})
+            continue
+        v = _num(m.get("strValue"))
+        if v is None:
+            continue
+        if op == "SetToFixedValue":
+            out.append({"kind": "statFixed", "stat": stat, "value": v,
+                        "conditional": cond})
+        elif op == "Additive":
+            kind = {"Loyalty": "loyalty",
+                    "ApparentLoyalty": "apparentLoyalty"}.get(stat, "stat")
+            e = {"kind": kind, "value": v, "conditional": cond}
+            if kind == "stat":
+                e["stat"] = stat
+            out.append(e)
+    for field, res in _TRAIT_INCOME:
+        if t.get(field):
+            out.append({"kind": "income", "resource": res, "value": t[field]})
+    if t.get("XPModifier"):
+        out.append({"kind": "xp", "value": t["XPModifier"]})
+    for m in t.get("missionsGrantedNames") or []:
+        out.append({"kind": "mission", "id": m, "name": mission_name(lang, m),
+                    "icon": mission_icon(m)})
+    for m in t.get("restrictedMissionNames") or []:
+        out.append({"kind": "restricted", "id": m, "name": mission_name(lang, m),
+                    "icon": mission_icon(m)})
+    if t.get("specialTraitRule"):
+        out.append({"kind": "rule", "rule": t["specialTraitRule"],
+                    "value": t.get("specialTraitRuleValue")})
+    return out
+
+
 def councilor_type_name(lang, data_name):
     t = templates()["councilorTypes"].get(data_name) or {}
     return loc(lang, "TICouncilorTypeTemplate", "displayName", data_name,

@@ -42,7 +42,7 @@ export interface Councilor {
   xp: number;
   base: Record<Attr, number>;
   attributes: Record<Attr, number>;
-  traits: { id: string; name: string }[];
+  traits: Trait[];
   orgs: Org[];
   missions: string[];
   apparentLoyalty: number | null;
@@ -53,6 +53,29 @@ export interface Councilor {
   covers?: { id: string; name: string; icon: string | null; attribute: Attr | null }[];
   gain?: Partial<Record<Attr, number>>;
   fixesWeak?: string[];
+  /* consiglieri forti (euristica STRONG_AT) su quell'attributo, prima e dopo */
+  depth?: Partial<Record<Attr, { now: number; after: number }>>;
+  /* missioni non standard del candidato; `new` = oggi nessuno la sa fare */
+  missionList?: { id: string; name: string; icon: string | null;
+    attribute: Attr | null; new: boolean }[];
+}
+
+/** Effetto dichiarato dal template del tratto. Codici, tradotti dall'interfaccia. */
+export type TraitEffect =
+  | { kind: "stat"; stat: Attr; value: number; conditional: boolean }
+  | { kind: "statFixed"; stat: string; value: number; conditional: boolean }
+  | { kind: "loyalty" | "apparentLoyalty"; value: number; conditional: boolean }
+  | { kind: "transparent" }
+  | { kind: "income"; resource: "money" | "influence" | "research" | "ops" | "boost";
+      value: number }
+  | { kind: "xp"; value: number }
+  | { kind: "mission" | "restricted"; id: string; name: string; icon: string | null }
+  | { kind: "rule"; rule: string; value: number | null };
+
+export interface Trait {
+  id: string;
+  name: string;
+  effects?: TraitEffect[];
 }
 
 export interface Income {

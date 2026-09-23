@@ -76,6 +76,11 @@ def can_hold(org, nationality, traits):
 # sotto questa soglia nessuno del consiglio e' credibile su un attributo
 WEAK_AT = 4
 
+# da questa soglia in su un consigliere e' una scelta seria per le missioni che
+# tirano su quell'attributo. Euristica nostra, non del gioco: serve a contare
+# quanti tentativi paralleli il consiglio puo' fare, non a dare un voto.
+STRONG_AT = 6
+
 
 def income_of(c, traits):
     """Reddito mensile del consigliere.
@@ -136,7 +141,8 @@ def councilor_view(g, c, lang="ita", known=True):
         "xp": c.get("XP") or 0,
         "base": {a: attrs.get(a, 0) for a in ATTRS},
         "attributes": effective,
-        "traits": [{"id": t, "name": gamedata.trait_name(lang, t)} for t in traits],
+        "traits": [{"id": t, "name": gamedata.trait_name(lang, t),
+                    "effects": gamedata.trait_effects(lang, t)} for t in traits],
         "orgs": orgs,
         "missions": sorted(missions),
         "apparentLoyalty": attrs.get("ApparentLoyalty"),
@@ -247,6 +253,9 @@ def recruits(g, lang="ita", include_hidden=False):
         have.update(c["missions"])
     missing = gamedata.player_missions() - have
     best_now = {a: max([c["attributes"].get(a, 0) for c in team] or [0]) for a in ATTRS}
+    strong_now = {a: sum(1 for c in team if c["attributes"].get(a, 0) >= STRONG_AT)
+                  for a in ATTRS}
+    base = gamedata.base_missions()
 
     out = []
     for c in g.available_councilors():
@@ -261,6 +270,16 @@ def recruits(g, lang="ita", include_hidden=False):
         v["fixesWeak"] = sorted(
             ATTR_SHORT[a] for a in ATTRS
             if best_now[a] < WEAK_AT <= v["attributes"].get(a, 0))
+        # quanti consiglieri forti su quell'attributo, prima e dopo
+        v["depth"] = {a: {"now": strong_now[a], "after": strong_now[a] + 1}
+                      for a in ATTRS if v["attributes"].get(a, 0) >= STRONG_AT}
+        # le missioni standard le ha chiunque: elencarle non distingue nessuno
+        v["missionList"] = [
+            {"id": m, "name": gamedata.mission_name(lang, m),
+             "icon": gamedata.mission_icon(m),
+             "attribute": gamedata.mission_attribute(m), "new": m in missing}
+            for m in sorted(set(v["missions"]) - base,
+                            key=lambda m: gamedata.mission_name(lang, m))]
         out.append(v)
     return out
 
