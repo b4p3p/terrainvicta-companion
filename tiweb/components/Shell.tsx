@@ -15,6 +15,7 @@ const TABS = [
   { href: "/nations", key: "nations" },
   { href: "/history", key: "history" },
   { href: "/plan", key: "plan" },
+  { href: "/presets", key: "presets" },
 ] as const;
 
 /* Terra Invicta tiene le risorse in una barra fissa in cima allo schermo.

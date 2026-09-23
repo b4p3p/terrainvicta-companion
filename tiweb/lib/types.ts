@@ -289,7 +289,7 @@ export interface Note {
 }
 
 /** Serie storiche per nazione (/api/nations/trends): chiavi come in `Nation`. */
-export type TrendKey = "gdp" | "pop" | "research" | "ip" | "education" | "democracy"
+export type TrendKey = "gdp" | "gdpPc" | "pop" | "research" | "ip" | "education" | "democracy"
   | "cohesion" | "unrest" | "inequality" | "miltech" | "nukes" | "support";
 
 export interface NationTrends {

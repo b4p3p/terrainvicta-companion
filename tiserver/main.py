@@ -21,7 +21,7 @@ from pydantic import BaseModel
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import ticore                                    # noqa: E402
-from ticore import alerts, gamedata, missions, model, paths, store  # noqa: E402
+from ticore import alerts, gamedata, missions, model, paths, presets, store  # noqa: E402
 from . import icons                             # noqa: E402
 
 app = FastAPI(title="TerraInvictaCompanion", version="1.0")
@@ -130,6 +130,34 @@ def health():
         "date": (state.snapshot or {}).get("date"),
         "lang": state.lang,
     }
+
+
+@app.get("/api/presets")
+def list_presets(lang: str = Query(None)):
+    return presets.status(lang or state.lang)
+
+
+@app.post("/api/presets/install")
+def install_presets(lang: str = Query(None)):
+    """Aggiunge i preset del companion al template del gioco.
+
+    Non passa dal sistema dei mod apposta: attivarlo disattiverebbe gli
+    achievement. Vedi ticore/presets.py.
+    """
+    try:
+        res = presets.install(lang or state.lang)
+    except (OSError, ValueError) as e:
+        raise HTTPException(400, str(e))
+    return dict(res, status=presets.status(lang or state.lang))
+
+
+@app.post("/api/presets/restore")
+def restore_presets(lang: str = Query(None)):
+    try:
+        res = presets.restore()
+    except (OSError, ValueError) as e:
+        raise HTTPException(400, str(e))
+    return dict(res, status=presets.status(lang or state.lang))
 
 
 @app.get("/api/icons/{bundle}/{name}.png")

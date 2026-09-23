@@ -37,6 +37,8 @@ const dec = (digits: number) => ({
 const METRICS: Metric[] = [
   // la serie del PIL arriva gia' in miliardi; la colonna usa bn() sul valore grezzo
   { key: "gdp", title: "PIL mld", icon: "ICO_economy_priority", value: (n) => n.gdp / 1e9, ...dec(0) },
+  // ricavato da PIL e popolazione: il salvataggio non ne tiene una serie
+  { key: "gdpPc", title: "PIL/ab $", icon: "ICO_per_capita_GDP", value: (n) => n.gdpPc, ...dec(0) },
   // la popolazione si muove di poco: variazione a 2 decimali (decine di migliaia)
   { key: "pop", title: "Pop. mln", icon: "ICO_population", value: (n) => n.pop, fmt: dec(1).fmt, fmtDelta: dec(2).fmtDelta },
   { key: "research", title: "Ricerca/m", icon: "ICO_research", value: (n) => n.research, ...dec(0) },
@@ -193,7 +195,7 @@ export default function NationsPage() {
       ),
     },
     num("gdp", (r) => bn(r.gdp)),
-    { key: "gdpPc", title: "PIL/ab $", icon: "ICO_per_capita_GDP", render: (r) => nf(r.gdpPc, 0) },
+    num("gdpPc", (r) => nf(r.gdpPc, 0)),
     num("pop", (r) => nf(r.pop)),
     num("research", (r) => nf(r.research, 0)),
     {

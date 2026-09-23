@@ -18,6 +18,7 @@ const it = {
     nations: "Nazioni",
     history: "Storico",
     plan: "Piano",
+    presets: "Preset",
   },
   common: {
     loading: "Caricamento…",
@@ -152,6 +153,25 @@ const it = {
     compareCouncil: "consiglio (max)",
     compareMissionsNew: "missioni nuove",
   },
+  presets: {
+    title: "Preset di priorità",
+    sub: "Aggiunge preset al gioco, così restano disponibili anche in una partita nuova.",
+    why:
+      "I preset che crei in partita vivono in `customPresets`, un campo dentro il salvataggio: muoiono con la partita. Questi vengono scritti nei template, che il gioco rilegge a ogni avvio.",
+    achievements:
+      "Non passa dal sistema dei mod: in Terra Invicta attivare i mod disattiva gli achievement, e basta la casella nel menu. Qui le voci si aggiungono al template, `playedWithMods` resta falso. Un aggiornamento di Steam o «verifica integrità file» riscrive i template: in quel caso basta reinstallare da qui.",
+    install: "Aggiungi al gioco",
+    reinstall: "Riscrivi nel gioco",
+    restore: "Rimuovi dal gioco",
+    done: "Preset aggiunti. Riavvia Terra Invicta per vederli.",
+    undone: "Template riportato all'originale.",
+    notWritable: "Il file dei template non è scrivibile: serve avviare il companion come amministratore.",
+    file: "File",
+    ours: "Preset del companion",
+    builtin: "Preset del gioco",
+    builtinHint:
+      "Ordinati per quota di ricerca. Il valore della Conoscenza è quasi sempre 3: quello che cambia è su quante voci si divide il bilancio.",
+  },
   missions: {
     title: "Missioni",
     catalogue: "Missioni del consiglio",
@@ -246,6 +266,7 @@ const en: typeof it = {
     nations: "Nations",
     history: "History",
     plan: "Plan",
+    presets: "Presets",
   },
   common: {
     loading: "Loading…",
@@ -379,6 +400,25 @@ const en: typeof it = {
     compareClear: "clear",
     compareCouncil: "council (max)",
     compareMissionsNew: "new missions",
+  },
+  presets: {
+    title: "Priority presets",
+    sub: "Adds presets to the game so they survive into a new campaign.",
+    why:
+      "Presets you create in game live in `customPresets`, a field inside the save file: they die with the campaign. These are written into the templates, which the game reloads on every launch.",
+    achievements:
+      "This does not use the mod system: in Terra Invicta enabling mods disables achievements, and merely ticking the box is enough. Here the entries are appended to the template and `playedWithMods` stays false. A Steam update or \"verify integrity of game files\" rewrites the templates — just reinstall from here.",
+    install: "Add to the game",
+    reinstall: "Rewrite into the game",
+    restore: "Remove from the game",
+    done: "Presets added. Restart Terra Invicta to see them.",
+    undone: "Template restored to the original.",
+    notWritable: "The template file is not writable: run the companion as administrator.",
+    file: "File",
+    ours: "Companion presets",
+    builtin: "Game presets",
+    builtinHint:
+      "Sorted by research share. Knowledge is almost always 3: what changes is how many entries split the budget.",
   },
   missions: {
     title: "Missions",

@@ -118,6 +118,11 @@ def nation_trends(g):
         if not name or not n.get("controlPoints"):
             continue
         s = {k: _series(_chrono(n.get(f)), d) for k, (f, d) in TREND_FIELDS.items()}
+        # il PIL pro capite non ha una serie sua: si ricava punto per punto,
+        # come fa nations() per il valore attuale (PIL / popolazione in milioni)
+        gdp, pop = _chrono(n.get("historyGDP")), _chrono(n.get("historyPopulation"))
+        s["gdpPc"] = [round(g_ / (p * 1e6), 1) if p else 0
+                      for g_, p in zip(gdp, pop)]
         s["support"] = [round(op.get(me_key, 0), 4)
                         for op in _chrono(n.get("historyPublicOpinion"))
                         if isinstance(op, dict)]

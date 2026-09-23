@@ -12,13 +12,17 @@ variant; these are the `_on` ones, with the suffix dropped, so the file name mat
 `missionIconImagePath` field in `TIMissionTemplate.json`
 (`councilor_missions/ICO_assassinate` → `ICO_assassinate.png`).
 
-`icons_2d/` holds 21 icons from the bundle of the same name: the seven resources
+`icons_2d/` holds 33 icons from the bundle of the same name: the seven resources
 (`ICO_currency`, `ICO_influence`, `ICO_ops`, `ICO_research`, `ICO_boost`,
 `ICO_mission_control`, `ICO_projects`), the control-point marker, the eight
 councilor attribute glyphs, the spaceflight-program marker
 (`ICO_spaceflightProgram_priority`), and the four trend arrows
 (`ICO_arrow_green`, `ICO_arrow_green_down`, `ICO_arrow_red`, `ICO_arrow_red_down`:
-the colour says good or bad, the direction says up or down).
+the colour says good or bad, the direction says up or down), and twelve nation
+statistics used as table headers (`ICO_economy_priority`, `ICO_per_capita_GDP`,
+`ICO_population`, `ICO_investments`, `ICO_education`, `ICO_gov_type`,
+`ICO_Cohesion_mid`, `ICO_Unrest_mid`, `ICO_inequality`, `ICO_funding_priority`,
+`ICO_nukes`, `tech_military_icon`).
 
 ## Why they are here
 
