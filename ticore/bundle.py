@@ -125,7 +125,7 @@ def load(src):
     for lang in manifest["languages"]:
         with open(os.path.join(src, "loc", "%s.json" % lang), encoding="utf-8") as f:
             strings[lang] = json.load(f)
-    gamedata.use_bundle(tpl, strings)
+    gamedata.use_bundle(tpl, strings, list(manifest["languages"]))
     return manifest
 
 
@@ -167,15 +167,13 @@ def check(save_path=None):
             }
         return json.loads(json.dumps(out, default=str))
 
-    gamedata.use_bundle(None, {})
-    gamedata._bundle = None             # dai file del gioco
+    gamedata.use_game_files()
     full = run()
     with tempfile.TemporaryDirectory() as d:
         build(d)
         load(d)                         # dall'estratto
         extract = run()
-    gamedata.use_bundle(None, {})
-    gamedata._bundle = None
+    gamedata.use_game_files()
     return _diff(full, extract)
 
 

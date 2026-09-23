@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { API, api } from "@/lib/api";
+import { api } from "@/lib/api";
 import { usePersistentState } from "@/lib/persist";
 import { useSettings } from "@/lib/settings";
 import { Button, Empty, GameIcon, Panel, Tag } from "@/components/ui";
@@ -238,13 +238,10 @@ export default function PresetsPage() {
     setBusy(true);
     setMsg(null);
     try {
-      const r = await fetch(`${API}${path}`, {
+      const d = await api<{ status: Status; install?: { ok: boolean; error: string | null } | null }>(path, {
         method,
-        headers: body ? { "Content-Type": "application/json" } : undefined,
         body: body ? JSON.stringify(body) : undefined,
       });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.detail ?? r.statusText);
       setSt(d.status);
       return d;
     } catch (e) {

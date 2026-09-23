@@ -4,7 +4,7 @@
 // Sono tutte copie generate e gitignorate: l'estratto sono dati di Pavonis.
 
 import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,6 +27,14 @@ for (const f of ["pyodide.mjs", "pyodide.asm.mjs", "pyodide.asm.wasm",
                  "python_stdlib.zip", "pyodide-lock.json"])
   copyFileSync(join(pyo, f), join(pyoDst, f));
 console.log("pyodide: nucleo -> public/pyodide");
+
+// icone delle missioni e delle risorse: nella versione web sono file statici
+// (arte di Pavonis, come l'estratto: vedi assets/icons/README.md)
+const iconsSrc = join(here, "..", "..", "assets", "icons");
+const iconsDst = join(here, "..", "public", "icons");
+rmSync(iconsDst, { recursive: true, force: true });
+cpSync(iconsSrc, iconsDst, { recursive: true, filter: (p) => !p.endsWith(".md") });
+console.log("icone: assets/icons -> public/icons");
 
 // l'estratto richiede il gioco installato: se manca, la build va avanti e la
 // pagina ricade sulla cartella scelta dall'utente

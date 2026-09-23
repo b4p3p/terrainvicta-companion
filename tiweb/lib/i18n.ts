@@ -357,6 +357,25 @@ const it = {
     noNotes: "Nessuna nota.",
   },
   severity: { critical: "critico", warning: "attenzione", info: "info" },
+  engine: {
+    waiting: "in attesa del salvataggio",
+    loading: "Avvio del companion nel browser…",
+    loadingStep: "passo: {step}",
+    firstLoad: "Al primo avvio scarica circa 13 MB (Python in WebAssembly); poi restano nella cache del browser.",
+    noFolderTitle: "Scegli la cartella dei salvataggi",
+    noFolder:
+      "Il companion legge i salvataggi direttamente dal tuo PC: nulla viene inviato in rete. Scegli Documenti, My Games o TerraInvicta: alla cartella Saves ci arriva da solo.",
+    pick: "Scegli la cartella",
+    change: "Cambia cartella",
+    permissionTitle: "Serve di nuovo il permesso sulla cartella",
+    permission:
+      "Chrome dimentica il permesso quando chiudi tutte le schede del sito. Nella finestra che si apre scegli «Consenti a ogni visita» e non te lo chiederà più.",
+    allow: "Consenti",
+    noSaves: "Nella cartella scelta non ci sono salvataggi (.gz).",
+    unsupported:
+      "Questo browser non permette di leggere una cartella del PC: serve Chrome o Edge.",
+    error: "Il motore del companion si è fermato:",
+  },
 };
 
 const en: typeof it = {
@@ -707,6 +726,25 @@ const en: typeof it = {
     noNotes: "No notes.",
   },
   severity: { critical: "critical", warning: "warning", info: "info" },
+  engine: {
+    waiting: "waiting for a save",
+    loading: "Starting the companion in the browser…",
+    loadingStep: "step: {step}",
+    firstLoad: "The first start downloads about 13 MB (Python in WebAssembly); after that it stays in the browser cache.",
+    noFolderTitle: "Choose the saves folder",
+    noFolder:
+      "The companion reads saves straight from your PC: nothing is sent over the network. Choose Documents, My Games or TerraInvicta: it finds the Saves folder by itself.",
+    pick: "Choose folder",
+    change: "Change folder",
+    permissionTitle: "The folder needs permission again",
+    permission:
+      "Chrome forgets the permission when you close every tab of the site. In the prompt choose “Allow on every visit” and it won't ask again.",
+    allow: "Allow",
+    noSaves: "The chosen folder has no saves (.gz).",
+    unsupported:
+      "This browser can't read a folder on your PC: use Chrome or Edge.",
+    error: "The companion engine stopped:",
+  },
 };
 
 export const DICT = { it, en };

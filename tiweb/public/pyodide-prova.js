@@ -84,7 +84,7 @@ onmessage = async ({ data }) => {
 
     let gioco;
     if (data.files) {
-      py.runPython("from ticore import gamedata; gamedata.use_bundle(None, {}); gamedata._bundle = None");
+      py.runPython("from ticore import gamedata; gamedata.use_game_files()");
       gioco = { ...(await caricaGioco(data.files)), versione: null };
       log(`dati del gioco copiati dalla cartella: ${(gioco.byte / 1048576).toFixed(1)} MB`);
     } else {

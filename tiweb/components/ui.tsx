@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { API } from "@/lib/api";
+import { iconUrl } from "@/lib/api";
 
 export const nf = (v: number | null | undefined, d = 1) =>
   v == null || Number.isNaN(v)
@@ -85,11 +85,11 @@ export function GameIcon({
   if (!icon || broken) return null;
   const h = height ?? size;
   return (
-    // PNG di 14-20px serviti dall'API locale: next/image non avrebbe nulla da
-    // ottimizzare e richiederebbe di dichiarare l'origine esterna.
+    // PNG di 14-20px, dall'API locale o statici: next/image non avrebbe nulla
+    // da ottimizzare e richiederebbe di dichiarare l'origine esterna.
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`${API}/api/icons/${bundle}/${encodeURIComponent(icon)}.png`}
+      src={iconUrl(bundle, icon)}
       alt="" title={title} width={size} height={h}
       onError={() => setBroken(true)}
       className="inline-block align-text-bottom shrink-0 object-contain"

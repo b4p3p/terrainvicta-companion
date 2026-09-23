@@ -2,6 +2,10 @@
 
     uvicorn tiserver.main:app --port 8732 --reload
 
+La logica delle rotte sta in `ticore/service.py`, che gira identica anche nel
+worker del browser: qui restano solo quello che vuole un server vero — il
+watcher, lo stream SSE e le icone — e la traduzione da HTTP a `Service`.
+
 Il watcher gira in background: sorveglia la mtime del salvataggio piu' recente,
 ricostruisce lo snapshot quando cambia, lo archivia e rivaluta le allerte.
 I client ricevono l'aggiornamento su /api/stream senza interrogare nulla.
@@ -11,7 +15,7 @@ import asyncio
 import json
 import os
 import sys
-import time
+from contextlib import contextmanager
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,9 +24,7 @@ from pydantic import BaseModel
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import ticore                                    # noqa: E402
-from ticore import (alerts, factions, gamedata, missions, model, paths,  # noqa: E402
-                    presets, store)
+from ticore.service import Service, ServiceError  # noqa: E402
 from . import icons                             # noqa: E402
 
 app = FastAPI(title="TerraInvictaCompanion", version="1.0")
@@ -34,69 +36,27 @@ app.add_middleware(
 
 POLL_SECONDS = 3.0
 
+state = Service()
+subscribers = set()
 
-class State:
-    """Snapshot corrente + allerte, condivisi fra le richieste."""
 
-    def __init__(self):
-        self.con = store.connect()
-        self.snapshot = None
-        self.trends = None
-        self.game = None                 # l'ultimo Game, per i dettagli su richiesta
-        self.previous = None
-        self.alerts = []
-        self.lang = "ita"
-        self.error = None
-        self.loaded_mtime = 0.0
-        self.subscribers = set()
+@contextmanager
+def http_errors():
+    try:
+        yield
+    except ServiceError as e:
+        raise HTTPException(e.status, e.message)
 
-    # -- caricamento ----------------------------------------------------
 
-    def reload(self, force=False):
+async def broadcast(event):
+    dead = []
+    for q in subscribers:
         try:
-            path, mtime = paths.latest_save()
-        except Exception as e:
-            self.error = str(e)
-            return False
-        if not force and mtime <= self.loaded_mtime:
-            return False
-        try:
-            g = ticore.load()
-        except ticore.SaveLocked as e:
-            self.error = str(e)          # il gioco sta scrivendo: riproviamo dopo
-            return False
-        snap = ticore.snapshot(g, self.lang)
-        prev = store.previous_snapshot(self.con, snap)
-        store.save_snapshot(self.con, snap)
-        self.previous = prev
-        self.snapshot = snap
-        self.trends = model.nation_trends(g)
-        self.game = g
-        self.alerts = alerts.evaluate(snap, prev)
-        self.loaded_mtime = g.mtime
-        self.error = None
-        return True
-
-    def require(self):
-        if self.snapshot is None and not self.reload(force=True):
-            raise HTTPException(503, self.error or "Nessuno snapshot disponibile")
-        return self.snapshot
-
-    def campaign(self):
-        return store.campaign_id(self.require())
-
-    async def broadcast(self, event):
-        dead = []
-        for q in self.subscribers:
-            try:
-                q.put_nowait(event)
-            except Exception:
-                dead.append(q)
-        for q in dead:
-            self.subscribers.discard(q)
-
-
-state = State()
+            q.put_nowait(event)
+        except Exception:
+            dead.append(q)
+    for q in dead:
+        subscribers.discard(q)
 
 
 @app.on_event("startup")
@@ -109,15 +69,8 @@ async def watcher():
     while True:
         await asyncio.sleep(POLL_SECONDS)
         try:
-            changed = await asyncio.to_thread(state.reload)
-            if changed:
-                await state.broadcast({
-                    "type": "snapshot",
-                    "date": state.snapshot["date"],
-                    "save": state.snapshot["save"],
-                    "faction": state.snapshot["faction"],
-                    "alerts": state.alerts,
-                })
+            if await asyncio.to_thread(state.reload):
+                await broadcast(state.event())
         except Exception as e:
             state.error = str(e)
 
@@ -126,68 +79,24 @@ async def watcher():
 
 @app.get("/api/health")
 def health():
-    return {
-        "ok": state.snapshot is not None,
-        "error": state.error,
-        "save": (state.snapshot or {}).get("save"),
-        "date": (state.snapshot or {}).get("date"),
-        "lang": state.lang,
-    }
-
-
-def _default_preset():
-    """Il preset predefinito della fazione, per i punti di controllo nuovi.
-
-    E' l'unico riferimento per NOME a un preset nel salvataggio: le priorita'
-    dei punti di controllo sono salvate come pesi, non come preset scelto."""
-    try:
-        return state.game.me.get("defaultPriorityPresetTemplateName") if state.game else None
-    except Exception:
-        return None
-
-
-def _presets_status(lang):
-    return dict(presets.status(lang or state.lang), defaultPreset=_default_preset())
-
-
-def _maybe_install(install, lang):
-    """Dopo un salvataggio, scrive subito nel gioco se richiesto e possibile.
-    Un fallimento qui non annulla il salvataggio: lo si dice e basta."""
-    if not install:
-        return None
-    try:
-        presets.install(lang or state.lang)
-        return {"ok": True, "error": None}
-    except (OSError, ValueError) as e:
-        return {"ok": False, "error": str(e)}
+    return state.health()
 
 
 @app.get("/api/presets")
 def list_presets(lang: str = Query(None)):
-    return _presets_status(lang)
+    return state.presets_status(lang)
 
 
 @app.post("/api/presets/install")
 def install_presets(lang: str = Query(None)):
-    """Aggiunge i preset del companion al template del gioco.
-
-    Non passa dal sistema dei mod apposta: attivarlo disattiverebbe gli
-    achievement. Vedi ticore/presets.py.
-    """
-    try:
-        res = presets.install(lang or state.lang)
-    except (OSError, ValueError) as e:
-        raise HTTPException(400, str(e))
-    return dict(res, status=_presets_status(lang))
+    with http_errors():
+        return state.presets_install(lang)
 
 
 @app.post("/api/presets/restore")
 def restore_presets(lang: str = Query(None)):
-    try:
-        res = presets.restore()
-    except (OSError, ValueError) as e:
-        raise HTTPException(400, str(e))
-    return dict(res, status=_presets_status(lang))
+    with http_errors():
+        return state.presets_restore(lang)
 
 
 class PresetIn(BaseModel):
@@ -197,41 +106,21 @@ class PresetIn(BaseModel):
 
 @app.post("/api/presets/custom")
 def create_preset(p: PresetIn, lang: str = Query(None), install: bool = Query(False)):
-    """Nuovo preset personale, in ~/.terrainvicta-companion/presets.json.
-    Con `install=true` lo scrive anche nel template del gioco."""
-    try:
-        entry = presets.save_user(p.name, p.weights)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    inst = _maybe_install(install, lang)
-    return {"id": entry["dataName"], "install": inst, "status": _presets_status(lang)}
+    with http_errors():
+        return state.preset_create(p.name, p.weights, lang, install)
 
 
 @app.put("/api/presets/custom/{data_name}")
 def update_preset(data_name: str, p: PresetIn, lang: str = Query(None),
                   install: bool = Query(False)):
-    try:
-        presets.save_user(p.name, p.weights, data_name)
-    except KeyError:
-        raise HTTPException(404, "Preset personale non trovato.")
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    inst = _maybe_install(install, lang)
-    return {"id": data_name, "install": inst, "status": _presets_status(lang)}
+    with http_errors():
+        return state.preset_update(data_name, p.name, p.weights, lang, install)
 
 
 @app.delete("/api/presets/custom/{data_name}")
 def delete_preset(data_name: str, lang: str = Query(None)):
-    # il gioco lo cerca per nome al caricamento della partita: toglierlo
-    # lascerebbe la fazione con un predefinito che non esiste
-    if data_name == _default_preset():
-        raise HTTPException(409, "E' il preset predefinito della tua fazione in partita: "
-                                 "scegline un altro come predefinito prima di eliminarlo.")
-    try:
-        presets.delete_user(data_name)
-    except KeyError:
-        raise HTTPException(404, "Preset personale non trovato.")
-    return {"status": _presets_status(lang)}
+    with http_errors():
+        return state.preset_delete(data_name, lang)
 
 
 @app.get("/api/icons/{bundle}/{name}.png")
@@ -261,101 +150,71 @@ def icons_status():
 
 @app.get("/api/snapshot")
 def get_snapshot(lang: str = Query(None)):
-    if lang and lang != state.lang:
-        state.lang = lang
-        state.reload(force=True)
-    return state.require()
+    with http_errors():
+        return state.get_snapshot(lang)
 
 
 @app.get("/api/alerts")
 def get_alerts():
-    state.require()
-    return {"alerts": state.alerts,
-            "comparedTo": (state.previous or {}).get("date")}
+    with http_errors():
+        return state.get_alerts()
 
 
 @app.get("/api/languages")
 def languages():
-    return {"current": state.lang,
-            "available": [{"id": k, "name": gamedata.LANGUAGES.get(k, k)}
-                          for k in gamedata.available_languages()]}
+    return state.languages()
 
 
 @app.get("/api/saves")
 def saves():
-    return [{"name": os.path.basename(p), "mtime": m} for m, p in paths.list_saves()]
+    return state.saves()
 
 
 @app.get("/api/missions")
 def mission_catalogue():
-    snap = state.require()
-    return missions.catalogue(snap, state.lang)
+    with http_errors():
+        return state.mission_catalogue()
 
 
 @app.get("/api/missions/{name}/plan")
 def mission_plan(name: str, councilor: str = Query(None)):
-    snap = state.require()
-    return missions.plan(snap, name, councilor)
+    with http_errors():
+        return state.mission_plan(name, councilor)
 
 
 @app.get("/api/history")
 def history():
-    state.require()
-    return store.history(state.con, state.campaign())
+    with http_errors():
+        return state.history()
 
 
 @app.get("/api/campaigns")
 def campaigns():
-    return store.campaigns(state.con)
+    return state.campaigns()
 
 
 @app.get("/api/nations/trends")
 def nation_trends():
-    """Serie storiche delle nazioni: stanno fuori dallo snapshot per non
-    gonfiare lo storico archiviato a ogni salvataggio."""
-    state.require()
-    return state.trends or {"points": 0, "nations": {}}
+    with http_errors():
+        return state.nation_trends()
 
 
 @app.get("/api/nations/{name}/detail")
 def nation_detail(name: str, lang: str = Query(None)):
-    """Cause di variazione degli indicatori e priorita' dei nostri punti di
-    controllo in quella nazione."""
-    state.require()
-    d = model.nation_detail(state.game, name, lang or state.lang)
-    if d is None:
-        raise HTTPException(404, "Nazione non trovata.")
-    return d
+    with http_errors():
+        return state.nation_detail(name, lang)
 
 
 @app.get("/api/factions")
 def faction_compare(lang: str = Query(None)):
-    """Le fazioni conosciute, coi soli campi che il nostro intel sblocca.
-    Soglie e misure sono quelle del gioco: vedi ticore/factions.py."""
-    state.require()
-    return factions.compare(state.game, lang or state.lang)
+    with http_errors():
+        return state.faction_compare(lang)
 
 
 @app.get("/api/diff")
 def diff():
-    """Cosa e' cambiato rispetto allo snapshot precedente."""
-    cur, prev = state.require(), state.previous
-    if not prev:
-        return {"previous": None}
-    res = {k: round((cur["resources"].get(k, 0) - prev["resources"].get(k, 0)), 1)
-           for k in cur["resources"]}
-    projs = {}
-    before = {p["id"]: p["accumulated"] for p in prev["projects"]["items"]}
-    for p in cur["projects"]["items"]:
-        if p["active"]:
-            projs[p["name"]] = round(p["accumulated"] - before.get(p["id"], 0), 1)
-    cps = {}
-    a, b = prev["controlPoints"]["byNation"], cur["controlPoints"]["byNation"]
-    for n in set(a) | set(b):
-        if b.get(n, 0) != a.get(n, 0):
-            cps[n] = {"before": a.get(n, 0), "after": b.get(n, 0)}
-    return {"previous": prev["date"], "current": cur["date"],
-            "resources": res, "projects": projs, "controlPoints": cps}
+    with http_errors():
+        return state.diff()
 
 
 # ---------------------------------------------------------- note e obiettivi
@@ -379,47 +238,46 @@ class GoalIn(BaseModel):
 
 @app.get("/api/notes")
 def notes(subject: str = Query(None)):
-    return store.list_notes(state.con, state.campaign(), subject)
+    with http_errors():
+        return state.notes(subject)
 
 
 @app.post("/api/notes")
 def note_add(n: NoteIn):
-    return {"id": store.add_note(state.con, state.campaign(), n.subject, n.body)}
+    with http_errors():
+        return state.note_add(n.subject, n.body)
 
 
 @app.put("/api/notes/{note_id}")
 def note_edit(note_id: int, n: NoteEdit):
-    store.update_note(state.con, note_id, n.body)
-    return {"ok": True}
+    return state.note_edit(note_id, n.body)
 
 
 @app.delete("/api/notes/{note_id}")
 def note_delete(note_id: int):
-    store.delete_note(state.con, note_id)
-    return {"ok": True}
+    return state.note_delete(note_id)
 
 
 @app.get("/api/goals")
 def goals():
-    return store.goal_progress(state.con, state.campaign(), state.require())
+    with http_errors():
+        return state.goals()
 
 
 @app.post("/api/goals")
 def goal_add(gl: GoalIn):
-    return {"id": store.add_goal(state.con, state.campaign(), gl.title, gl.kind,
-                                 gl.target, gl.amount, gl.due)}
+    with http_errors():
+        return state.goal_add(gl.title, gl.kind, gl.target, gl.amount, gl.due)
 
 
 @app.post("/api/goals/{goal_id}/done")
 def goal_done(goal_id: int, done: bool = True):
-    store.set_goal_done(state.con, goal_id, done)
-    return {"ok": True}
+    return state.goal_done(goal_id, done)
 
 
 @app.delete("/api/goals/{goal_id}")
 def goal_delete(goal_id: int):
-    store.delete_goal(state.con, goal_id)
-    return {"ok": True}
+    return state.goal_delete(goal_id)
 
 
 # -------------------------------------------------------------------- SSE
@@ -427,16 +285,13 @@ def goal_delete(goal_id: int):
 @app.get("/api/stream")
 async def stream():
     q: asyncio.Queue = asyncio.Queue()
-    state.subscribers.add(q)
+    subscribers.add(q)
 
     async def gen():
         try:
             yield "retry: 3000\n\n"
             if state.snapshot:
-                yield _sse({"type": "hello", "date": state.snapshot["date"],
-                            "save": state.snapshot["save"],
-                            "faction": state.snapshot["faction"],
-                            "alerts": state.alerts})
+                yield _sse(state.event("hello"))
             while True:
                 try:
                     ev = await asyncio.wait_for(q.get(), timeout=20)
@@ -444,7 +299,7 @@ async def stream():
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"   # tiene viva la connessione
         finally:
-            state.subscribers.discard(q)
+            subscribers.discard(q)
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache",

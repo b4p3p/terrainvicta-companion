@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { api, askNotificationPermission, useSnapshot } from "@/lib/api";
+import { api, askNotificationPermission, useEngineStatus, useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
+import { EngineGate } from "@/components/EngineGate";
 import { ResourceIcon } from "@/components/ui";
 
 const TABS = [
@@ -29,6 +30,8 @@ const RESOURCES = [
 export default function Shell({ children }: { children: React.ReactNode }) {
   const { t, game, setGame, live } = useSettings();
   const { data: snap } = useSnapshot(live.version, game);
+  // null con l'API locale: deciso dopo il montaggio, niente differenze col render del server
+  const engineStatus = useEngineStatus();
   const path = usePathname();
   const [langs, setLangs] = useState<{ id: string; name: string }[]>([]);
 
@@ -74,7 +77,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               </Link>
             )}
             <span className={live.connected ? "text-good" : "text-bad"}>
-              {live.connected ? t.common.live : t.common.offline}
+              {live.connected ? t.common.live
+                : engineStatus ? t.engine.waiting : t.common.offline}
             </span>
             <select value={game} aria-label={t.common.language}
               onChange={(e) => setGame(e.target.value)}>
@@ -148,6 +152,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
       {/* nessun limite di larghezza: è una console da secondo monitor, e un cap
           disallineava il contenuto dall'intestazione a tutta larghezza */}
+      <EngineGate />
       <main className="p-4 w-full">{children}</main>
     </div>
   );

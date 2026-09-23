@@ -36,14 +36,25 @@ _TEMPLATE_FILES = {
 _bundle = None
 
 
-def use_bundle(tpl, strings_by_lang):
+def use_bundle(tpl, strings_by_lang, languages=None):
     """Usa un estratto (vedi `bundle.py`) al posto dei file del gioco.
 
     `strings_by_lang` puo' contenere solo alcune lingue: il browser scarica
     quella scelta e l'inglese, e aggiunge le altre con `add_strings()`.
+    `languages` sono tutte quelle dell'estratto, anche non ancora scaricate.
     """
     global _bundle
-    _bundle = {"templates": tpl, "strings": dict(strings_by_lang)}
+    _bundle = {"templates": tpl, "strings": dict(strings_by_lang),
+               "languages": list(languages or strings_by_lang)}
+    for f in (templates, strings, available_languages, mission_icon,
+              faction_colors, trait_description):
+        f.cache_clear()
+
+
+def use_game_files():
+    """Torna a leggere dall'installazione del gioco."""
+    global _bundle
+    _bundle = None
     for f in (templates, strings, available_languages, mission_icon,
               faction_colors, trait_description):
         f.cache_clear()
@@ -105,7 +116,7 @@ def strings(lang):
 @lru_cache(maxsize=1)
 def available_languages():
     if _bundle:
-        return [x for x in LANGUAGES if x in _bundle["strings"]] or ["en"]
+        return [x for x in LANGUAGES if x in _bundle["languages"]] or ["en"]
     d = paths.localization_dir()
     if not d:
         return ["en"]

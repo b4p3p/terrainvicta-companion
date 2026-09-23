@@ -44,4 +44,5 @@ next-env.d.ts
 # dei dati del gioco (dati di Pavonis: mai nel repo)
 /public/py/
 /public/pyodide/
+/public/icons/
 /public/gamedata/
