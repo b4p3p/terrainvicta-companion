@@ -9,7 +9,6 @@ import type { Alert } from "./types";
 
 interface Settings {
   ui: UiLang;
-  setUi: (l: UiLang) => void;
   game: string;
   setGame: (l: string) => void;
   t: Dict;
@@ -19,36 +18,33 @@ interface Settings {
 
 const Ctx = createContext<Settings | null>(null);
 
-// la lingua di gioco predefinita segue quella dell'interfaccia
-const GAME_FOR_UI: Record<UiLang, string> = { it: "ita", en: "en" };
+// Una sola scelta: la lingua di gioco. L'interfaccia ha solo it/en, quindi
+// segue: italiano se il gioco e' in italiano, inglese per tutte le altre.
+const uiFor = (game: string): UiLang => (game === "ita" ? "it" : "en");
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [ui, setUiRaw] = useState<UiLang>("it");
   const [game, setGameRaw] = useState<string>("ita");
   const live = useLive();
 
   // preferenze per-browser: non sono stato di partita, stanno bene qui
   useEffect(() => {
     try {
-      const u = localStorage.getItem("ti.ui") as UiLang | null;
       const g = localStorage.getItem("ti.game");
-      if (u) setUiRaw(u);
       if (g) setGameRaw(g);
     } catch { /* storage bloccato: restiamo sui default */ }
   }, []);
 
-  const setUi = (l: UiLang) => {
-    setUiRaw(l);
-    try { localStorage.setItem("ti.ui", l); } catch {}
-  };
   const setGame = (l: string) => {
     setGameRaw(l);
     try { localStorage.setItem("ti.game", l); } catch {}
   };
 
   const value = useMemo<Settings>(
-    () => ({ ui, setUi, game, setGame, t: dict(ui), live }),
-    [ui, game, live],
+    () => {
+      const ui = uiFor(game);
+      return { ui, game, setGame, t: dict(ui), live };
+    },
+    [game, live],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
@@ -58,5 +54,3 @@ export function useSettings() {
   if (!c) throw new Error("useSettings fuori dal provider");
   return c;
 }
-
-export { GAME_FOR_UI };

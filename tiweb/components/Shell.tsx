@@ -4,8 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, askNotificationPermission, useSnapshot } from "@/lib/api";
-import { UI_LANGS, type UiLang } from "@/lib/i18n";
-import { useSettings, GAME_FOR_UI } from "@/lib/settings";
+import { useSettings } from "@/lib/settings";
 import { ResourceIcon } from "@/components/ui";
 
 const TABS = [
@@ -28,7 +27,7 @@ const RESOURCES = [
 ] as const;
 
 export default function Shell({ children }: { children: React.ReactNode }) {
-  const { t, ui, setUi, game, setGame, live } = useSettings();
+  const { t, game, setGame, live } = useSettings();
   const { data: snap } = useSnapshot(live.version, game);
   const path = usePathname();
   const [langs, setLangs] = useState<{ id: string; name: string }[]>([]);
@@ -77,15 +76,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             <span className={live.connected ? "text-good" : "text-bad"}>
               {live.connected ? t.common.live : t.common.offline}
             </span>
-            <select value={ui} aria-label={t.common.uiLanguage}
-              onChange={(e) => {
-                const l = e.target.value as UiLang;
-                setUi(l);
-                setGame(GAME_FOR_UI[l] ?? game);
-              }}>
-              {UI_LANGS.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
-            <select value={game} aria-label={t.common.gameLanguage}
+            <select value={game} aria-label={t.common.language}
               onChange={(e) => setGame(e.target.value)}>
               {langs.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
