@@ -122,18 +122,23 @@ export function AttrIcon({
     size={size} title={title} />;
 }
 
-/** Sparkline: verde se l'ultimo valore è sopra il primo, rossa altrimenti. */
-export function Spark({ data, w = 54, h = 14 }: { data: number[]; w?: number; h?: number }) {
+/** Sparkline: verde se l'ultimo valore è sopra il primo, rossa altrimenti.
+ *  `upIsBad` inverte i colori per gli indicatori che salendo peggiorano
+ *  (disordini, disuguaglianza); una serie piatta resta neutra. */
+export function Spark({ data, w = 54, h = 14, upIsBad = false }: {
+  data: number[]; w?: number; h?: number; upIsBad?: boolean;
+}) {
   if (!data || data.length < 2) return null;
   const mn = Math.min(...data), mx = Math.max(...data), sp = mx - mn || 1;
   const pts = data
     .map((v, i) => `${((i / (data.length - 1)) * w).toFixed(1)},${(h - ((v - mn) / sp) * h).toFixed(1)}`)
     .join(" ");
-  const up = data[data.length - 1] >= data[0];
+  const d = data[data.length - 1] - data[0];
+  const stroke = d === 0 ? "var(--ink-faint)"
+    : (d > 0) !== upIsBad ? "var(--good)" : "var(--bad)";
   return (
     <svg width={w} height={h} className="inline-block align-middle">
-      <polyline points={pts} fill="none" strokeWidth={1.4}
-        stroke={up ? "var(--good)" : "var(--bad)"} />
+      <polyline points={pts} fill="none" strokeWidth={1.4} stroke={stroke} />
     </svg>
   );
 }

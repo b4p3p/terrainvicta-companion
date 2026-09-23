@@ -287,3 +287,12 @@ export interface Note {
   created: number;
   updated: number;
 }
+
+/** Serie storiche per nazione (/api/nations/trends): chiavi come in `Nation`. */
+export type TrendKey = "gdp" | "pop" | "research" | "ip" | "education" | "democracy"
+  | "cohesion" | "unrest" | "inequality" | "miltech" | "nukes" | "support";
+
+export interface NationTrends {
+  points: number;
+  nations: Record<string, Partial<Record<TrendKey, number[]>>>;
+}

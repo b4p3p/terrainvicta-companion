@@ -12,10 +12,11 @@ variant; these are the `_on` ones, with the suffix dropped, so the file name mat
 `missionIconImagePath` field in `TIMissionTemplate.json`
 (`councilor_missions/ICO_assassinate` → `ICO_assassinate.png`).
 
-`icons_2d/` holds 16 icons from the bundle of the same name: the seven resources
+`icons_2d/` holds 17 icons from the bundle of the same name: the seven resources
 (`ICO_currency`, `ICO_influence`, `ICO_ops`, `ICO_research`, `ICO_boost`,
-`ICO_mission_control`, `ICO_projects`), the control-point marker, and the eight
-councilor attribute glyphs.
+`ICO_mission_control`, `ICO_projects`), the control-point marker, the eight
+councilor attribute glyphs, and the spaceflight-program marker
+(`ICO_spaceflightProgram_priority`).
 
 ## Why they are here
 

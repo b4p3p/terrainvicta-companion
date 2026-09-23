@@ -21,7 +21,7 @@ from pydantic import BaseModel
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import ticore                                    # noqa: E402
-from ticore import alerts, gamedata, missions, paths, store  # noqa: E402
+from ticore import alerts, gamedata, missions, model, paths, store  # noqa: E402
 from . import icons                             # noqa: E402
 
 app = FastAPI(title="TerraInvictaCompanion", version="1.0")
@@ -40,6 +40,7 @@ class State:
     def __init__(self):
         self.con = store.connect()
         self.snapshot = None
+        self.trends = None
         self.previous = None
         self.alerts = []
         self.lang = "ita"
@@ -67,6 +68,7 @@ class State:
         store.save_snapshot(self.con, snap)
         self.previous = prev
         self.snapshot = snap
+        self.trends = model.nation_trends(g)
         self.alerts = alerts.evaluate(snap, prev)
         self.loaded_mtime = g.mtime
         self.error = None
@@ -203,6 +205,14 @@ def history():
 @app.get("/api/campaigns")
 def campaigns():
     return store.campaigns(state.con)
+
+
+@app.get("/api/nations/trends")
+def nation_trends():
+    """Serie storiche delle nazioni: stanno fuori dallo snapshot per non
+    gonfiare lo storico archiviato a ogni salvataggio."""
+    state.require()
+    return state.trends or {"points": 0, "nations": {}}
 
 
 @app.get("/api/diff")
