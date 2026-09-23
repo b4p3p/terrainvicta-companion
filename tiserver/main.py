@@ -135,9 +135,36 @@ def health():
     }
 
 
+def _default_preset():
+    """Il preset predefinito della fazione, per i punti di controllo nuovi.
+
+    E' l'unico riferimento per NOME a un preset nel salvataggio: le priorita'
+    dei punti di controllo sono salvate come pesi, non come preset scelto."""
+    try:
+        return state.game.me.get("defaultPriorityPresetTemplateName") if state.game else None
+    except Exception:
+        return None
+
+
+def _presets_status(lang):
+    return dict(presets.status(lang or state.lang), defaultPreset=_default_preset())
+
+
+def _maybe_install(install, lang):
+    """Dopo un salvataggio, scrive subito nel gioco se richiesto e possibile.
+    Un fallimento qui non annulla il salvataggio: lo si dice e basta."""
+    if not install:
+        return None
+    try:
+        presets.install(lang or state.lang)
+        return {"ok": True, "error": None}
+    except (OSError, ValueError) as e:
+        return {"ok": False, "error": str(e)}
+
+
 @app.get("/api/presets")
 def list_presets(lang: str = Query(None)):
-    return presets.status(lang or state.lang)
+    return _presets_status(lang)
 
 
 @app.post("/api/presets/install")
@@ -151,7 +178,7 @@ def install_presets(lang: str = Query(None)):
         res = presets.install(lang or state.lang)
     except (OSError, ValueError) as e:
         raise HTTPException(400, str(e))
-    return dict(res, status=presets.status(lang or state.lang))
+    return dict(res, status=_presets_status(lang))
 
 
 @app.post("/api/presets/restore")
@@ -160,7 +187,7 @@ def restore_presets(lang: str = Query(None)):
         res = presets.restore()
     except (OSError, ValueError) as e:
         raise HTTPException(400, str(e))
-    return dict(res, status=presets.status(lang or state.lang))
+    return dict(res, status=_presets_status(lang))
 
 
 class PresetIn(BaseModel):
@@ -169,36 +196,42 @@ class PresetIn(BaseModel):
 
 
 @app.post("/api/presets/custom")
-def create_preset(p: PresetIn, lang: str = Query(None)):
+def create_preset(p: PresetIn, lang: str = Query(None), install: bool = Query(False)):
     """Nuovo preset personale, in ~/.terrainvicta-companion/presets.json.
-
-    Non tocca il gioco: per portarlo in partita serve reinstallare.
-    """
+    Con `install=true` lo scrive anche nel template del gioco."""
     try:
         entry = presets.save_user(p.name, p.weights)
     except ValueError as e:
         raise HTTPException(400, str(e))
-    return {"id": entry["dataName"], "status": presets.status(lang or state.lang)}
+    inst = _maybe_install(install, lang)
+    return {"id": entry["dataName"], "install": inst, "status": _presets_status(lang)}
 
 
 @app.put("/api/presets/custom/{data_name}")
-def update_preset(data_name: str, p: PresetIn, lang: str = Query(None)):
+def update_preset(data_name: str, p: PresetIn, lang: str = Query(None),
+                  install: bool = Query(False)):
     try:
         presets.save_user(p.name, p.weights, data_name)
     except KeyError:
         raise HTTPException(404, "Preset personale non trovato.")
     except ValueError as e:
         raise HTTPException(400, str(e))
-    return {"id": data_name, "status": presets.status(lang or state.lang)}
+    inst = _maybe_install(install, lang)
+    return {"id": data_name, "install": inst, "status": _presets_status(lang)}
 
 
 @app.delete("/api/presets/custom/{data_name}")
 def delete_preset(data_name: str, lang: str = Query(None)):
+    # il gioco lo cerca per nome al caricamento della partita: toglierlo
+    # lascerebbe la fazione con un predefinito che non esiste
+    if data_name == _default_preset():
+        raise HTTPException(409, "E' il preset predefinito della tua fazione in partita: "
+                                 "scegline un altro come predefinito prima di eliminarlo.")
     try:
         presets.delete_user(data_name)
     except KeyError:
         raise HTTPException(404, "Preset personale non trovato.")
-    return {"status": presets.status(lang or state.lang)}
+    return {"status": _presets_status(lang)}
 
 
 @app.get("/api/icons/{bundle}/{name}.png")

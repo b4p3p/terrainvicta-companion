@@ -7,9 +7,10 @@ import { useSettings } from "@/lib/settings";
 import { Button, Empty, GameIcon, Panel, Tag } from "@/components/ui";
 import { Combo, type ComboOption } from "@/components/Combo";
 import { Guide } from "@/components/Guide";
+import { Modal } from "@/components/Modal";
 import {
   COLOR_OF, FAMILIES, Legend, ShareBar, WeightChips, familyShares, pc, pp,
-  type Priority, type Slice,
+  type Family, type Priority, type Slice,
 } from "@/components/priorities";
 
 interface Preset {
@@ -39,6 +40,8 @@ interface Status {
   priorities: Priority[];
   presets: Preset[];
   pending: Preset[];
+  /** preset predefinito della fazione in partita (dataName), se c'è un salvataggio */
+  defaultPreset: string | null;
 }
 
 type Labels = ReturnType<typeof useSettings>["t"]["presets"];
@@ -66,9 +69,9 @@ function FamilyDelta({ p, base, t, knowledge }: {
   );
 }
 
-function Row({ p, base, t, knowledge, onEdit, onDuplicate, onDelete }: {
+function Row({ p, base, t, knowledge, onEdit, onDuplicate, isDefault }: {
   p: Preset; base: Preset | null; t: Labels; knowledge: string;
-  onEdit?: () => void; onDuplicate: () => void; onDelete?: () => void;
+  onEdit?: () => void; onDuplicate: () => void; isDefault: boolean;
 }) {
   const isBase = base?.id === p.id;
   const compare = base && !isBase;
@@ -82,6 +85,7 @@ function Row({ p, base, t, knowledge, onEdit, onDuplicate, onDelete }: {
         {p.mine && p.stale && <Tag tone="warn">{t.staleTag}</Tag>}
         {p.mine && !p.installed && <Tag>{t.notInGame}</Tag>}
         {isBase && <Tag>{t.reference}</Tag>}
+        {isDefault && <span title={t.defaultHint}><Tag tone="free">{t.defaultTag}</Tag></span>}
         <span className="ml-auto flex gap-3 text-[12px] items-baseline">
           <span className="text-faint">{p.count} {t.entries} · Σ {p.total}</span>
           <button type="button" onClick={onDuplicate}
@@ -92,12 +96,6 @@ function Row({ p, base, t, knowledge, onEdit, onDuplicate, onDelete }: {
             <button type="button" onClick={onEdit}
               className="text-accent hover:text-ink text-[11.5px] p-0 bg-transparent border-0">
               {t.edit}
-            </button>
-          )}
-          {onDelete && (
-            <button type="button" onClick={onDelete}
-              className="text-bad hover:text-ink text-[11.5px] p-0 bg-transparent border-0">
-              {t.remove}
             </button>
           )}
         </span>
@@ -133,9 +131,9 @@ interface Draft {
 
 /** Editor dei pesi. La quota si ricalcola a ogni clic, come farà il gioco:
  *  peso della voce diviso la somma dei pesi accesi. */
-function Editor({ draft, setDraft, catalog, t, knowledge, busy, onSave, onCancel }: {
+function Editor({ draft, setDraft, catalog, t, knowledge }: {
   draft: Draft; setDraft: (d: Draft) => void; catalog: Priority[]; t: Labels;
-  knowledge: string; busy: boolean; onSave: () => void; onCancel: () => void;
+  knowledge: string;
 }) {
   const total = Object.values(draft.weights).reduce((a, b) => a + b, 0);
   const preview = useMemo(() => ({
@@ -151,46 +149,67 @@ function Editor({ draft, setDraft, catalog, t, knowledge, busy, onSave, onCancel
   }
 
   return (
-    <div className="bg-panel border border-sel-edge px-3 py-3 mb-3">
+    <div>
       <div className="flex items-center gap-2 flex-wrap mb-2">
         <input value={draft.name} placeholder={t.name} autoFocus
           onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-          className="min-w-[260px]" />
+          className="min-w-[300px] flex-1 text-[13px]" />
         <span className="text-faint text-[11.5px]">Σ {total}</span>
-        <span className="ml-auto flex gap-2">
-          <Button tone="primary" onClick={onSave}
-            disabled={busy || !draft.name.trim() || !total}>{t.save}</Button>
-          <Button onClick={onCancel} disabled={busy}>{t.cancel}</Button>
-        </span>
       </div>
       <p className="text-faint text-[11.5px] mb-2">{t.editorHint}</p>
       <div className="mb-2"><ShareBar p={preview} height={18} weightLabel={t.weight} /></div>
       <div className="mb-3"><Legend names={t.fam} knowledge={knowledge} /></div>
-      <div className="grid gap-x-4 gap-y-[2px]"
-        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(330px, 1fr))" }}>
-        {catalog.map((c) => {
-          const w = draft.weights[c.id] ?? 0;
-          return (
-            <div key={c.id} className={`flex items-center gap-2 px-1.5 py-[3px] border-l-2 ${
-              w ? "bg-sel" : ""}`} style={{ borderColor: COLOR_OF[c.id] }}>
-              <GameIcon bundle="icons_2d" icon={c.icon} size={16} />
-              <span className={`text-[12px] flex-1 ${w ? "text-ink" : "text-dim"}`}>{c.name}</span>
-              <span className="text-[11.5px] text-faint w-[46px] text-right">
-                {w ? pc(w / total) : ""}
-              </span>
-              <span className="flex">
-                {[0, 1, 2, 3].map((n) => (
-                  <button key={n} type="button" onClick={() => setW(c.id, n)}
-                    className={`w-[22px] h-[20px] text-[11px] border border-edge-lit -ml-px p-0
-                      ${n !== w ? "bg-control text-dim hover:text-ink"
-                        : n ? "bg-accent text-void" : "bg-edge-lit text-ink"}`}>
-                    {n || "–"}
-                  </button>
-                ))}
-              </span>
-            </div>
-          );
-        })}
+      {/* per famiglia, in tre colonne di altezza simile: 6 · 6 · 8 voci */}
+      <div className="grid gap-x-5 gap-y-3 grid-cols-[repeat(auto-fit,minmax(290px,1fr))]">
+        {([["knowledge", "civil"], ["space", "power"], ["military"]] as Family[][]).map((col) => (
+          <div key={col.join()} className="flex flex-col gap-3">
+            {col.map((fk) => {
+              const fam = FAMILIES.find((f) => f.key === fk)!;
+              const items = catalog.filter((c) => fam.members.includes(c.id));
+              const share = items.reduce((a, c) => a + (draft.weights[c.id] ?? 0), 0) / (total || 1);
+              return (
+                <div key={fk}>
+                  <div className="flex items-baseline justify-between mb-1 border-b border-edge pb-0.5">
+                    <span className="display text-[11px] uppercase tracking-[.06em] text-dim
+                                     inline-flex items-center gap-1.5">
+                      <span className="inline-block w-2 h-2" style={{ background: fam.color }} />
+                      {fk === "knowledge" ? knowledge : t.fam[fk]}
+                    </span>
+                    <span className="text-faint text-[11px]">{share ? pc(share) : ""}</span>
+                  </div>
+                  <div className="flex flex-col gap-[2px]">
+                    {items.map((c) => {
+                      const w = draft.weights[c.id] ?? 0;
+                      return (
+                        <div key={c.id} className={`flex items-center gap-2 px-1.5 py-[3px] border-l-2 ${
+                          w ? "bg-sel" : ""}`} style={{ borderColor: COLOR_OF[c.id] }}>
+                          <GameIcon bundle="icons_2d" icon={c.icon} size={16} />
+                          <span className={`text-[12px] flex-1 truncate ${w ? "text-ink" : "text-dim"}`}>
+                            {c.name}
+                          </span>
+                          <span className="text-[11.5px] text-faint w-[42px] text-right">
+                            {w ? pc(w / total) : ""}
+                          </span>
+                          <span className="flex">
+                            {[0, 1, 2, 3].map((n) => (
+                              <button key={n} type="button" onClick={() => setW(c.id, n)}
+                                aria-pressed={n === w}
+                                className={`w-[22px] h-[20px] text-[11px] border border-edge-lit -ml-px p-0
+                                  ${n !== w ? "bg-control text-dim hover:text-ink"
+                                    : n ? "bg-accent text-void" : "bg-edge-lit text-ink"}`}>
+                                {n || "–"}
+                              </button>
+                            ))}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -203,6 +222,8 @@ export default function PresetsPage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [modalErr, setModalErr] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [baseId, setBaseId] = usePersistentState<string>(
     "presets.base", "", (v): v is string => typeof v === "string");
   const [comparing, setComparing] = usePersistentState<boolean>(
@@ -227,7 +248,9 @@ export default function PresetsPage() {
       setSt(d.status);
       return d;
     } catch (e) {
-      setMsg(String(e));
+      const text = String(e).replace(/^Error: /, "");
+      setMsg(text);
+      setModalErr(text);
       return null;
     } finally {
       setBusy(false);
@@ -240,22 +263,33 @@ export default function PresetsPage() {
     }
   }
 
-  async function saveDraft() {
-    if (!draft) return;
-    const body = { name: draft.name, weights: draft.weights };
-    const ok = draft.id
-      ? await call(`/api/presets/custom/${encodeURIComponent(draft.id)}`, "PUT", body)
-      : await call("/api/presets/custom", "POST", body);
-    if (ok) {
-      setDraft(null);
-      setMsg(t.saved);
-    }
+  function openDraft(d: Draft) {
+    setDraft(d);
+    setModalErr(null);
+    setConfirmDelete(false);
   }
 
-  async function remove(p: Preset) {
-    if (await call(`/api/presets/custom/${encodeURIComponent(p.id)}`, "DELETE")) {
-      setMsg(t.deleted);
-    }
+  /** Salva e, se il template è scrivibile, scrive subito nel gioco: dalla
+   *  modale si esce con il preset pronto, manca solo riavviare Terra Invicta. */
+  async function saveDraft() {
+    if (!draft || !st) return;
+    const body = { name: draft.name, weights: draft.weights };
+    const q = st.writable ? "?install=true" : "";
+    const d = draft.id
+      ? await call(`/api/presets/custom/${encodeURIComponent(draft.id)}${q}`, "PUT", body)
+      : await call(`/api/presets/custom${q}`, "POST", body);
+    if (!d) return;                 // l'errore l'ha già messo call() nella modale
+    setDraft(null);
+    setMsg(d.install?.ok ? t.savedRestart
+      : d.install ? `${t.savedNotInstalled} ${d.install.error}` : t.saved);
+  }
+
+  async function removeDraft() {
+    if (!draft?.id) return;
+    const d = await call(`/api/presets/custom/${encodeURIComponent(draft.id)}`, "DELETE");
+    if (!d) return;
+    setDraft(null);
+    setMsg(t.deleted);
   }
 
   if (!st) return <Empty>{msg ?? all.common.loading}</Empty>;
@@ -279,12 +313,14 @@ export default function PresetsPage() {
 
   const rowProps = (p: Preset) => ({
     p, base, t, knowledge,
-    onDuplicate: () => setDraft({ id: null, name: `${p.name} (2)`, weights: { ...p.weights } }),
+    isDefault: p.id === st.defaultPreset,
+    onDuplicate: () => openDraft({ id: null, name: `${p.name} (2)`, weights: { ...p.weights } }),
     onEdit: p.editable
-      ? () => setDraft({ id: p.id, name: p.name, weights: { ...p.weights } })
+      ? () => openDraft({ id: p.id, name: p.name, weights: { ...p.weights } })
       : undefined,
-    onDelete: p.editable ? () => remove(p) : undefined,
   });
+  const draftTotal = draft ? Object.values(draft.weights).reduce((a, b) => a + b, 0) : 0;
+  const draftIsDefault = !!draft?.id && draft.id === st.defaultPreset;
 
   return (
     <>
@@ -336,18 +372,40 @@ export default function PresetsPage() {
           <h3 className="display text-[12px] uppercase tracking-[.06em] text-dim m-0">
             {t.personal}
           </h3>
-          {!draft && (
-            <Button onClick={() => setDraft({ id: null, name: "", weights: {} })}>
-              {t.newPreset}
-            </Button>
-          )}
+          <Button onClick={() => openDraft({ id: null, name: "", weights: {} })}>
+            {t.newPreset}
+          </Button>
         </div>
-        {draft && (
-          <Editor draft={draft} setDraft={setDraft} catalog={st.priorities} t={t}
-            knowledge={knowledge} busy={busy} onSave={saveDraft}
-            onCancel={() => setDraft(null)} />
-        )}
-        {personal.length === 0 && !draft && (
+        <Modal open={!!draft} onClose={() => !busy && setDraft(null)} width={1000}
+          title={draft?.id ? `${t.edit} · ${draft.name || "…"}` : t.newPreset}
+          footer={draft && (
+            <div className="flex items-center gap-3 flex-wrap">
+              {draft.id && (
+                draftIsDefault
+                  ? <span className="text-faint text-[11.5px]">{t.cantDeleteDefault}</span>
+                  : confirmDelete
+                    ? <Button tone="danger" onClick={removeDraft} disabled={busy}>{t.confirmDelete}</Button>
+                    : <Button onClick={() => setConfirmDelete(true)} disabled={busy}>{t.remove}</Button>
+              )}
+              <p className="text-warn text-[11.5px] m-0 flex-1 min-w-[260px]">
+                {st.writable ? t.restartWarning : t.notWritable}
+              </p>
+              <Button onClick={() => setDraft(null)} disabled={busy}>{t.cancel}</Button>
+              <Button tone="primary" onClick={saveDraft}
+                disabled={busy || !draft.name.trim() || !draftTotal}>
+                {st.writable ? t.saveAndWrite : t.save}
+              </Button>
+            </div>
+          )}>
+          {draft && (
+            <>
+              {modalErr && <p className="text-bad text-[12px] mb-2">{modalErr}</p>}
+              <Editor draft={draft} setDraft={setDraft} catalog={st.priorities} t={t}
+                knowledge={knowledge} />
+            </>
+          )}
+        </Modal>
+        {personal.length === 0 && (
           <p className="text-faint text-[12px] mb-3">{t.noPersonal}</p>
         )}
         {personal.map((p) => <Row key={p.id} {...rowProps(p)} />)}

@@ -173,6 +173,15 @@ const it = {
     builtinHint:
       "Ordinati per quota di ricerca. Il valore della Conoscenza è quasi sempre 3: quello che cambia è su quante voci si divide il bilancio.",
     guide: "Guida",
+    defaultTag: "predefinito in partita",
+    defaultHint: "È il preset che il gioco applica ai punti di controllo che conquisti. Il gioco lo cerca per nome: se lo modifichi, i nuovi punti prendono i pesi nuovi.",
+    cantDeleteDefault: "È il tuo preset predefinito in partita: non si può eliminare finché non ne scegli un altro.",
+    confirmDelete: "Conferma: elimina",
+    saveAndWrite: "Salva e scrivi nel gioco",
+    restartWarning:
+      "Il gioco legge i preset solo all'avvio: dopo il salvataggio riavvia Terra Invicta. I punti di controllo dove l'hai già applicato NON cambiano (il gioco ne salva i pesi, non il preset): riapplicalo lì.",
+    savedRestart: "Salvato e scritto nel gioco. Riavvia Terra Invicta per vederlo, poi riapplicalo dove lo usavi.",
+    savedNotInstalled: "Salvato, ma non scritto nel gioco:",
     guideWhyTitle: "A cosa serve",
     guideAchTitle: "Achievement",
     guideReadTitle: "Come leggere le barre",
@@ -499,6 +508,15 @@ const en: typeof it = {
     builtinHint:
       "Sorted by research share. Knowledge is almost always 3: what changes is how many entries split the budget.",
     guide: "Guide",
+    defaultTag: "default in game",
+    defaultHint: "The preset the game applies to control points you gain. The game looks it up by name: if you edit it, new points get the new weights.",
+    cantDeleteDefault: "This is your default preset in game: it cannot be deleted until you pick another one.",
+    confirmDelete: "Confirm: delete",
+    saveAndWrite: "Save and write to game",
+    restartWarning:
+      "The game only reads presets at startup: restart Terra Invicta after saving. Control points where you already applied it do NOT change (the game stores their weights, not the preset): apply it there again.",
+    savedRestart: "Saved and written to the game. Restart Terra Invicta to see it, then apply it again where you used it.",
+    savedNotInstalled: "Saved, but not written to the game:",
     guideWhyTitle: "What it is for",
     guideAchTitle: "Achievements",
     guideReadTitle: "Reading the bars",
