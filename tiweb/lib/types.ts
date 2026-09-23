@@ -40,6 +40,8 @@ export interface Councilor {
   nationality: string | null;
   location: string | null;
   xp: number;
+  /** anni compiuti alla data di gioco, da dateBorn */
+  age: number | null;
   base: Record<Attr, number>;
   attributes: Record<Attr, number>;
   traits: Trait[];

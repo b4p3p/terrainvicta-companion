@@ -109,6 +109,15 @@ def income_of(c, traits):
     return out
 
 
+def age_of(g, c):
+    """Anni compiuti alla data di gioco, da `dateBorn`. None se manca."""
+    born = c.get("dateBorn") or {}
+    y, m, d = g.game_date()
+    if not born.get("year") or not y:
+        return None
+    return y - born["year"] - ((m, d) < (born.get("month", 1), born.get("day", 1)))
+
+
 def councilor_view(g, c, lang="ita", known=True):
     """Un consigliere: attributi base ed effettivi, org, missioni, tratti.
 
@@ -139,6 +148,7 @@ def councilor_view(g, c, lang="ita", known=True):
         "nationality": (home or {}).get("displayName"),
         "location": g.region_label((c.get("location") or {}).get("value")),
         "xp": c.get("XP") or 0,
+        "age": age_of(g, c),
         "base": {a: attrs.get(a, 0) for a in ATTRS},
         "attributes": effective,
         "traits": [{"id": t, "name": gamedata.trait_name(lang, t),

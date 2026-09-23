@@ -117,6 +117,20 @@ function Traits({ c }: { c: Councilor }) {
   );
 }
 
+function KeyFigure({ label, value, tone, title }: {
+  label: string; value: string; tone?: "good" | "faint"; title?: string;
+}) {
+  return (
+    <div className="bg-void/40 border border-edge px-2 py-1" title={title}>
+      <div className="text-[10.5px] text-faint uppercase tracking-[.05em]">{label}</div>
+      <div className={`display text-[20px] leading-none mt-0.5 ${
+        tone === "good" ? "text-good" : tone === "faint" ? "text-faint" : "text-ink"}`}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
 function Candidate({ c, sortAttr, picked, canPick, onPick }: {
   c: Councilor; sortAttr: Attr | null; picked: boolean; canPick: boolean;
   onPick: () => void;
@@ -151,6 +165,15 @@ function Candidate({ c, sortAttr, picked, canPick, onPick }: {
 
       <div className="text-dim text-[12px] mt-0.5">
         {c.nationality ?? "—"} · {c.location ?? "—"}
+      </div>
+
+      {/* i tre numeri che decidono: si leggono prima di tutto il resto */}
+      <div className="grid grid-cols-3 gap-[2px] mt-2">
+        <KeyFigure label={t.recruit.newMissions} tone={fresh ? "good" : "faint"}
+          value={fresh ? `+${fresh}` : "0"} title={t.recruit.missionsNewHint} />
+        <KeyFigure label={t.recruit.totalMissions} value={String(missions.length)} />
+        <KeyFigure label={t.recruit.age} value={c.age != null ? String(c.age) : "—"}
+          title={t.recruit.ageHint} />
       </div>
 
       {/* attributi: valore grezzo, col guadagno sul massimo del consiglio accanto */}
@@ -304,7 +327,7 @@ function Compare({ picked, coverage, onClear }: {
   );
 }
 
-type Sort = "covers" | "income" | "loyalty" | Attr;
+type Sort = "covers" | "income" | "loyalty" | "age" | Attr;
 
 export default function RecruitsPage() {
   const { t, game, live } = useSettings();
@@ -321,6 +344,8 @@ export default function RecruitsPage() {
     if (sortAttr) return (b.attributes[sortAttr] ?? 0) - (a.attributes[sortAttr] ?? 0);
     if (sort === "covers") return (b.covers?.length ?? 0) - (a.covers?.length ?? 0);
     if (sort === "income") return incomeWeight(b.income) - incomeWeight(a.income);
+    // età: dal più giovane; chi non ha una data di nascita va in fondo
+    if (sort === "age") return (a.age ?? 999) - (b.age ?? 999);
     return (b.apparentLoyalty ?? 0) - (a.apparentLoyalty ?? 0);
   });
 
@@ -356,7 +381,8 @@ export default function RecruitsPage() {
         <span className="text-dim ml-auto">{t.recruit.sortBy}</span>
         {([["covers", t.recruit.sortCovers],
            ["income", t.recruit.sortIncome],
-           ["loyalty", t.recruit.sortLoyalty]] as [Sort, string][]).map(([k, label]) => (
+           ["loyalty", t.recruit.sortLoyalty],
+           ["age", t.recruit.sortAge]] as [Sort, string][]).map(([k, label]) => (
           <button key={k} onClick={() => setSort(k)} className={btn(sort === k)}>
             {label}
           </button>
