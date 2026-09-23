@@ -256,18 +256,25 @@ export default function FactionsPage() {
                 render={(f) => {
                   const x = f.resources?.find((y) => y.id === r.id);
                   if (!x) return null;
-                  const v = metric(f, r.id), mv = metric(me, r.id);
+                  // ogni differenza accanto al numero a cui si riferisce:
+                  // sopra la scorta, sotto il reddito mensile
+                  const mx = me.resources?.find((y) => y.id === r.id);
+                  const cmp = !f.mine && mx;
                   return (
-                    <div className="whitespace-nowrap">
+                    <div className="whitespace-nowrap leading-[1.35]">
                       {/* la ricerca non si accumula: la scorta sarebbe sempre 0 */}
-                      {x.id !== "Research" && nf(x.stock, 0)}
-                      <span className={`ml-1.5 text-[11px] ${x.monthly > 0 ? "text-dim" : "text-faint"}`}>
-                        {x.monthly > 0 ? "+" : ""}{nf(x.monthly, 1)}/{t.common.month}
-                      </span>
-                      {!f.mine && v != null && mv != null && (
-                        <span className="ml-2"><Gap d={v - mv} digits={r.id === "Research" ? 1 : 0}
-                          title={t.factions.gapHint} /></span>
+                      {x.id !== "Research" && (
+                        <div className="flex items-baseline gap-2">
+                          <span>{nf(x.stock, 0)}</span>
+                          {cmp && <Gap d={x.stock - mx.stock} title={t.factions.gapStockHint} />}
+                        </div>
                       )}
+                      <div className="flex items-baseline gap-2 text-[11px]">
+                        <span className={x.monthly > 0 ? "text-dim" : "text-faint"}>
+                          {x.monthly > 0 ? "+" : ""}{nf(x.monthly, 1)}/{t.common.month}
+                        </span>
+                        {cmp && <Gap d={x.monthly - mx.monthly} digits={1} title={t.factions.gapIncomeHint} />}
+                      </div>
                     </div>
                   );
                 }} />
