@@ -41,6 +41,7 @@ class State:
         self.con = store.connect()
         self.snapshot = None
         self.trends = None
+        self.game = None                 # l'ultimo Game, per i dettagli su richiesta
         self.previous = None
         self.alerts = []
         self.lang = "ita"
@@ -69,6 +70,7 @@ class State:
         self.previous = prev
         self.snapshot = snap
         self.trends = model.nation_trends(g)
+        self.game = g
         self.alerts = alerts.evaluate(snap, prev)
         self.loaded_mtime = g.mtime
         self.error = None
@@ -279,6 +281,17 @@ def nation_trends():
     gonfiare lo storico archiviato a ogni salvataggio."""
     state.require()
     return state.trends or {"points": 0, "nations": {}}
+
+
+@app.get("/api/nations/{name}/detail")
+def nation_detail(name: str, lang: str = Query(None)):
+    """Cause di variazione degli indicatori e priorita' dei nostri punti di
+    controllo in quella nazione."""
+    state.require()
+    d = model.nation_detail(state.game, name, lang or state.lang)
+    if d is None:
+        raise HTTPException(404, "Nazione non trovata.")
+    return d
 
 
 @app.get("/api/diff")

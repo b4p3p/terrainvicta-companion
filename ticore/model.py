@@ -131,6 +131,126 @@ def nation_trends(g):
     return {"points": points, "nations": out}
 
 
+# indicatore -> prefisso dei tracker di causa nel salvataggio. Sono le tabelle
+# «Causa del cambiamento di valore» che il gioco mostra nella scheda nazione,
+# con le stesse tre colonne: questo mese, mese scorso, complessivo.
+REASON_FIELDS = {
+    "gdp": "GDP",
+    "inequality": "Inequality",
+    "cohesion": "Cohesion",
+    "unrest": "Unrest",
+    "education": "Education",
+    "democracy": "Democracy",
+}
+_PERIODS = (("month", "CurrentTrackingPeriod"), ("last", "PriorTrackingPeriod"),
+            ("all", "AllTime"))
+
+# voce di PriorityType (come la scrive controlPointPriorities) -> campo preset
+_PRIORITY_KEY = {kind: key for key, (kind, _) in gamedata.PRIORITIES.items()}
+
+
+def _reasons(n, lang):
+    out = {}
+    for stat, prefix in REASON_FIELDS.items():
+        tables = {col: n.get("tracker_%sChangeReason_%s" % (prefix, field)) or {}
+                  for col, field in _PERIODS}
+        rows = []
+        for reason in tables["all"].keys() | tables["month"].keys() | tables["last"].keys():
+            vals = {col: tables[col].get(reason) or 0 for col in tables}
+            if not any(vals.values()):
+                continue                   # il gioco elenca anche le cause a zero
+            rows.append(dict(vals, id=reason,
+                             name=gamedata.strings(lang).get(reason)
+                             or gamedata.strings("en").get(reason) or reason))
+        rows.sort(key=lambda r: -abs(r["all"]))
+        out[stat] = rows
+    return out
+
+
+def _preset_index(g, lang):
+    """{pesi congelati: nome} dei preset che il giocatore puo' aver scelto:
+    quelli del gioco, i nostri installati e quelli salvati in partita."""
+    from . import presets              # import tardivo: presets importa gamedata
+    st = presets.status(lang)
+    idx = {}
+    for p in st.get("presets", []) + [p for p in st.get("pending", []) if p["installed"]]:
+        idx.setdefault(frozenset(p["weights"].items()), p["name"])
+    for p in g.me.get("customPresets") or []:
+        if isinstance(p, dict):
+            w = presets.weights(p)
+            idx.setdefault(frozenset(w.items()),
+                           p.get("friendlyName") or p.get("dataName") or "?")
+    return idx
+
+
+def _shares(weights):
+    t = sum(weights.values())
+    return {k: v / t for k, v in weights.items()} if t else {}
+
+
+def _closest(weights, index):
+    """Il preset piu' simile e quanto bilancio andrebbe spostato per arrivarci:
+    meta' della distanza L1 fra le quote. EURISTICA NOSTRA, non del gioco."""
+    mine = _shares(weights)
+    best = None
+    for key, name in index.items():
+        other = _shares(dict(key))
+        d = sum(abs(mine.get(k, 0) - other.get(k, 0)) for k in mine.keys() | other.keys()) / 2
+        if best is None or d < best[1]:
+            best = (name, d)
+    return {"name": best[0], "moved": round(best[1], 4)} if best else None
+
+
+def nation_detail(g, name, lang="ita"):
+    """Perche' una nazione si muove: cause di variazione e priorita' in uso.
+
+    Le cause sono i tracker che il gioco mostra nella scheda nazione. Le
+    priorita' sono solo quelle dei NOSTRI punti di controllo: sono le uniche
+    che il giocatore imposta e vede.
+    """
+    n = next((x for x in g.nations.values() if x.get("displayName") == name), None)
+    if n is None:
+        return None
+    index = None
+    cps = []
+    for c in n.get("controlPoints") or []:
+        cp = g.cps.get(c["value"])
+        if not cp or g.factions.get((cp.get("faction") or {}).get("value")) is not g.me:
+            continue
+        raw = cp.get("controlPointPriorities") or {}
+        weights = {_PRIORITY_KEY[k]: v for k, v in raw.items()
+                   if v and k in _PRIORITY_KEY}
+        total = sum(weights.values())
+        if index is None:
+            index = _preset_index(g, lang)
+        order = list(gamedata.PRIORITIES)
+        cps.append({
+            "position": cp.get("positionInNation"),
+            "name": cp.get("displayName"),
+            "benefitsDisabled": bool(cp.get("benefitsDisabled")),
+            "total": total,
+            # nessun campo dice quale preset e' stato scelto: si confrontano i
+            # pesi. Se coincidono con piu' preset, vale il primo trovato.
+            "preset": index.get(frozenset(weights.items())) if weights else None,
+            "closest": _closest(weights, index) if weights else None,
+            "priorities": [dict(gamedata.priority_view(lang, k), weight=w,
+                                share=w / total if total else 0)
+                           for k, w in sorted(weights.items(),
+                                              key=lambda kv: (-kv[1], order.index(kv[0])))],
+        })
+    cps.sort(key=lambda c: c["position"] if c["position"] is not None else 99)
+    strings = gamedata.strings(lang)
+    return {
+        "name": name,
+        "columns": {k: strings.get(key) or gamedata.strings("en").get(key) or k
+                    for k, key in (("cause", "UI.Nation.Cause"), ("month", "UI.Nation.MTD"),
+                                   ("last", "UI.Nation.LastMonth"),
+                                   ("all", "UI.Nation.AllTime"))},
+        "reasons": _reasons(n, lang),
+        "controlPoints": cps,
+    }
+
+
 def flows(g, months_back=1, lang="ita"):
     """Transazioni aggregate per categoria su un mese di gioco."""
     y, m, _ = g.game_date()

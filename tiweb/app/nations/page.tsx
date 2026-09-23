@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useApi, useSnapshot } from "@/lib/api";
+import { Legend, ShareBar, WeightChips, pc, type Slice } from "@/components/priorities";
 import { useSettings } from "@/lib/settings";
 import { usePersistentState } from "@/lib/persist";
 import {
@@ -90,11 +91,125 @@ function Delta({ m, series }: { m: Metric; series: number[] | undefined }) {
   );
 }
 
+interface ReasonRow { id: string; name: string; month: number; last: number; all: number }
+interface NationDetail {
+  name: string;
+  columns: { cause: string; month: string; last: string; all: string };
+  reasons: Partial<Record<TrendKey, ReasonRow[]>>;
+  controlPoints: {
+    position: number | null;
+    name: string;
+    benefitsDisabled: boolean;
+    total: number;
+    preset: string | null;
+    closest: { name: string; moved: number } | null;
+    priorities: Slice[];
+  }[];
+}
+
+/** oltre questa quota di bilancio spostata, «il più simile» non dice nulla */
+const CLOSE_ENOUGH = 0.25;
+
+/** Il PIL arriva in dollari: in milioni si leggono le cause di un mese. Gli
+ *  altri indicatori si muovono di millesimi, e a 1 decimale sparirebbero. */
+function fmtReason(stat: TrendKey, v: number) {
+  if (Math.abs(v) < 1e-9) return "·";
+  // almeno due cifre significative: 0,00025 non deve diventare «0,000»
+  const digits = Math.min(5, Math.max(3, Math.ceil(-Math.log10(Math.abs(v))) + 1));
+  const s = stat === "gdp" ? `${nf(Math.abs(v) / 1e6, 1)} mln` : nf(Math.abs(v), digits);
+  return (v > 0 ? "+" : "−") + s;
+}
+
+/** Le cause di variazione, come nella scheda nazione del gioco. */
+function Reasons({ d }: { d: NationDetail }) {
+  const { t } = useSettings();
+  const stats = (Object.keys(d.reasons) as TrendKey[]).filter((k) => d.reasons[k]?.length);
+  if (!stats.length) return <p className="text-faint text-[11.5px]">{t.nations.noReasons}</p>;
+  return (
+    <div className="grid gap-x-5 gap-y-3 grid-cols-[repeat(auto-fill,minmax(400px,1fr))]">
+      {stats.map((k) => (
+        <table key={k} className="text-[11.5px] w-full self-start">
+          <thead>
+            <tr className="text-faint">
+              <th className="text-left font-normal pb-0.5">
+                <span className="text-dim inline-flex items-center gap-1">
+                  <GameIcon bundle="icons_2d" icon={METRIC[k].icon} size={14} />{METRIC[k].title}
+                </span>
+              </th>
+              <th className="text-right font-normal pb-0.5 pl-2 whitespace-nowrap">{d.columns.month}</th>
+              <th className="text-right font-normal pb-0.5 pl-2 whitespace-nowrap">{d.columns.last}</th>
+              <th className="text-right font-normal pb-0.5 pl-2 whitespace-nowrap">{d.columns.all}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.reasons[k]!.map((r) => (
+              <tr key={r.id} className="border-t border-edge">
+                <td className="text-dim py-[2px] pr-2">{r.name}</td>
+                {(["month", "last", "all"] as const).map((c) => (
+                  <td key={c} className={`text-right pl-2 whitespace-nowrap ${
+                    r[c] === 0 ? "text-faint" : c === "all" ? "text-dim" : ""}`}>
+                    {fmtReason(k, r[c])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ))}
+    </div>
+  );
+}
+
+/** Priorità dei NOSTRI punti di controllo: le sole che il giocatore imposta.
+ *  Quelli con pesi identici si raggruppano in una riga. */
+function MyPriorities({ d, knowledge }: { d: NationDetail; knowledge: string }) {
+  const { t } = useSettings();
+  const groups = new Map<string, NationDetail["controlPoints"]>();
+  for (const cp of d.controlPoints) {
+    const key = cp.priorities.map((s) => `${s.id}:${s.weight}`).join(",");
+    groups.set(key, [...(groups.get(key) ?? []), cp]);
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      {[...groups.values()].map((cps) => {
+        const cp = cps[0];
+        // «Belgio-Lussemburgo (Legislatura)» -> «Legislatura»
+        const label = cps.map((c) => c.name.match(/\(([^)]+)\)$/)?.[1] ?? c.name).join(" · ");
+        const near = !cp.preset && cp.closest && cp.closest.moved <= CLOSE_ENOUGH;
+        return (
+          <div key={label} className="bg-void/30 border border-edge px-2.5 py-2">
+            <div className="flex items-baseline gap-2 flex-wrap text-[12px] mb-1.5">
+              <span className="text-ink">{label}</span>
+              {cp.preset ? <Tag tone="mine">{cp.preset}</Tag>
+                : near ? <Tag>{t.nations.closeTo.replace("{name}", cp.closest!.name)
+                    .replace("{moved}", pc(cp.closest!.moved))}</Tag>
+                : <Tag>{t.nations.customPreset}</Tag>}
+              {cps.some((c) => c.benefitsDisabled) && <Tag tone="bad">{t.nations.benefitsOff}</Tag>}
+              <span className="ml-auto text-faint text-[11px]">Σ {cp.total}</span>
+            </div>
+            {cp.priorities.length ? (
+              <>
+                <ShareBar p={cp} weightLabel={t.presets.weight} />
+                <div className="mt-1.5"><WeightChips p={cp} /></div>
+              </>
+            ) : <p className="text-faint text-[11.5px]">{t.nations.noPriorities}</p>}
+          </div>
+        );
+      })}
+      <Legend names={t.presets.fam} knowledge={knowledge} />
+    </div>
+  );
+}
+
 /** Tutti gli andamenti di una nazione, in piccolo, coi valori grezzi. */
 function Detail({ name, series, onClose }: {
   name: string; series: Partial<Record<TrendKey, number[]>>; onClose: () => void;
 }) {
-  const { t } = useSettings();
+  const { t, game, live } = useSettings();
+  const { data: why } = useApi<NationDetail>(
+    `/api/nations/${encodeURIComponent(name)}/detail?lang=${game}`, [live.version, game]);
+  const knowledge = why?.controlPoints.flatMap((c) => c.priorities)
+    .find((s) => s.id === "knowledge")?.name ?? "Conoscenza";
   return (
     <div className="bg-panel border border-accent/50 p-3 mb-3.5">
       <div className="flex items-baseline gap-2 mb-2">
@@ -124,6 +239,24 @@ function Detail({ name, series, onClose }: {
           );
         })}
       </div>
+
+      {why && why.controlPoints.length > 0 && (
+        <>
+          <h3 className="display text-[12px] uppercase tracking-[.06em] text-dim mt-4 mb-1.5">
+            {t.nations.myPriorities}
+          </h3>
+          <MyPriorities d={why} knowledge={knowledge} />
+        </>
+      )}
+      {why && (
+        <>
+          <h3 className="display text-[12px] uppercase tracking-[.06em] text-dim mt-4 mb-1">
+            {t.nations.why}
+          </h3>
+          <p className="text-faint text-[11.5px] mb-2">{t.nations.whyHint}</p>
+          <Reasons d={why} />
+        </>
+      )}
     </div>
   );
 }
