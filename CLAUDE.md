@@ -25,13 +25,16 @@ analisi, non un aimbot.
 .\start.ps1 -NoReload    # senza auto-reload dell'API
 ```
 
-L'API parte con `--reload` su `ticore/` e `tiserver/` — non su `tiweb/` (ci pensa
-Next) né sulla cartella dei salvataggi, che la farebbe ripartire a ogni autosave.
+L'API si riavvia da sola quando cambiano `ticore/` e `tiserver/` — non `tiweb/` (ci
+pensa Next) né la cartella dei salvataggi, che la farebbe ripartire a ogni autosave.
+Il riavvio lo fa **watchfiles, non `uvicorn --reload`**: su Windows il supervisore di
+uvicorn ferma il worker con `CTRL_C_EVENT` e lo aspetta senza timeout; in background
+l'evento non arriva e dal secondo reload in poi non succede più nulla.
 
 Oppure separatamente:
 
 ```bash
-python -m uvicorn tiserver.main:app --port 8732 --reload --reload-dir ticore --reload-dir tiserver
+python -m watchfiles --filter python --sigint-timeout 2 --sigkill-timeout 1 "python -m uvicorn tiserver.main:app --host 127.0.0.1 --port 8732 --timeout-graceful-shutdown 2" ticore tiserver
 cd tiweb && npm run dev                            # interfaccia su :3000
 ```
 
@@ -55,10 +58,14 @@ ti.py       CLI sottile sopra ticore (utile senza browser).
 | `missions.py` | fattori reali di una missione e bersagli ordinati |
 | `model.py` | `snapshot()`: il payload completo |
 | `alerts.py` | motore di regole sul confronto fra snapshot |
+| `presets.py` | preset di priorità: lettura, preset personali, scrittura nel template del gioco **senza mod** (gli achievement restano) |
+| `factions.py` | confronto fra fazioni, coi soli campi che l'intel sblocca: soglie e misure di `TIGlobalConfig`/`FactionView` |
 | `store.py` | SQLite in `~/.terrainvicta-companion/`: storico, note, obiettivi. La campagna è identificata da **fazione + difficoltà + `realWorldCampaignStart`** |
 
 ### API
 `/api/snapshot?lang=` · `/api/alerts` · `/api/missions` · `/api/missions/{id}/plan`
+· `/api/nations/trends` · `/api/nations/{name}/detail` · `/api/factions`
+· `/api/presets` (+ `install`, `restore`, `custom`)
 · `/api/nations` (dentro snapshot) · `/api/history` · `/api/campaigns` · `/api/diff`
 · `/api/goals` · `/api/notes` · `/api/saves` · `/api/languages` · `/api/stream` (SSE)
 · `/api/health` · `/api/icons/mission/{icona}.png` · `/api/icons/status`

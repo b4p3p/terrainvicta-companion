@@ -22,6 +22,7 @@ classifiers = [
 dependencies = [
     "fastapi>=0.110",
     "uvicorn>=0.27",
+    "watchfiles>=0.21",           # riavvio dell'API in sviluppo, vedi start.ps1
     "pydantic>=2.0",
 ]
 
