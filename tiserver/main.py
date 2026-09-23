@@ -21,7 +21,8 @@ from pydantic import BaseModel
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import ticore                                    # noqa: E402
-from ticore import alerts, gamedata, missions, model, paths, presets, store  # noqa: E402
+from ticore import (alerts, factions, gamedata, missions, model, paths,  # noqa: E402
+                    presets, store)
 from . import icons                             # noqa: E402
 
 app = FastAPI(title="TerraInvictaCompanion", version="1.0")
@@ -292,6 +293,14 @@ def nation_detail(name: str, lang: str = Query(None)):
     if d is None:
         raise HTTPException(404, "Nazione non trovata.")
     return d
+
+
+@app.get("/api/factions")
+def faction_compare(lang: str = Query(None)):
+    """Le fazioni conosciute, coi soli campi che il nostro intel sblocca.
+    Soglie e misure sono quelle del gioco: vedi ticore/factions.py."""
+    state.require()
+    return factions.compare(state.game, lang or state.lang)
 
 
 @app.get("/api/diff")

@@ -19,6 +19,7 @@ const it = {
     history: "Storico",
     plan: "Piano",
     presets: "Preset",
+    factions: "Fazioni",
   },
   common: {
     loading: "Caricamento…",
@@ -266,6 +267,31 @@ const it = {
     first: "primo",
     last: "ultimo",
   },
+  factions: {
+    title: "Fazioni",
+    sub: "La tua fazione accanto a quelle che hai incontrato, con quello che il tuo intel lascia vedere. Le fazioni mai contattate non compaiono.",
+    you: "tu",
+    locked: "intel insufficiente",
+    lockedHint: "Livello attuale / livello che il gioco richiede per mostrare questo dato.",
+    intelHint: "Livello di intel attuale. Se una volta era più alto, accanto c'è il massimo raggiunto.",
+    finished: "completati",
+    fields: {
+      resources: "Risorse e reddito",
+      unassignedOrgs: "Org non assegnate",
+      objectives: "Obiettivi",
+      projects: "Progetti",
+    },
+    measureNow: "intel attuale",
+    measureHighest: "massimo intel raggiunto",
+    guideIntro:
+      "Il salvataggio contiene tutto di tutti, ma qui compare solo quello che la scheda Fazioni del gioco ti mostra. Quando manca un dato non resta un buco: la cella dice «intel insufficiente», col livello attuale e quello richiesto. Serve anche a capire dove mandare una missione di indagine.",
+    guideGatesTitle: "Soglie",
+    guideGates:
+      "Le soglie sono quelle del gioco (TIGlobalConfig), lette dal codice e non stimate. Il gioco non usa sempre la stessa misura: per alcuni dati guarda l'intel attuale, che cala col tempo; per altri il massimo mai raggiunto. Qui si segue la stessa regola, campo per campo.",
+    guideIncomeTitle: "Reddito",
+    guideIncome:
+      "Il reddito mensile è la somma delle entrate correnti che il gioco ha registrato nell'ultimo mese chiuso. Per la tua fazione torna con quello dell'intestazione.",
+  },
   history: {
     title: "Storico della partita",
     hint: "Uno snapshot per ogni salvataggio che il companion ha visto.",
@@ -310,6 +336,7 @@ const en: typeof it = {
     history: "History",
     plan: "Plan",
     presets: "Presets",
+    factions: "Factions",
   },
   common: {
     loading: "Loading…",
@@ -556,6 +583,31 @@ const en: typeof it = {
     noReasons: "The game has not recorded any cause for this nation yet.",
     first: "first",
     last: "last",
+  },
+  factions: {
+    title: "Factions",
+    sub: "Your faction next to the ones you have met, with what your intel lets you see. Factions never contacted do not appear.",
+    you: "you",
+    locked: "insufficient intel",
+    lockedHint: "Current level / level the game requires to show this data.",
+    intelHint: "Current intel level. If it was once higher, the highest reached is shown next to it.",
+    finished: "completed",
+    fields: {
+      resources: "Resources and income",
+      unassignedOrgs: "Unassigned orgs",
+      objectives: "Objectives",
+      projects: "Projects",
+    },
+    measureNow: "current intel",
+    measureHighest: "highest intel reached",
+    guideIntro:
+      "The save holds everything about everyone, but this page only shows what the game's Factions screen shows you. Missing data is not a silent gap: the cell says “insufficient intel”, with the current and required levels. It also hints where to send an investigation mission.",
+    guideGatesTitle: "Thresholds",
+    guideGates:
+      "Thresholds are the game's own (TIGlobalConfig), read from its code rather than estimated. The game does not always use the same measure: for some data it checks current intel, which decays; for others the highest ever reached. This page follows the same rule, field by field.",
+    guideIncomeTitle: "Income",
+    guideIncome:
+      "Monthly income is the sum of the current income the game recorded over the last full month. For your faction it matches the header.",
   },
   history: {
     title: "Campaign history",

@@ -15,6 +15,7 @@ const TABS = [
   { href: "/nations", key: "nations" },
   { href: "/history", key: "history" },
   { href: "/plan", key: "plan" },
+  { href: "/factions", key: "factions" },
   { href: "/presets", key: "presets" },
 ] as const;
 
