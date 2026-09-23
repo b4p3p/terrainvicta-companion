@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { API, api } from "@/lib/api";
 import { usePersistentState } from "@/lib/persist";
 import { useSettings } from "@/lib/settings";
-import { Button, Empty, GameIcon, Panel, Tag, barFill, nf } from "@/components/ui";
+import { Button, Empty, GameIcon, Panel, Tag, nf } from "@/components/ui";
 
 interface Priority {
   id: string;
@@ -68,6 +68,27 @@ const FAMILY_OF: Record<string, (typeof FAMILIES)[number]> = Object.fromEntries(
   FAMILIES.flatMap((f) => f.members.map((m) => [m, f])),
 );
 
+/* Ogni priorità ha un tono suo: la tinta dice la famiglia, la luce la voce.
+   Rampa dal chiaro allo scuro nell'ordine fisso di `members`, così il colore
+   segue la priorità e non la sua posizione nella barra: Esercito ha lo
+   stesso tono in ogni preset. */
+function ramp(color: string, i: number, n: number): string {
+  if (n < 2) return color;
+  const t = i / (n - 1);                       // 0 = più chiaro, 1 = più scuro
+  const span = n > 5 ? 44 : 34;                // più voci, rampa più larga
+  const light = Math.round(span * (1 - 2 * t)); // +span% bianco … −span% nero
+  return light >= 0
+    ? `color-mix(in oklab, ${color}, white ${light}%)`
+    : `color-mix(in oklab, ${color}, black ${-light}%)`;
+}
+const COLOR_OF: Record<string, string> = Object.fromEntries(
+  FAMILIES.flatMap((f) => f.members.map((m, i) => [m, ramp(f.color, i, f.members.length)])),
+);
+/** campione di legenda: tutta la rampa della famiglia */
+const swatch = (f: (typeof FAMILIES)[number]) =>
+  f.members.length < 2 ? f.color
+    : `linear-gradient(to right, ${f.members.map((m) => COLOR_OF[m]).join(", ")})`;
+
 const pc = (v: number) => `${nf(v * 100, 1)}%`;
 /** differenza in punti percentuali, col segno */
 const pp = (v: number) => (Math.abs(v) < 0.0005 ? "=" : `${v > 0 ? "+" : "−"}${nf(Math.abs(v) * 100, 1)}`);
@@ -83,18 +104,16 @@ function familyShares(p: { priorities: Slice[] }) {
 
 /** Una barra impilata: un segmento per priorità, raggruppati per famiglia,
  *  separati da 2px di fondo. L'etichetta di ogni segmento sta nel tooltip. */
-function ShareBar({ p, height = 16 }: { p: { priorities: Slice[] }; height?: number }) {
-  // dentro una famiglia i segmenti alternano un tono più scuro: stessi colori,
-  // ma due voci vicine non si fondono in un blocco unico
+function ShareBar({ p, height = 14 }: { p: { priorities: Slice[] }; height?: number }) {
+  // dentro la famiglia, nell'ordine della rampa: dal tono chiaro allo scuro
   const ordered = FAMILIES.flatMap((f) =>
-    p.priorities.filter((s) => FAMILY_OF[s.id]?.key === f.key)
-      .map((s, i) => ({ ...s, shade: i % 2 ? 0.16 : 0 })));
+    f.members.map((m) => p.priorities.find((s) => s.id === m)).filter((s) => s != null));
   return (
     <div className="flex gap-[2px] w-full bg-panel" style={{ height }} role="img"
       aria-label={ordered.map((s) => `${s.name} ${pc(s.share)}`).join(", ")}>
       {ordered.map((s) => (
         <div key={s.id} title={`${s.name} · peso ${s.weight} · ${pc(s.share)}`}
-          style={{ width: `${s.share * 100}%`, background: barFill(FAMILY_OF[s.id].color, s.shade) }}
+          style={{ width: `${s.share * 100}%`, background: COLOR_OF[s.id] }}
           className="h-full min-w-[2px] hover:brightness-125" />
       ))}
     </div>
@@ -106,7 +125,7 @@ function Legend({ t, knowledge }: { t: Labels; knowledge: string }) {
     <div className="flex gap-3 flex-wrap text-[11.5px] text-dim">
       {FAMILIES.map((f) => (
         <span key={f.key} className="inline-flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5" style={{ background: barFill(f.color) }} />
+          <span className="inline-block w-5 h-2.5" style={{ background: swatch(f) }} />
           {f.key === "knowledge" ? knowledge : t.fam[f.key]}
         </span>
       ))}
@@ -125,7 +144,7 @@ function Weights({ p, base }: { p: Preset; base: Preset | null }) {
           <span key={s.id} className="text-[11px] border border-edge px-1.5 py-[1px]
                                       inline-flex items-center gap-1">
             <span className="inline-block w-1.5 h-1.5"
-              style={{ background: FAMILY_OF[s.id]?.color }} />
+              style={{ background: COLOR_OF[s.id] }} />
             <GameIcon bundle="icons_2d" icon={s.icon} size={14} />
             <span className={s.id === "knowledge" ? "text-ink" : "text-dim"}>{s.name}</span>
             <span className="text-faint">{s.weight}</span>
@@ -257,7 +276,7 @@ function Editor({ draft, setDraft, catalog, t, knowledge, busy, onSave, onCancel
           const w = draft.weights[c.id] ?? 0;
           return (
             <div key={c.id} className={`flex items-center gap-2 px-1.5 py-[3px] border-l-2 ${
-              w ? "bg-sel" : ""}`} style={{ borderColor: FAMILY_OF[c.id]?.color }}>
+              w ? "bg-sel" : ""}`} style={{ borderColor: COLOR_OF[c.id] }}>
               <GameIcon bundle="icons_2d" icon={c.icon} size={16} />
               <span className={`text-[12px] flex-1 ${w ? "text-ink" : "text-dim"}`}>{c.name}</span>
               <span className="text-[11.5px] text-faint w-[46px] text-right">

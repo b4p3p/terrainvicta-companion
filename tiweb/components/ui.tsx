@@ -156,23 +156,6 @@ export function Spark({ data, w = 54, h = 14, upIsBad = false }: {
   );
 }
 
-/** Riempimento delle barre: lucido verticale come le barre del gioco, riga
- *  chiara in alto, corpo pieno, base più scura. `shade` (0-1) scurisce il
- *  tono, per separare segmenti adiacenti dello stesso colore senza cambiare
- *  tinta: l'identità resta al colore, la variazione è solo di luce. */
-export function barFill(color: string, shade = 0): string {
-  const c = shade ? `color-mix(in oklab, ${color}, black ${Math.round(shade * 100)}%)` : color;
-  return [
-    `linear-gradient(to bottom,`,
-    `color-mix(in oklab, ${c}, white 55%) 0,`,
-    `color-mix(in oklab, ${c}, white 28%) 1.5px,`,
-    `color-mix(in oklab, ${c}, white 12%) 35%,`,
-    `${c} 55%,`,
-    `color-mix(in oklab, ${c}, black 22%) 85%,`,
-    `color-mix(in oklab, ${c}, black 40%) 100%)`,
-  ].join(" ");
-}
-
 /** Barre orizzontali etichettate. */
 export function Bars<T>({
   rows, value, label, highlight, format,
@@ -192,7 +175,8 @@ export function Bars<T>({
           <span className="h-[11px]"
             style={{
               width: `${Math.max((value(r) / max) * 100, 1)}%`,
-              background: barFill(highlight?.(r) ? "var(--good)" : "var(--accent)"),
+              background: highlight?.(r) ? "var(--good)" : "var(--accent)",
+              opacity: 0.85,
             }} />
           <span className="text-dim shrink-0">{format(r)}</span>
         </div>
