@@ -18,7 +18,10 @@ Write-Host "Interfaccia -> http://localhost:$WebPort" -ForegroundColor Cyan
 $apiArgs = @("-m", "uvicorn", "tiserver.main:app", "--host", "127.0.0.1",
              "--port", "$ApiPort", "--log-level", "warning")
 if (-not $NoReload) {
-    $apiArgs += @("--reload", "--reload-dir", "ticore", "--reload-dir", "tiserver")
+    # --timeout-graceful-shutdown: lo stream SSE del browser non si chiude mai da
+    # solo, e senza un limite uvicorn resta ad aspettarlo: il reload non avviene.
+    $apiArgs += @("--reload", "--reload-dir", "ticore", "--reload-dir", "tiserver",
+                  "--timeout-graceful-shutdown", "2")
 }
 
 $api = Start-Process -PassThru -WindowStyle Minimized python `
