@@ -6,10 +6,10 @@ nuova. I template invece si caricano a ogni avvio.
 
 Il sistema dei mod risolverebbe il problema, ma in Terra Invicta **attivare i
 mod disattiva gli achievement** — basta la casella nel menu, senza nemmeno un
-mod acceso, e il salvataggio lo registra in `playedWithMods`. Qui quindi si
-scrive direttamente in `TIPriorityPresetTemplate.json`, aggiungendo voci con un
-`dataName` nuovo: il gioco non se ne accorge come mod e `playedWithMods` resta
-falso.
+mod acceso, e il salvataggio lo registra in `playedWithMods`. Per questo i
+preset **non sono confezionati come mod**: si scrivono direttamente in
+`TIPriorityPresetTemplate.json`, aggiungendo voci con un `dataName` nuovo. Il
+gioco non le vede come mod e `playedWithMods` resta falso.
 
 Il prezzo e' che un aggiornamento di Steam, o "verifica integrita' file",
 riscrive i template e cancella l'aggiunta. `status()` se ne accorge e
@@ -29,7 +29,7 @@ from . import gamedata, paths
 TEMPLATE = "TIPriorityPresetTemplate.json"
 PREFIX = "TIC_"                 # marca le voci nostre: mai toccare le altre
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_SOURCE = os.path.join(_REPO, "mods", "TerraInvictaCompanionPresets", TEMPLATE)
+_SOURCE = os.path.join(_REPO, "assets", "presets", TEMPLATE)
 
 # quali priorita' contano come spesa militare, per il riepilogo
 _MILITARY = ("military", "foundMilitary", "army", "navy",
