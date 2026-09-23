@@ -3,18 +3,24 @@
 import { useMemo, useState } from "react";
 import { useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
+import { usePersistentState } from "@/lib/persist";
 import {
   Column, DataTable, Empty, Panel, Spark, Tag, bn, nf, pct,
 } from "@/components/ui";
 import type { Nation } from "@/lib/types";
 
-type Scope = "all" | "eu" | "mine" | "full" | "partial" | "free" | "contested";
+const SCOPES = ["all", "eu", "mine", "full", "partial", "free", "contested"] as const;
+type Scope = (typeof SCOPES)[number];
+const isScope = (v: unknown): v is Scope => SCOPES.includes(v as Scope);
+const isString = (v: unknown): v is string => typeof v === "string";
 
 export default function NationsPage() {
   const { t, game, live } = useSettings();
   const { data: snap } = useSnapshot(live.version, game);
-  const [scope, setScope] = useState<Scope>("eu");
-  const [q, setQ] = useState("");
+  // combo e ricerca restano fra un caricamento e l'altro; la casella dei
+  // proprietari no: e' informazione altrui, deve ripartire spenta ogni volta
+  const [scope, setScope] = usePersistentState<Scope>("nations.scope", "eu", isScope);
+  const [q, setQ] = usePersistentState("nations.q", "", isString);
   const [showOwners, setShowOwners] = useState(false);
 
   const rows = useMemo(() => {
