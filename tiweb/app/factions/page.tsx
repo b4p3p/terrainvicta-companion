@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useApi } from "@/lib/api";
+import { usePersistentState } from "@/lib/persist";
 import { useSettings } from "@/lib/settings";
 import { Empty, Panel, ResourceIcon, Tag, nf } from "@/components/ui";
 import { Guide } from "@/components/Guide";
@@ -62,16 +63,41 @@ function Redacted({ seed, lines = 1 }: { seed: string; lines?: number }) {
 function DossierHeader({ n, total }: { n: number; total: number }) {
   const { t } = useSettings();
   return (
-    <div className="relative pl-2 border-l-2 border-dashed border-edge-lit">
+    <div className="pl-2 border-l-2 border-dashed border-edge-lit">
       <div className="flex items-center gap-1.5">
         <span className="dossier-glyph display text-[13px] text-dim">?</span>
-        <span className="redacted inline-block h-[11px] w-[88px]" />
+        <span className="redacted inline-block h-[11px] w-[88px] max-w-full" />
       </div>
-      <div className="text-faint text-[10.5px] mt-1 tracking-[.08em] uppercase">
-        {t.factions.file} {String(n).padStart(2, "0")}/{String(total).padStart(2, "0")}
+      {/* il timbro sta nel flusso della cella, non sopra: così non può uscire
+          dal bordo della tabella, qualunque sia la larghezza della colonna */}
+      <div className="flex items-center gap-2 mt-1 flex-wrap">
+        <span className="text-faint text-[10.5px] tracking-[.08em] uppercase">
+          {t.factions.file} {String(n).padStart(2, "0")}/{String(total).padStart(2, "0")}
+        </span>
+        <span className="dossier-stamp display">{t.factions.classified}</span>
       </div>
-      <span className="dossier-stamp display">{t.factions.classified}</span>
     </div>
+  );
+}
+
+/** Il valore che conta di una risorsa: la scorta, tranne la ricerca, che non
+ *  si accumula e si confronta col reddito mensile. null = intel insufficiente. */
+function metric(f: Faction, id: string): number | null {
+  const x = f.resources?.find((r) => r.id === id);
+  if (!x) return null;
+  return id === "Research" ? x.monthly : x.stock;
+}
+
+/** Distanza da noi: chi ci sta davanti è un problema (rosso), chi sta dietro no.
+ *  Freccia e segno ripetono il colore, che da solo non basta. */
+function Gap({ d, digits = 0, title }: { d: number; digits?: number; title?: string }) {
+  // sotto la precisione mostrata è pari: «▲ +0» direbbe il falso
+  if (Math.abs(d) < 0.5 * 10 ** -digits) return <span className="text-faint text-[11px]" title={title}>=</span>;
+  const ahead = d > 0;
+  return (
+    <span className={`text-[11px] whitespace-nowrap ${ahead ? "text-bad" : "text-good"}`} title={title}>
+      {ahead ? "▲" : "▼"} {ahead ? "+" : "−"}{nf(Math.abs(d), digits)}
+    </span>
   );
 }
 
@@ -86,14 +112,16 @@ function Locked({ f, gate }: { f: Faction; gate: Gate }) {
   );
 }
 
-function Row({ label, factions, field, render, lines, seed }: {
+function Row({ label, factions, field, render, lines, seed, active }: {
   label: ReactNode; factions: Column[]; field: Field;
   render: (f: Faction) => ReactNode;
   /** righe di censura nelle colonne sconosciute */
   lines?: number; seed: string;
+  /** riga della metrica di ordinamento */
+  active?: boolean;
 }) {
   return (
-    <tr className="border-t border-edge align-top">
+    <tr className={`border-t border-edge align-top ${active ? "outline outline-1 outline-sel-edge/50 -outline-offset-1" : ""}`}>
       <th className="text-left font-normal text-dim py-1.5 pr-3 whitespace-nowrap">{label}</th>
       {factions.map((f) => isUnknown(f) ? (
         <td key={f.id} className="py-1.5 px-3 dossier">
@@ -111,12 +139,32 @@ function Row({ label, factions, field, render, lines, seed }: {
 export default function FactionsPage() {
   const { t, game, live } = useSettings();
   const { data, error } = useApi<Compare>(`/api/factions?lang=${game}`, [live.version, game]);
+  const [sortKey, setSortKey] = usePersistentState<string>(
+    "factions.sort", "Money", (v): v is string => typeof v === "string");
+  const [sortDesc, setSortDesc] = usePersistentState<boolean>(
+    "factions.desc", true, (v): v is boolean => typeof v === "boolean");
   if (error) return <Empty>{error}</Empty>;
   if (!data) return <Empty>{t.common.loading}</Empty>;
-  const fs = data.factions;
-  const known = fs.filter((f): f is Faction => !isUnknown(f));
-  const resIds = known.find((f) => f.resources)?.resources ?? [];
-  const unknownIds = fs.filter(isUnknown).map((f) => f.id);
+  const known = data.factions.filter((f): f is Faction => !isUnknown(f));
+  const me = known.find((f) => f.mine)!;
+  const resIds = me.resources ?? [];
+  const unknownIds = data.factions.filter(isUnknown).map((f) => f.id);
+
+  // la nostra colonna resta prima e i dossier ultimi: si ordinano le altre.
+  // Chi non ha il dato (intel insufficiente) va in fondo, qualunque verso.
+  const others = known.filter((f) => !f.mine).sort((a, b) => {
+    const va = metric(a, sortKey), vb = metric(b, sortKey);
+    if (va == null || vb == null) return va == null ? (vb == null ? 0 : 1) : -1;
+    return sortDesc ? vb - va : va - vb;
+  });
+  const fs: Column[] = [me, ...others, ...data.factions.filter(isUnknown)];
+  const sortRes = resIds.find((r) => r.id === sortKey);
+  const mineVal = metric(me, sortKey);
+
+  function pick(id: string) {
+    if (id === sortKey) setSortDesc(!sortDesc);
+    else { setSortKey(id); setSortDesc(true); }
+  }
 
   return (
     <Panel title={t.factions.title}
@@ -138,17 +186,38 @@ export default function FactionsPage() {
         </Guide>
       }>
       <p className="text-faint text-[11.5px] mb-3">{t.factions.sub}</p>
+
+      <div className="flex items-center gap-2 flex-wrap mb-3 border-t border-edge pt-3">
+        <span className="text-dim text-[12px] mr-1">{t.factions.sortBy}</span>
+        <div className="flex">
+          {resIds.map((r) => {
+            const on = r.id === sortKey;
+            return (
+              <button key={r.id} type="button" onClick={() => pick(r.id)}
+                aria-pressed={on}
+                className={`inline-flex items-center gap-1.5 text-[12px] px-2.5 py-[3px] -ml-px
+                  border ${on ? "border-sel-edge bg-sel text-ink relative z-[1]"
+                    : "border-edge-lit bg-control text-dim hover:text-ink"}`}>
+                <ResourceIcon icon={r.icon} size={14} />
+                {r.name}
+                {on && <span className="text-[10px] text-accent">{sortDesc ? "▼" : "▲"}</span>}
+              </button>
+            );
+          })}
+        </div>
+        <span className="text-faint text-[11px] ml-2">{t.factions.sortHint}</span>
+      </div>
       <div className="overflow-x-auto">
         <table className="text-[12px] w-full border-collapse">
           <thead>
             <tr>
               <th />
               {fs.map((f) => isUnknown(f) ? (
-                <th key={f.id} className="text-left px-3 pb-2 pt-1 font-normal dossier">
+                <th key={f.id} className="text-left align-top px-3 pb-2 pt-1 font-normal dossier">
                   <DossierHeader n={known.length + unknownIds.indexOf(f.id) + 1} total={fs.length} />
                 </th>
               ) : (
-                <th key={f.id} className={`text-left px-3 pb-2 font-normal ${f.mine ? "bg-sel/40" : ""}`}>
+                <th key={f.id} className={`text-left align-top px-3 pb-2 pt-1 font-normal ${f.mine ? "bg-sel/40" : ""}`}>
                   <div className="display text-[13px] uppercase tracking-[.04em] border-l-2 pl-2"
                     style={{ borderColor: f.colors?.accent ?? "var(--edge-lit)" }}>
                     {f.name}
@@ -161,27 +230,45 @@ export default function FactionsPage() {
                       </span>
                     )}
                   </div>
+                  {!f.mine && sortRes && (() => {
+                    const v = metric(f, sortKey);
+                    return (
+                      <div className="pl-2.5 mt-1 text-[11px] flex items-center gap-1.5 whitespace-nowrap">
+                        <ResourceIcon icon={sortRes.icon} size={12} />
+                        {v == null || mineVal == null
+                          ? <span className="text-faint">{t.factions.locked}</span>
+                          : <Gap d={v - mineVal} digits={sortKey === "Research" ? 1 : 0}
+                              title={t.factions.gapHint} />}
+                        {v != null && mineVal != null && <span className="text-faint">{t.factions.vsYou}</span>}
+                      </div>
+                    );
+                  })()}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {resIds.map((r) => (
-              <Row key={r.id} field="resources" factions={fs} seed={r.id}
+              <Row key={r.id} field="resources" factions={fs} seed={r.id} active={r.id === sortKey}
                 label={<span className="inline-flex items-center gap-1.5">
                   <ResourceIcon icon={r.icon} size={14} />{r.name}
                 </span>}
                 render={(f) => {
                   const x = f.resources?.find((y) => y.id === r.id);
                   if (!x) return null;
+                  const v = metric(f, r.id), mv = metric(me, r.id);
                   return (
-                    <span className="whitespace-nowrap">
+                    <div className="whitespace-nowrap">
                       {/* la ricerca non si accumula: la scorta sarebbe sempre 0 */}
                       {x.id !== "Research" && nf(x.stock, 0)}
-                      <span className={`ml-1.5 text-[11px] ${x.monthly > 0 ? "text-good" : "text-faint"}`}>
+                      <span className={`ml-1.5 text-[11px] ${x.monthly > 0 ? "text-dim" : "text-faint"}`}>
                         {x.monthly > 0 ? "+" : ""}{nf(x.monthly, 1)}/{t.common.month}
                       </span>
-                    </span>
+                      {!f.mine && v != null && mv != null && (
+                        <span className="ml-2"><Gap d={v - mv} digits={r.id === "Research" ? 1 : 0}
+                          title={t.factions.gapHint} /></span>
+                      )}
+                    </div>
                   );
                 }} />
             ))}

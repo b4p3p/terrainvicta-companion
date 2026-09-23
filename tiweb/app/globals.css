@@ -157,8 +157,8 @@ button:focus-visible, a:focus-visible {
   outline: 1px solid #0d1519; outline-offset: -1px;
 }
 .dossier-stamp {
-  position: absolute; right: -2px; top: -2px;
-  transform: rotate(-9deg);
+  display: inline-block;
+  transform: rotate(-7deg);
   border: 1.5px solid color-mix(in oklab, var(--bad), transparent 35%);
   color: color-mix(in oklab, var(--bad), transparent 25%);
   font-size: 9.5px; letter-spacing: .14em; padding: 0 5px; line-height: 15px;
