@@ -1,6 +1,9 @@
-// Copia ticore/*.py in public/py/ticore/ con un manifest, per Pyodide.
-// ticore resta l'unica fonte: questa e' una copia generata (gitignorata).
+// Copia ticore/*.py in public/py/ticore/ con un manifest, Pyodide da
+// node_modules in public/pyodide/ (niente CDN: si serve da noi), e rigenera
+// in public/gamedata/ l'estratto dei dati del gioco (ticore/bundle.py).
+// Sono tutte copie generate e gitignorate: l'estratto sono dati di Pavonis.
 
+import { spawnSync } from "node:child_process";
 import { copyFileSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,3 +18,20 @@ const files = readdirSync(src).filter((f) => f.endsWith(".py"));
 for (const f of files) copyFileSync(join(src, f), join(dst, f));
 writeFileSync(join(dst, "manifest.json"), JSON.stringify(files));
 console.log(`ticore: ${files.length} file -> public/py/ticore`);
+
+// Pyodide: solo il nucleo. sqlite3 in questa versione sta gia' nella stdlib.
+const pyo = join(here, "..", "node_modules", "pyodide");
+const pyoDst = join(here, "..", "public", "pyodide");
+mkdirSync(pyoDst, { recursive: true });
+for (const f of ["pyodide.mjs", "pyodide.asm.mjs", "pyodide.asm.wasm",
+                 "python_stdlib.zip", "pyodide-lock.json"])
+  copyFileSync(join(pyo, f), join(pyoDst, f));
+console.log("pyodide: nucleo -> public/pyodide");
+
+// l'estratto richiede il gioco installato: se manca, la build va avanti e la
+// pagina ricade sulla cartella scelta dall'utente
+const out = join(here, "..", "public", "gamedata");
+const r = spawnSync("python", ["-m", "ticore.bundle", out],
+  { cwd: join(here, "..", ".."), encoding: "utf-8" });
+console.log(r.status === 0 ? r.stdout.trim()
+  : `gamedata: estratto non generato (${(r.stderr || r.error || "").toString().trim().split("\n").pop()})`);

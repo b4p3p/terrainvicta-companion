@@ -39,6 +39,7 @@ interface RisultatoPy {
   msGame: number; msSnapshot: number; msJson: number; byteSnapshot: number;
   fazione: string; data: string; campagna: string; cpMiei: number;
   consiglio: string[]; missioneEsempio: string;
+  fonte: "estratto" | "cartella"; versioneDati: string | null; versioneSalvataggio: string | null;
 }
 
 interface Voce { ora: string; testo: string; tono: "mine" | "bad" | "dim" }
@@ -218,10 +219,17 @@ export default function ProvaCartella() {
     scrivi(`dati del gioco salvati: ${tpl} template + ${loc} file di localizzazione, ${mb(byte)} (su ${lista.length} file nella cartella)`, "mine");
   };
 
-  const eseguiPy = () => {
-    if (!dati || !ultimoFile.current) return;
+  const eseguiPy = (fonte: "estratto" | "cartella") => {
+    if (!ultimoFile.current || (fonte === "cartella" && !dati)) return;
     if (!worker.current) {
-      worker.current = new Worker("/pyodide-prova.js");
+      scrivi("avvio il worker…");
+      worker.current = new Worker("/pyodide-prova.js", { type: "module" });
+      // senza questi, un errore nel worker (es. importScripts fallito) e' muto
+      worker.current.onerror = (e) => {
+        scrivi(`[py] errore nel worker: ${e.message || "sconosciuto"} (${e.filename}:${e.lineno})`, "bad");
+        worker.current?.terminate(); worker.current = null; setInCorso(false);
+      };
+      worker.current.onmessageerror = () => scrivi("[py] messaggio non leggibile dal worker", "bad");
       worker.current.onmessage = ({ data }) => {
         if (data.tipo === "log") scrivi(`[py] ${data.testo}`);
         else if (data.tipo === "errore") { scrivi(`[py] ${data.testo}`, "bad"); setInCorso(false); }
@@ -233,7 +241,9 @@ export default function ProvaCartella() {
       };
     }
     setInCorso(true);
-    worker.current.postMessage({ save: ultimoFile.current, files: dati.files });
+    scrivi(`[py] invio ${ultimoFile.current.name} al worker (${fonte})`);
+    worker.current.postMessage({ save: ultimoFile.current,
+                                 files: fonte === "cartella" ? dati?.files : undefined });
   };
 
   const scegli = async () => {
@@ -341,7 +351,7 @@ export default function ProvaCartella() {
       )}
 
       <Panel title="Prova 2: ticore in Pyodide"
-        sub="Cartella del gioco + snapshot() completo, come fa oggi l'API">
+        sub="snapshot() completo, come fa oggi l'API. Dati del gioco: estratto incluso nel sito, o la cartella come ripiego">
         <div className="p-4 space-y-3 text-[13px]">
           <div className="flex items-center gap-3 flex-wrap">
             {/* webkitdirectory non e' negli attributi tipizzati di React */}
@@ -352,15 +362,19 @@ export default function ProvaCartella() {
               {dati ? "Ricarica i dati del gioco" : "Scegli la cartella del gioco"}
             </Button>
             {dati && <Tag tone="mine">{Object.keys(dati.files).length} file · {dati.salvato}</Tag>}
-            <Button tone="primary" onClick={eseguiPy}
+            <Button tone="primary" onClick={() => eseguiPy("estratto")}
+              disabled={!letto || inCorso}>
+              {inCorso ? "In corso…" : "Esegui ticore (dati inclusi)"}
+            </Button>
+            <Button onClick={() => eseguiPy("cartella")}
               disabled={!dati || !letto || inCorso}>
-              {inCorso ? "In corso…" : "Esegui ticore"}
+              Esegui con la cartella
             </Button>
           </div>
           <p className="text-dim text-[12px]">
             Di solito <code>C:\Program Files (x86)\Steam\steamapps\common\Terra Invicta</code>:
             oppure la sua StreamingAssets. Chrome chiederà conferma per «caricare» i file: non escono dal
-            PC, la pagina ne tiene solo template e localizzazione. Il primo avvio scarica Pyodide (~10 MB).
+            PC, la pagina ne tiene solo template e localizzazione. Il primo avvio scarica Pyodide (~13 MB, dal nostro server).
           </p>
         </div>
         {py && (
@@ -368,7 +382,11 @@ export default function ProvaCartella() {
             <tbody>
               {([
                 ["Pyodide", ms(py.msPyodide) + (py.msPyodide === 0 ? " (già caricato)" : "")],
-                ["dati del gioco", `${mb(py.byteGioco)} copiati in ${ms(py.msGioco)}`],
+                ["dati del gioco", `${py.fonte}: ${mb(py.byteGioco)} in ${ms(py.msGioco)}`],
+                ["versione", py.versioneDati
+                  ? `dati ${py.versioneDati} · salvataggio ${py.versioneSalvataggio}` +
+                    (py.versioneDati === py.versioneSalvataggio ? " ✓" : " — DIVERSE")
+                  : `salvataggio ${py.versioneSalvataggio}`],
                 ["Game()", ms(py.msGame)],
                 ["snapshot()", ms(py.msSnapshot)],
                 ["json.dumps", `${ms(py.msJson)} · ${mb(py.byteSnapshot)}`],

@@ -31,8 +31,34 @@ _TEMPLATE_FILES = {
 }
 
 
+# Estratto caricato da `bundle.load()` o dal browser: sostituisce la lettura
+# dall'installazione del gioco, che sul web non e' raggiungibile.
+_bundle = None
+
+
+def use_bundle(tpl, strings_by_lang):
+    """Usa un estratto (vedi `bundle.py`) al posto dei file del gioco.
+
+    `strings_by_lang` puo' contenere solo alcune lingue: il browser scarica
+    quella scelta e l'inglese, e aggiunge le altre con `add_strings()`.
+    """
+    global _bundle
+    _bundle = {"templates": tpl, "strings": dict(strings_by_lang)}
+    for f in (templates, strings, available_languages, mission_icon,
+              faction_colors, trait_description):
+        f.cache_clear()
+
+
+def add_strings(lang, table):
+    _bundle["strings"][lang] = table
+    strings.cache_clear()
+    trait_description.cache_clear()
+
+
 @lru_cache(maxsize=1)
 def templates():
+    if _bundle:
+        return {k: _bundle["templates"].get(k, {}) for k in _TEMPLATE_FILES}
     d = paths.template_dir()
     out = {k: {} for k in _TEMPLATE_FILES}
     if not d:
@@ -53,6 +79,8 @@ def templates():
 @lru_cache(maxsize=None)
 def strings(lang):
     """{'TIMissionTemplate.displayName.GainInfluence': 'Controlla nazione', ...}"""
+    if _bundle:
+        return _bundle["strings"].get(lang, {})
     d = paths.localization_dir()
     out = {}
     if not d:
@@ -76,6 +104,8 @@ def strings(lang):
 
 @lru_cache(maxsize=1)
 def available_languages():
+    if _bundle:
+        return [x for x in LANGUAGES if x in _bundle["strings"]] or ["en"]
     d = paths.localization_dir()
     if not d:
         return ["en"]

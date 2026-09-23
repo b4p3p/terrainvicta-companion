@@ -59,6 +59,7 @@ ti.py       CLI sottile sopra ticore (utile senza browser).
 | `model.py` | `snapshot()`: il payload completo |
 | `alerts.py` | motore di regole sul confronto fra snapshot |
 | `presets.py` | preset di priorità: lettura, preset personali, scrittura nel template del gioco **senza mod** (gli achievement restano) |
+| `bundle.py` | estratto dei dati del gioco per la versione web (template + chiavi di localizzazione usate), in `tiweb/public/gamedata/`, gitignorato: sono dati di Pavonis. Chi aggiunge un `loc()` su una famiglia nuova la mette in `KEEP_PREFIXES`; `python -m ticore.bundle --check` confronta l'output dell'API coi file del gioco e con l'estratto |
 | `factions.py` | confronto fra fazioni, coi soli campi che l'intel sblocca: soglie e misure di `TIGlobalConfig`/`FactionView` |
 | `store.py` | SQLite in `~/.terrainvicta-companion/`: storico, note, obiettivi. La campagna è identificata da **fazione + difficoltà + `realWorldCampaignStart`** |
 

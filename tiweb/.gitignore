@@ -40,5 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# copia generata di ticore per Pyodide (scripts/sync-ticore.mjs)
+# copie generate da scripts/sync-ticore.mjs: ticore per Pyodide e l'estratto
+# dei dati del gioco (dati di Pavonis: mai nel repo)
 /public/py/
+/public/pyodide/
+/public/gamedata/
