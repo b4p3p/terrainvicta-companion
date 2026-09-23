@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# copia generata di ticore per Pyodide (scripts/sync-ticore.mjs)
+/public/py/
