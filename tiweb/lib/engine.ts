@@ -37,7 +37,18 @@ export type EngineState =
   | "unsupported"  // niente File System Access API: non e' Chrome/Edge
   | "error";
 
-export interface EngineStatus { state: EngineState; detail: string | null }
+/** Passi dell'avvio, in ordine: con `loading` il dettaglio e' uno di questi. */
+export const BOOT_STEPS = ["runtime", "code", "gamedata", "save"] as const;
+export type BootStep = (typeof BOOT_STEPS)[number];
+
+export interface EngineStatus {
+  state: EngineState;
+  detail: string | null;
+  /** passi dell'avvio completati (0-4); non torna indietro */
+  done: number;
+  /** vero dal primo snapshot in poi: da li' l'avvio e' finito per sempre */
+  everReady: boolean;
+}
 
 export interface LiveEvent {
   type: "hello" | "snapshot";
@@ -115,7 +126,7 @@ class Engine {
   private eventSubs = new Set<(e: LiveEvent) => void>();
   private statusSubs = new Set<(s: EngineStatus) => void>();
   private last: LiveEvent | null = null;
-  status: EngineStatus = { state: "loading", detail: null };
+  status: EngineStatus = { state: "loading", detail: "runtime", done: 0, everReady: false };
   gameVersion: string | null = null;
 
   /** Avvia il worker, una volta sola. Lo chiama chi arriva prima: `useLive`
@@ -146,7 +157,7 @@ class Engine {
   }
 
   private sendFolder() {
-    this.setStatus("loading", "salvataggio");
+    this.setStatus("loading", "save");
     this.worker?.postMessage({ t: "folder", handle: this.dir });
   }
 
@@ -199,7 +210,12 @@ class Engine {
   private setStatus(state: EngineState, detail: string | null = null) {
     // senza cartella il worker dice "nosaves": per la pagina e' "nofolder"
     if (state === "nosaves" && !this.dir) state = "nofolder";
-    this.status = { state, detail };
+    let done = this.status.done;
+    const i = BOOT_STEPS.indexOf(detail as BootStep);
+    if (state === "loading" && i >= 0) done = Math.max(done, i);
+    if (state === "ready") done = BOOT_STEPS.length;
+    this.status = { state, detail, done,
+                    everReady: this.status.everReady || state === "ready" };
     this.statusSubs.forEach((f) => f(this.status));
   }
 
@@ -221,6 +237,9 @@ class Engine {
       this.setStatus(m.state, m.detail ?? null);
     } else if (m.t === "ready") {
       this.gameVersion = m.gameVersion ?? null;
+      // interprete, codice e dati pronti: manca solo il salvataggio
+      this.status = { ...this.status, done: Math.max(this.status.done, 3) };
+      this.statusSubs.forEach((f) => f(this.status));
     }
   }
 }

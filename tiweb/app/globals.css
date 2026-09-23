@@ -175,3 +175,24 @@ button:focus-visible, a:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: .01ms !important; animation: none !important; }
 }
+
+/* ------------------------------------------------- avvio del motore nel browser */
+
+/* la schermata c'e' nell'HTML fin dall'inizio; la si vede solo se lo script
+   in app/layout.tsx ha deciso che il motore gira nel browser */
+html:not([data-engine="browser"]) .ti-splash { display: none; }
+
+.ti-pulse { animation: ti-pulse 1.1s ease-in-out infinite; }
+@keyframes ti-pulse { 50% { background: color-mix(in srgb, var(--accent) 45%, transparent); } }
+
+/* il riflesso che scorre sulla barra mentre un passo e' in corso */
+.ti-scan {
+  position: absolute; inset: 0; width: 28%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 80%, white 20%), transparent);
+  animation: ti-scan 1.4s linear infinite;
+}
+@keyframes ti-scan { from { transform: translateX(-100%); } to { transform: translateX(360%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ti-pulse, .ti-scan { animation: none; }
+}

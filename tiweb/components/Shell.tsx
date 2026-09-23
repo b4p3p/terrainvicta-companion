@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { api, askNotificationPermission, useEngineStatus, useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { EngineGate } from "@/components/EngineGate";
+import { EngineSplash } from "@/components/EngineSplash";
 import { ResourceIcon } from "@/components/ui";
 
 const TABS = [
@@ -152,6 +153,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
       {/* nessun limite di larghezza: è una console da secondo monitor, e un cap
           disallineava il contenuto dall'intestazione a tutta larghezza */}
+      <EngineSplash />
       <EngineGate />
       <main className="p-4 w-full">{children}</main>
     </div>

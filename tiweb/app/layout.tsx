@@ -28,11 +28,23 @@ export const metadata: Metadata = {
   description: "Companion di partita: allerte, consiglio, missioni, nazioni.",
 };
 
+/* Decide prima dell'idratazione se il motore gira nel browser, con la stessa
+   regola di lib/engine.ts (engineMode): cosi' la schermata d'avvio c'e' dal
+   primo fotogramma invece di comparire dopo che la pagina si e' vista. */
+const ENGINE_MODE_SCRIPT = `try{var q=new URLSearchParams(location.search).get("engine");
+if(q==="browser"||q==="server")localStorage.setItem("ti.engine",q);
+var m=localStorage.getItem("ti.engine")||${JSON.stringify(process.env.NEXT_PUBLIC_ENGINE ?? "")}||
+(["localhost","127.0.0.1"].indexOf(location.hostname)>=0?"server":"browser");
+document.documentElement.dataset.engine=m}catch(e){}`;
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="it" className={`${plex.variable} ${saira.variable}`}>
+    <html lang="it" className={`${plex.variable} ${saira.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: ENGINE_MODE_SCRIPT }} />
+      </head>
       <body>
         <SettingsProvider>
           <Shell>{children}</Shell>

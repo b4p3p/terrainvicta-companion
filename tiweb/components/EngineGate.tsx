@@ -1,8 +1,8 @@
 "use client";
 
-/* Cosa serve al motore nel browser prima di poter mostrare qualcosa: la
-   cartella dei salvataggi, il permesso su di essa, il primo caricamento.
-   Con l'API locale non compare mai. */
+/* Cosa serve al motore nel browser quando qualcosa si interrompe a partita
+   in corso: permesso perso, cartella vuota, errore. L'avvio lo gestisce
+   EngineSplash. Con l'API locale non compare mai. */
 
 import { useState } from "react";
 import { useEngineStatus } from "@/lib/api";
@@ -15,7 +15,8 @@ export function EngineGate() {
   const e = t.engine;
   const st = useEngineStatus();
   const [err, setErr] = useState<string | null>(null);
-  if (!st || st.state === "ready") return null;
+  // prima del primo snapshot ci pensa la schermata d'avvio (EngineSplash)
+  if (!st || !st.everReady || st.state === "ready") return null;
 
   const pick = async () => setErr(await engine.pickFolder());
 

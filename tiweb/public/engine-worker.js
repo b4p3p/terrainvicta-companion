@@ -11,7 +11,8 @@
      {t:"req", id, method, path, query, body}  risponde {t:"res", id, ok, status, data|error}
    Verso la pagina, oltre alle risposte:
      {t:"event", ev}      come l'SSE di tiserver: hello / snapshot
-     {t:"status", state, detail}   loading | ready | nosaves | permission | error
+     {t:"status", state, detail}   loading | ready | nosaves | permission | error;
+                                   con loading, detail e' il passo: runtime code gamedata save
 
    Worker di tipo modulo: Pyodide 314 non supporta piu' quelli classici. */
 
@@ -86,15 +87,15 @@ gamedata.add_strings(${JSON.stringify(lang)}, json.loads(LOC)); del LOC`);
 }
 
 async function init(lang) {
-  status("loading", "Pyodide");
+  status("loading", "runtime");
   py = await loadPyodide({ indexURL: "/pyodide/" });
 
-  status("loading", "ticore");
+  status("loading", "code");
   const files = JSON.parse(await fetchText("/py/ticore/manifest.json"));
   py.FS.mkdirTree("/lib/ticore");
   for (const f of files) py.FS.writeFile(`/lib/ticore/${f}`, await fetchText(`/py/ticore/${f}`));
 
-  status("loading", "dati del gioco");
+  status("loading", "gamedata");
   const manifest = JSON.parse(await fetchText("/gamedata/manifest.json"));
   const langs = [...new Set(["en", lang])].filter((l) => l in manifest.languages);
   py.globals.set("TPL", await fetchText("/gamedata/templates.json"));
@@ -118,7 +119,7 @@ del TPL, LOC, LANGS
 `);
   service = py.runPython(`s = Service(); s.lang = ${JSON.stringify(lang)}; s`);
   post({ t: "ready", gameVersion: manifest.gameVersion });
-  status(dir ? "loading" : "nosaves", dir ? "salvataggio" : null);
+  status(dir ? "loading" : "nosaves", dir ? "save" : null);
 }
 
 // ------------------------------------------------------------ salvataggi
@@ -157,7 +158,7 @@ async function poll() {
     const first = !lastKey;
     const changed = service.reload(true);
     if (!changed) {                           // il gioco lo stava scrivendo
-      status("loading", service.error || "salvataggio non leggibile, riprovo");
+      status("loading", "save");   // il gioco lo stava scrivendo: riprovo
       return;
     }
     lastKey = key;

@@ -64,6 +64,9 @@ const it = {
   },
   council: {
     title: "Consiglio",
+    use: "missioni: {a} in attacco · {d} in difesa",
+    unused: "nessuna missione lo usa: non è un buco",
+    useHint: "Attacco: missioni che tirano su questo attributo del tuo consigliere. Difesa: missioni nemiche a cui questo attributo resiste. Letto dai template del gioco.",
     coverage: "Copertura degli attributi",
     coverageHint:
       "Il valore più alto del consiglio per ogni attributo. Sotto 4 nessuno è credibile.",
@@ -361,6 +364,13 @@ const it = {
     waiting: "in attesa del salvataggio",
     loading: "Avvio del companion nel browser…",
     loadingStep: "passo: {step}",
+    stepRuntime: "Interprete Python (WebAssembly)",
+    stepCode: "Motore di analisi",
+    stepGamedata: "Dati di gioco e traduzioni",
+    stepSave: "Lettura del salvataggio",
+    stepDone: "fatto",
+    stepActive: "in corso",
+    stepWaiting: "in attesa",
     firstLoad: "Al primo avvio scarica circa 13 MB (Python in WebAssembly); poi restano nella cache del browser.",
     noFolderTitle: "Scegli la cartella dei salvataggi",
     noFolder:
@@ -433,6 +443,9 @@ const en: typeof it = {
   },
   council: {
     title: "Council",
+    use: "missions: {a} attacking · {d} defending",
+    unused: "no mission uses it: not a gap",
+    useHint: "Attacking: missions that roll on this attribute of your councilor. Defending: enemy missions this attribute resists. Read from the game templates.",
     coverage: "Attribute coverage",
     coverageHint:
       "Your council's highest value per attribute. Below 4 nobody is credible.",
@@ -730,6 +743,13 @@ const en: typeof it = {
     waiting: "waiting for a save",
     loading: "Starting the companion in the browser…",
     loadingStep: "step: {step}",
+    stepRuntime: "Python interpreter (WebAssembly)",
+    stepCode: "Analysis engine",
+    stepGamedata: "Game data and translations",
+    stepSave: "Reading the save",
+    stepDone: "done",
+    stepActive: "working",
+    stepWaiting: "waiting",
     firstLoad: "The first start downloads about 13 MB (Python in WebAssembly); after that it stays in the browser cache.",
     noFolderTitle: "Choose the saves folder",
     noFolder:
