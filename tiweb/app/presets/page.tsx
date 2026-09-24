@@ -78,7 +78,7 @@ function DownloadBox({ file, t, onMsg }: { file: string; t: Labels; onMsg: (m: s
     </li>
   );
   return (
-    <div className="border border-edge-lit bg-panel p-3 mb-3 max-w-3xl">
+    <div className="border border-edge-lit bg-panel p-3 mb-3">
       <div className="display text-[12px] uppercase tracking-[.06em] text-dim mb-1">{t.dlTitle}</div>
       <p className="text-[12px] text-dim mb-3">{t.dlWhy}</p>
       <ol className="space-y-2.5 text-[12.5px] list-none">

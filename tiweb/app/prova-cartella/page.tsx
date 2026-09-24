@@ -330,7 +330,7 @@ export default function ProvaCartella() {
   }, [giro]);
 
   return (
-    <div className="max-w-3xl">
+    <div>
       <Panel title="Prova: lettura della cartella dal browser"
         sub="File System Access API + DecompressionStream, senza l'API Python">
         <div className="p-4 space-y-3 text-[13px]">

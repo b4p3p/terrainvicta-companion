@@ -21,7 +21,7 @@ export function EngineGate() {
   const pick = async () => setErr(await engine.pickFolder());
 
   const box = (title: string, body: React.ReactNode, action?: React.ReactNode, tone = "border-edge-lit") => (
-    <div className={`mx-4 mt-4 mb-2 p-4 bg-raised border ${tone} max-w-3xl`}>
+    <div className={`mx-4 mt-4 mb-2 p-4 bg-raised border ${tone}`}>
       <div className="display text-[14px] mb-1">{title}</div>
       <div className="text-[13px] text-dim space-y-2">{body}</div>
       {action && <div className="mt-3 flex items-center gap-3 flex-wrap">{action}</div>}

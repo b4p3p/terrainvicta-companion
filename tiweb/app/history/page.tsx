@@ -129,7 +129,7 @@ function DataPanel({ onImported }: { onImported: () => void }) {
 
   return (
     <Panel title={h.dataTitle}>
-      <div className="space-y-2 text-[12.5px] max-w-3xl">
+      <div className="space-y-2 text-[12.5px]">
         <p className={browser ? "text-warn" : "text-dim"}>{browser ? h.dataBrowser : h.dataServer}</p>
         {sum && (
           <p className="text-dim tabular-nums">

@@ -18,6 +18,7 @@ const TABS = [
   { href: "/factions", key: "factions" },
   { href: "/presets", key: "presets" },
   { href: "/plan", key: "plan" },            // la meno usata: in fondo
+  { href: "/about", key: "about" },          // non e' una scheda di gioco: a destra
 ] as const;
 
 /* Terra Invicta tiene le risorse in una barra fissa in cima allo schermo.
@@ -141,6 +142,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                 aria-current={active ? "page" : undefined}
                 className={`display text-[12px] uppercase tracking-[.07em]
                   px-4 h-8 flex items-center border-r border-edge transition-colors
+                  ${tab.key === "about" ? "ml-auto border-l" : ""}
                   ${active
                     ? "bg-sel text-ink border-t-2 border-t-accent"
                     : "text-dim hover:text-ink hover:bg-panel border-t-2 border-t-transparent"}`}>
