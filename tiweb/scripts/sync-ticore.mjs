@@ -44,7 +44,17 @@ console.log("icone: assets/icons -> public/icons");
 // l'estratto richiede il gioco installato: se manca, la build va avanti e la
 // pagina ricade sulla cartella scelta dall'utente
 const out = join(here, "..", "public", "gamedata");
-const r = spawnSync("python", ["-m", "ticore.bundle", out],
-  { cwd: join(here, "..", ".."), encoding: "utf-8" });
-console.log(r.status === 0 ? r.stdout.trim()
-  : `gamedata: estratto non generato (${(r.stderr || r.error || "").toString().trim().split("\n").pop()})`);
+const gd = process.env.TI_GAMEDATA;
+if (gd) {
+  // senza il gioco installato (es. Linux): un estratto gia' fatto altrove
+  rmSync(out, { recursive: true, force: true });
+  cpSync(gd, out, { recursive: true });
+  console.log(`gamedata: copiato da TI_GAMEDATA (${gd})`);
+} else {
+  // su Linux di solito c'e' solo python3
+  const py = process.env.PYTHON || (process.platform === "win32" ? "python" : "python3");
+  const r = spawnSync(py, ["-m", "ticore.bundle", out],
+    { cwd: join(here, "..", ".."), encoding: "utf-8" });
+  console.log(r.status === 0 ? r.stdout.trim()
+    : `gamedata: estratto non generato (${(r.stderr || r.error || "").toString().trim().split("\n").pop()})`);
+}

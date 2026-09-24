@@ -21,6 +21,11 @@ class NoSavesFound(RuntimeError):
 
 
 def save_dir():
+    # TI_SAVES: una cartella qualunque, per lavorare senza il gioco installato
+    # (su Linux, o con i salvataggi di prova in fixtures/saves)
+    env = os.environ.get("TI_SAVES")
+    if env and os.path.isdir(env):
+        return env
     for d in SAVE_DIRS:
         if os.path.isdir(d):
             return d

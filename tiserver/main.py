@@ -36,6 +36,12 @@ app.add_middleware(
 
 POLL_SECONDS = 3.0
 
+# TI_GAMEDATA: l'estratto di ticore/bundle.py al posto dell'installazione del
+# gioco, per far girare l'API dove il gioco non c'e' (es. Linux)
+if os.environ.get("TI_GAMEDATA"):
+    from ticore import bundle
+    bundle.load(os.environ["TI_GAMEDATA"])
+
 state = Service()
 subscribers = set()
 
