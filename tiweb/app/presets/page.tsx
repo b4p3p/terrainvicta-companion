@@ -93,10 +93,10 @@ function DownloadBox({ file, t, onMsg }: { file: string; t: Labels; onMsg: (m: s
           <CopyPath path={GAME_TEMPLATES_DIR} />
           <p className="text-faint text-[11.5px]">{t.dlOtherDisk}</p>
         </>)}
-        {step(3, <p className="text-dim">{t.dlStep3.replace("{file}", file)}</p>)}
-        {step(4, <p className="text-dim">{t.dlStep4}</p>)}
+        {step(3, <p className="text-dim">{t.dlStep3}</p>)}
       </ol>
       <p className="text-warn text-[11.5px] mt-3">{t.dlRedo}</p>
+      <p className="text-faint text-[11.5px] mt-1">{t.dlRestore}</p>
     </div>
   );
 }
