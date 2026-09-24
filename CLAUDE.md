@@ -60,6 +60,7 @@ ti.py       CLI sottile sopra ticore (utile senza browser).
 | `alerts.py` | motore di regole sul confronto fra snapshot |
 | `presets.py` | preset di priorità: lettura, preset personali, scrittura nel template del gioco **senza mod** (gli achievement restano) |
 | `service.py` | le rotte `/api/*` senza framework: `Service` (snapshot, precedente, allerte) + `dispatch()`. La usano sia `tiserver` sia il worker del browser (`tiweb/public/engine-worker.js`): **una rotta nuova si aggiunge qui e in `_ROUTES`**, poi l'involucro FastAPI |
+| `portable.py` | export (zip con `companion.db` + `presets.json`) e import che **unisce**: accetta anche il `companion.db` dell'API locale. Nel browser è l'unico modo di non perdere lo storico |
 | `bundle.py` | estratto dei dati del gioco per la versione web (template + chiavi di localizzazione usate), in `tiweb/public/gamedata/`, gitignorato: sono dati di Pavonis. Chi aggiunge un `loc()` su una famiglia nuova la mette in `KEEP_PREFIXES`; `python -m ticore.bundle --check` confronta l'output dell'API coi file del gioco e con l'estratto |
 | `factions.py` | confronto fra fazioni, coi soli campi che l'intel sblocca: soglie e misure di `TIGlobalConfig`/`FactionView` |
 | `store.py` | SQLite in `~/.terrainvicta-companion/`: storico, note, obiettivi. La campagna è identificata da **fazione + difficoltà + `realWorldCampaignStart`** |

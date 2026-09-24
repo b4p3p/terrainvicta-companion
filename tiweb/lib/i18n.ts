@@ -346,6 +346,17 @@ const it = {
     empty:
       "Ancora nessuno storico. Resta aperto mentre giochi: ogni salvataggio viene archiviato.",
     points: "rilevazioni",
+    dataTitle: "Dati del companion",
+    dataBrowser:
+      "Storico, note, obiettivi e preset personali stanno solo in questo browser: cambiando PC o cancellando i dati del sito si perdono. Esportali ogni tanto.",
+    dataServer: "Stanno in ~/.terrainvicta-companion/companion.db, sul PC dove gira l'API locale.",
+    dataCounts: "{snapshots} giorni archiviati in {campaigns} partite · {notes} note · {goals} obiettivi · {presets} preset personali · {size}",
+    dataExport: "Esporta",
+    dataImport: "Importa…",
+    dataImportHint:
+      "L'import unisce, non sostituisce: si può rifare senza creare doppioni. Accetta un export del companion (.zip), il companion.db dell'API locale o un presets.json.",
+    dataImported: "Importati {snapshots} giorni nuovi, {newer} aggiornati, {notes} note, {goals} obiettivi, {presets} preset.",
+    dataExported: "Esportato {file}.",
   },
   plan: {
     title: "Piano",
@@ -737,6 +748,17 @@ const en: typeof it = {
     empty:
       "No history yet. Keep this open while you play: every save gets archived.",
     points: "readings",
+    dataTitle: "Companion data",
+    dataBrowser:
+      "History, notes, goals and personal presets live only in this browser: changing PC or clearing the site's data loses them. Export them now and then.",
+    dataServer: "They live in ~/.terrainvicta-companion/companion.db, on the PC running the local API.",
+    dataCounts: "{snapshots} days archived in {campaigns} campaigns · {notes} notes · {goals} goals · {presets} personal presets · {size}",
+    dataExport: "Export",
+    dataImport: "Import…",
+    dataImportHint:
+      "Import merges, it doesn't replace: you can redo it without duplicates. It takes a companion export (.zip), the local API's companion.db or a presets.json.",
+    dataImported: "Imported {snapshots} new days, {newer} updated, {notes} notes, {goals} goals, {presets} presets.",
+    dataExported: "Exported {file}.",
   },
   plan: {
     title: "Plan",

@@ -9,12 +9,13 @@ Gli errori sono `ServiceError(status, messaggio)`: ognuno dei due involucri li
 trasforma nella sua risposta.
 """
 
+import base64
 import os
 import re
 from urllib.parse import unquote
 
 from . import (Game, SaveLocked, alerts, factions, gamedata, load, missions,
-               model, paths, presets, snapshot, store)
+               model, paths, portable, presets, snapshot, store)
 
 
 class ServiceError(Exception):
@@ -259,6 +260,29 @@ class Service:
             raise ServiceError(404, "Preset personale non trovato.")
         return {"status": self.presets_status(lang)}
 
+    # -- export e import dei dati ---------------------------------------------
+
+    def data_summary(self):
+        return portable.summary(self.con)
+
+    def data_export(self):
+        """Lo zip in base64: passa uguale da HTTP e dal worker del browser."""
+        return {"file": portable.export_name(self.snapshot),
+                "base64": base64.b64encode(portable.export(self.con)).decode("ascii")}
+
+    def data_import(self, b64):
+        if not b64:
+            raise ServiceError(400, "Nessun file.")
+        try:
+            res = portable.import_bytes(self.con, base64.b64decode(b64))
+        except ValueError as e:
+            raise ServiceError(400, str(e))
+        # lo storico e' cambiato: il "precedente" e le allerte vanno ricalcolati
+        if self.snapshot:
+            self.previous = store.previous_snapshot(self.con, self.snapshot)
+            self.alerts = alerts.evaluate(self.snapshot, self.previous)
+        return dict(res, summary=self.data_summary())
+
     # -- note e obiettivi ---------------------------------------------------
 
     def notes(self, subject=None):
@@ -340,6 +364,9 @@ _ROUTES = [
                                          q.get("lang"), _bool(q.get("install")))),
     ("DELETE", r"/api/presets/custom/([^/]+)",
      lambda s, q, b, dn: s.preset_delete(dn, q.get("lang"))),
+    ("GET", r"/api/data", lambda s, q, b: s.data_summary()),
+    ("GET", r"/api/data/export", lambda s, q, b: s.data_export()),
+    ("POST", r"/api/data/import", lambda s, q, b: s.data_import(b.get("base64"))),
     ("GET", r"/api/notes", lambda s, q, b: s.notes(q.get("subject"))),
     ("POST", r"/api/notes", lambda s, q, b: s.note_add(b.get("subject"), b.get("body"))),
     ("PUT", r"/api/notes/(\d+)", lambda s, q, b, i: s.note_edit(int(i), b.get("body"))),

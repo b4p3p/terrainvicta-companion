@@ -223,6 +223,29 @@ def diff():
         return state.diff()
 
 
+# ---------------------------------------------------- export e import dei dati
+
+class DataIn(BaseModel):
+    file: str | None = None
+    base64: str
+
+
+@app.get("/api/data")
+def data_summary():
+    return state.data_summary()
+
+
+@app.get("/api/data/export")
+def data_export():
+    return state.data_export()
+
+
+@app.post("/api/data/import")
+def data_import(d: DataIn):
+    with http_errors():
+        return state.data_import(d.base64)
+
+
 # ---------------------------------------------------------- note e obiettivi
 
 class NoteIn(BaseModel):

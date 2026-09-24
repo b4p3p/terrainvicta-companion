@@ -1,8 +1,9 @@
 "use client";
 
-import { useApi } from "@/lib/api";
+import { useRef, useState } from "react";
+import { api, useApi, useEngineStatus } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
-import { Empty, Panel, nf } from "@/components/ui";
+import { Button, Empty, Panel, nf } from "@/components/ui";
 import type { HistoryPoint } from "@/lib/types";
 
 const SERIES = [
@@ -63,12 +64,103 @@ function Lines({
   );
 }
 
+interface DataSummary {
+  snapshots: number; campaigns: number; notes: number; goals: number;
+  presets: number; bytes: number;
+}
+
+const fill = (s: string, v: Record<string, string | number>) =>
+  s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ""));
+
+/** Export e import di storico, note, obiettivi e preset personali. Nel
+ *  browser e' l'unico modo di non perderli, e di portarci lo storico
+ *  dell'API locale (vedi ticore/portable.py). */
+function DataPanel({ onImported }: { onImported: () => void }) {
+  const { t, live } = useSettings();
+  const h = t.history;
+  const browser = useEngineStatus() !== null;
+  const [tick, setTick] = useState(0);
+  const { data: sum } = useApi<DataSummary>("/api/data", [live.version, tick]);
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+
+  const doExport = async () => {
+    setBusy(true);
+    try {
+      const d = await api<{ file: string; base64: string }>("/api/data/export");
+      const bytes = Uint8Array.from(atob(d.base64), (c) => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = d.file;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setMsg({ text: fill(h.dataExported, { file: d.file }) });
+    } catch (e) {
+      setMsg({ text: String(e).replace(/^Error: /, ""), bad: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doImport = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const b64 = await new Promise<string>((ok, ko) => {
+        const r = new FileReader();
+        r.onload = () => ok(String(r.result).split(",", 2)[1] ?? "");
+        r.onerror = () => ko(r.error);
+        r.readAsDataURL(file);
+      });
+      const res = await api<{ snapshots: number; snapshotsNewer: number; notes: number;
+        goals: number; presets: number }>("/api/data/import",
+        { method: "POST", body: JSON.stringify({ file: file.name, base64: b64 }) });
+      setMsg({ text: fill(h.dataImported, { ...res, newer: res.snapshotsNewer }) });
+      setTick((x) => x + 1);
+      onImported();
+    } catch (e) {
+      setMsg({ text: String(e).replace(/^Error: /, ""), bad: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Panel title={h.dataTitle}>
+      <div className="space-y-2 text-[12.5px] max-w-3xl">
+        <p className={browser ? "text-warn" : "text-dim"}>{browser ? h.dataBrowser : h.dataServer}</p>
+        {sum && (
+          <p className="text-dim tabular-nums">
+            {fill(h.dataCounts, { ...sum, size: `${(sum.bytes / 1048576).toFixed(1)} MB` })}
+          </p>
+        )}
+        <div className="flex items-center gap-2 flex-wrap pt-1">
+          <Button tone="primary" onClick={doExport} disabled={busy || !sum?.snapshots}>{h.dataExport}</Button>
+          <Button onClick={() => input.current?.click()} disabled={busy}>{h.dataImport}</Button>
+          <input ref={input} type="file" accept=".zip,.db,.json" className="hidden"
+            onChange={(e) => { void doImport(e.target.files?.[0]); e.target.value = ""; }} />
+          {msg && <span className={`text-[12px] ${msg.bad ? "text-bad" : "text-good"}`}>{msg.text}</span>}
+        </div>
+        <p className="text-faint text-[11.5px]">{h.dataImportHint}</p>
+      </div>
+    </Panel>
+  );
+}
+
 export default function HistoryPage() {
   const { t, live } = useSettings();
-  const { data } = useApi<HistoryPoint[]>("/api/history", [live.version]);
+  const [imported, setImported] = useState(0);
+  const { data, error } = useApi<HistoryPoint[]>("/api/history", [live.version, imported]);
+  // il pannello dei dati c'e' sempre: e' da li' che si importa uno storico
+  const dataPanel = <DataPanel onImported={() => setImported((x) => x + 1)} />;
 
-  if (!data) return <Empty>{t.common.loading}</Empty>;
-  if (data.length < 2) return <Panel title={t.history.title}><Empty>{t.history.empty}</Empty></Panel>;
+  if (!data) return <><Empty>{error ?? t.common.loading}</Empty>{dataPanel}</>;
+  if (data.length < 2) return <>
+    <Panel title={t.history.title}><Empty>{t.history.empty}</Empty></Panel>
+    {dataPanel}
+  </>;
 
   return (
     <>
@@ -115,6 +207,8 @@ export default function HistoryPage() {
           </table>
         </div>
       </Panel>
+
+      {dataPanel}
     </>
   );
 }
