@@ -374,7 +374,7 @@ const it = {
     firstLoad: "Al primo avvio scarica circa 13 MB (Python in WebAssembly); poi restano nella cache del browser.",
     noFolderTitle: "Scegli la cartella dei salvataggi",
     noFolder:
-      "Il companion legge i salvataggi direttamente dal tuo PC: nulla viene inviato in rete. Scegli Documenti, My Games o TerraInvicta: alla cartella Saves ci arriva da solo.",
+      "Il companion legge i salvataggi direttamente dal tuo PC: nulla viene inviato in rete. In Documenti scegli My Games o TerraInvicta (Chrome non accetta Documenti intera): alla cartella Saves ci arriva da solo.",
     pick: "Scegli la cartella",
     change: "Cambia cartella",
     permissionTitle: "Serve di nuovo il permesso sulla cartella",
@@ -753,7 +753,7 @@ const en: typeof it = {
     firstLoad: "The first start downloads about 13 MB (Python in WebAssembly); after that it stays in the browser cache.",
     noFolderTitle: "Choose the saves folder",
     noFolder:
-      "The companion reads saves straight from your PC: nothing is sent over the network. Choose Documents, My Games or TerraInvicta: it finds the Saves folder by itself.",
+      "The companion reads saves straight from your PC: nothing is sent over the network. In Documents choose My Games or TerraInvicta (Chrome refuses the whole Documents folder): it finds the Saves folder by itself.",
     pick: "Choose folder",
     change: "Change folder",
     permissionTitle: "The folder needs permission again",

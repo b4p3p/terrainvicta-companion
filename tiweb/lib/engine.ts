@@ -87,7 +87,9 @@ function idb<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<
 // ------------------------------------------------------------ cartella
 
 /* Il selettore non accetta un percorso: parte da Documenti. Si accetta anche
-   un antenato di Saves (Documenti, My Games, TerraInvicta) e si scende noi. */
+   un antenato di Saves (My Games, TerraInvicta) e si scende noi. Documenti
+   intera Chrome la rifiuta: blocca la cartella, non il suo contenuto
+   (DIR_USER_DOCUMENTS, kDontBlockChildren). */
 const TO_SAVES = ["My Games", "TerraInvicta", "Saves"];
 
 async function hasSaves(dir: DirHandle) {

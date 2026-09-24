@@ -8,10 +8,14 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Button, Panel, Tag } from "@/components/ui";
+import { CopyPath } from "@/components/CopyPath";
 
 const NS = "PavonisInteractive.TerraInvicta.";
 const DB = "ti-prova-cartella";
 const POLL_MS = 3000;
+// installazione Steam predefinita: chi ha la libreria su un altro disco la adatta
+const TEMPLATES_DIR =
+  String.raw`C:\Program Files (x86)\Steam\steamapps\common\Terra Invicta\TerraInvicta_Data\StreamingAssets\Templates`;
 
 // i tipi della File System Access API non sono tutti in lib.dom
 type DirHandle = Omit<FileSystemDirectoryHandle, "getDirectoryHandle"> & {
@@ -267,6 +271,31 @@ export default function ProvaCartella() {
     }
   };
 
+  /* Prova 3: il selettore di salvataggio arriva fino a Templates? Chrome
+     blocca la lettura sotto Program Files; la scrittura con
+     showSaveFilePicker e' da verificare. Si scrive un .txt innocuo, non il
+     template vero: il gioco carica solo i suoi .json. */
+  const provaSalvataggio = async () => {
+    try {
+      const h = await (window as unknown as {
+        showSaveFilePicker(o: object): Promise<FileSystemFileHandle>;
+      }).showSaveFilePicker({
+        id: "ti-templates",
+        suggestedName: "prova-companion.txt",
+        types: [{ description: "Testo", accept: { "text/plain": [".txt"] } }],
+      });
+      const w = await (h as unknown as {
+        createWritable(): Promise<{ write(d: string): Promise<void>; close(): Promise<void> }>;
+      }).createWritable();
+      await w.write(`Prova di scrittura del companion, ${new Date().toLocaleString()}. Si puo' cancellare.
+`);
+      await w.close();
+      scrivi(`scrittura riuscita: ${h.name} — controlla in che cartella è finito`, "mine");
+    } catch (e) {
+      scrivi(`scrittura non riuscita: ${e}`, "bad");
+    }
+  };
+
   const riconcedi = async () => {
     if (!dir) return;
     const s = await dir.requestPermission({ mode: "read" });
@@ -404,6 +433,29 @@ export default function ProvaCartella() {
             </tbody>
           </table>
         )}
+      </Panel>
+
+      <Panel title="Prova 3: salvare dentro la cartella del gioco"
+        sub="Per i preset: Chrome lascia scrivere in Templates con il selettore di salvataggio?">
+        <div className="p-4 space-y-3 text-[13px]">
+          <ol className="space-y-3 list-none">
+            <li>
+              <div className="text-dim mb-1.5"><span className="text-accent display">1 ·</span> Copia il percorso della cartella dei template</div>
+              <CopyPath path={TEMPLATES_DIR} />
+            </li>
+            <li className="text-dim">
+              <span className="text-accent display">2 ·</span> Premi il pulsante qui sotto, incolla il percorso nella
+              barra degli indirizzi della finestra e premi Invio
+            </li>
+            <li className="text-dim">
+              <span className="text-accent display">3 ·</span> Salva. Il file è <code className="text-ink">prova-companion.txt</code>:
+              un testo innocuo che il gioco non legge, da cancellare dopo la prova
+            </li>
+          </ol>
+          <Button tone="primary" onClick={provaSalvataggio} disabled={!supportato}>
+            Prova a salvare nel gioco
+          </Button>
+        </div>
       </Panel>
 
       <Panel title="Registro">
