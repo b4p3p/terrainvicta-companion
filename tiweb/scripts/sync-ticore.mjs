@@ -17,7 +17,12 @@ mkdirSync(dst, { recursive: true });
 const files = readdirSync(src).filter((f) => f.endsWith(".py"));
 for (const f of files) copyFileSync(join(src, f), join(dst, f));
 writeFileSync(join(dst, "manifest.json"), JSON.stringify(files));
-console.log(`ticore: ${files.length} file -> public/py/ticore`);
+// i preset distribuiti col progetto: presets.py li cerca in <repo>/assets/presets
+const presetsDst = join(here, "..", "public", "py", "assets", "presets");
+mkdirSync(presetsDst, { recursive: true });
+copyFileSync(join(here, "..", "..", "assets", "presets", "TIPriorityPresetTemplate.json"),
+             join(presetsDst, "TIPriorityPresetTemplate.json"));
+console.log(`ticore: ${files.length} file -> public/py/ticore, piu' i preset distribuiti`);
 
 // Pyodide: solo il nucleo. sqlite3 in questa versione sta gia' nella stdlib.
 const pyo = join(here, "..", "node_modules", "pyodide");

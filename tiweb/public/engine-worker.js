@@ -105,6 +105,13 @@ async function init(lang) {
   py.globals.set("LANGS", py.toPy(Object.keys(manifest.languages)));
   langs.forEach((l) => loadedLangs.add(l));
 
+  // presets.py cerca i preset distribuiti in <repo>/assets/presets: nel
+  // file system del worker il "repo" e' /lib
+  py.FS.mkdirTree("/lib/assets/presets");
+  py.FS.writeFile("/lib/assets/presets/TIPriorityPresetTemplate.json",
+                  await fetchText("/py/assets/presets/TIPriorityPresetTemplate.json"));
+  py.globals.set("PRESETS", await fetchText("/gamedata/presets-template.json"));
+
   await restoreFiles();
   py.runPython(`
 import sys, json
@@ -115,7 +122,9 @@ P.GAME_DIRS = []                     # nessuna installazione: solo l'estratto
 from ticore import gamedata
 from ticore.service import Service, ServiceError
 gamedata.use_bundle(json.loads(TPL), {l: json.loads(v) for l, v in LOC.items()}, list(LANGS))
-del TPL, LOC, LANGS
+from ticore import presets
+presets.use_bundled_template(json.loads(PRESETS))
+del TPL, LOC, LANGS, PRESETS
 `);
   service = py.runPython(`s = Service(); s.lang = ${JSON.stringify(lang)}; s`);
   post({ t: "ready", gameVersion: manifest.gameVersion });

@@ -212,6 +212,14 @@ class Service:
             raise ServiceError(400, str(e))
         return dict(res, status=self.presets_status(lang))
 
+    def presets_export(self):
+        """Il template completo da scaricare: nel browser e' l'unico modo di
+        portare i preset nel gioco (Chrome non scrive in Program Files)."""
+        try:
+            return presets.export()
+        except (OSError, ValueError) as e:
+            raise ServiceError(400, str(e))
+
     def presets_restore(self, lang=None):
         try:
             res = presets.restore()
@@ -321,6 +329,7 @@ _ROUTES = [
     ("GET", r"/api/factions", lambda s, q, b: s.faction_compare(q.get("lang"))),
     ("GET", r"/api/diff", lambda s, q, b: s.diff()),
     ("GET", r"/api/presets", lambda s, q, b: s.presets_status(q.get("lang"))),
+    ("GET", r"/api/presets/export", lambda s, q, b: s.presets_export()),
     ("POST", r"/api/presets/install", lambda s, q, b: s.presets_install(q.get("lang"))),
     ("POST", r"/api/presets/restore", lambda s, q, b: s.presets_restore(q.get("lang"))),
     ("POST", r"/api/presets/custom",

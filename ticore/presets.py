@@ -44,6 +44,28 @@ def template_file():
     return p if p and os.path.isfile(p) else None
 
 
+# Nel browser il template del gioco non si puo' ne' leggere ne' scrivere
+# (Chrome blocca Program Files): arriva dall'estratto (bundle.py) e il file
+# completo si scarica con `export()`, da copiare a mano in Templates.
+_bundled = None
+
+
+def use_bundled_template(data):
+    global _bundled
+    _bundled = [o for o in (data or []) if isinstance(o, dict)]
+
+
+def game_original():
+    """Il template del gioco senza le nostre voci: dal backup se c'e', cioe'
+    com'era prima che lo toccassimo, altrimenti dal file ripulito."""
+    path = template_file()
+    if not path:
+        return None
+    backup = path + ".ti-companion.bak"
+    data = _read(backup if os.path.isfile(backup) else path)
+    return [o for o in data if not str(o.get("dataName", "")).startswith(PREFIX)]
+
+
 def _read(path):
     with open(path, encoding="utf-8-sig") as f:
         return json.load(f)
@@ -201,6 +223,8 @@ def _write_user(data):
 def status(lang="ita"):
     """Preset del gioco piu' i nostri, con lo stato di installazione."""
     path = template_file()
+    if not path and _bundled is not None:
+        return _status(_bundled, lang, mode="download")
     if not path:
         return {"ok": False, "error": "Template del gioco non trovato.",
                 "path": None, "presets": [], "pending": []}
@@ -209,6 +233,14 @@ def status(lang="ita"):
     except (OSError, ValueError) as e:
         return {"ok": False, "error": str(e), "path": path,
                 "presets": [], "pending": []}
+    return _status(data, lang, path=path)
+
+
+def _status(data, lang, path=None, mode="direct"):
+    """`direct`: il companion scrive nel gioco (API locale). `download`: nel
+    browser, dove si puo' solo scaricare il file; li' non sappiamo cosa c'e'
+    nel gioco, quindi niente installato / da aggiornare."""
+    direct = mode == "direct"
 
     have = {o.get("dataName"): o for o in data}
     # solo i preset del giocatore: le opzioni dell'AI nazionale non si scelgono.
@@ -219,8 +251,8 @@ def status(lang="ita"):
               and not str(o.get("dataName", "")).startswith(PREFIX)]
     ours = custom()
     # `stale`: nel gioco c'e' una versione diversa, va reinstallato
-    pending = [view(o, lang, installed=o["dataName"] in have,
-                    stale=o["dataName"] in have and have[o["dataName"]] != o)
+    pending = [view(o, lang, installed=direct and o["dataName"] in have,
+                    stale=direct and o["dataName"] in have and have[o["dataName"]] != o)
                for o in ours]
     # voci nostre rimaste nel gioco dopo che l'utente le ha cancellate
     names = {o["dataName"] for o in ours}
@@ -228,9 +260,11 @@ def status(lang="ita"):
     return {
         "ok": True,
         "error": None,
+        "mode": mode,
         "path": path,
-        "writable": os.access(path, os.W_OK),
-        "backup": os.path.isfile(path + ".ti-companion.bak"),
+        "file": TEMPLATE,
+        "writable": direct and os.access(path, os.W_OK),
+        "backup": direct and os.path.isfile(path + ".ti-companion.bak"),
         "installed": sum(1 for p in pending if p["installed"]),
         "stale": sum(1 for p in pending if p["stale"]) + len(orphans),
         "priorities": catalog(lang),
@@ -258,6 +292,30 @@ def install(lang="ita"):
     if not os.path.isfile(backup):
         shutil.copy2(path, backup)
 
+    data, added, updated, removed = _merge(data, mine)
+    _write_atomic(path, data)
+    return {"added": added, "updated": updated, "removed": removed,
+            "backup": backup}
+
+
+def export():
+    """Il template completo, gioco + nostri, come testo: nel browser si
+    scarica e l'utente lo copia in Templates al posto dell'originale."""
+    base = _bundled if _bundled is not None else game_original()
+    if base is None:
+        raise FileNotFoundError("Template del gioco non trovato.")
+    mine = custom()
+    if not mine:
+        raise ValueError("Nessun preset da installare.")
+    data, added, _, _ = _merge([dict(o) for o in base], mine)
+    return {"file": TEMPLATE, "count": added,
+            "content": json.dumps(data, ensure_ascii=False, indent=2) + "\n"}
+
+
+def _merge(data, mine):
+    """Le nostre voci dentro il template: sostituisce quelle col nostro
+    prefisso, aggiunge le mancanti in coda, toglie le nostre che non esistono
+    piu'. Non tocca nessuna voce altrui."""
     wanted = {p.get("dataName") for p in mine}
     before = len(data)
     data = [o for o in data if not str(o.get("dataName", "")).startswith(PREFIX)
@@ -275,10 +333,7 @@ def install(lang="ita"):
         else:
             data.append(p)
             added += 1
-
-    _write_atomic(path, data)
-    return {"added": added, "updated": updated, "removed": removed,
-            "backup": backup}
+    return data, added, updated, removed
 
 
 def restore():

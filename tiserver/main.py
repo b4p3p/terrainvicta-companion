@@ -93,6 +93,12 @@ def install_presets(lang: str = Query(None)):
         return state.presets_install(lang)
 
 
+@app.get("/api/presets/export")
+def export_presets():
+    with http_errors():
+        return state.presets_export()
+
+
 @app.post("/api/presets/restore")
 def restore_presets(lang: str = Query(None)):
     with http_errors():

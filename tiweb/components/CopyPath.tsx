@@ -6,6 +6,10 @@
 
 import { useState } from "react";
 
+/** Cartella dei template con l'installazione Steam predefinita. */
+export const GAME_TEMPLATES_DIR =
+  String.raw`C:\Program Files (x86)\Steam\steamapps\common\Terra Invicta\TerraInvicta_Data\StreamingAssets\Templates`;
+
 export function CopyPath({ path }: { path: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {

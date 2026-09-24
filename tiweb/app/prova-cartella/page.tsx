@@ -8,14 +8,12 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Button, Panel, Tag } from "@/components/ui";
-import { CopyPath } from "@/components/CopyPath";
+import { CopyPath, GAME_TEMPLATES_DIR } from "@/components/CopyPath";
 
 const NS = "PavonisInteractive.TerraInvicta.";
 const DB = "ti-prova-cartella";
 const POLL_MS = 3000;
-// installazione Steam predefinita: chi ha la libreria su un altro disco la adatta
-const TEMPLATES_DIR =
-  String.raw`C:\Program Files (x86)\Steam\steamapps\common\Terra Invicta\TerraInvicta_Data\StreamingAssets\Templates`;
+const TEMPLATES_DIR = GAME_TEMPLATES_DIR;
 
 // i tipi della File System Access API non sono tutti in lib.dom
 type DirHandle = Omit<FileSystemDirectoryHandle, "getDirectoryHandle"> & {

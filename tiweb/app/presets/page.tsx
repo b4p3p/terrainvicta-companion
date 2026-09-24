@@ -8,6 +8,7 @@ import { Button, Empty, GameIcon, Panel, Tag } from "@/components/ui";
 import { Combo, type ComboOption } from "@/components/Combo";
 import { Guide } from "@/components/Guide";
 import { Modal } from "@/components/Modal";
+import { CopyPath, GAME_TEMPLATES_DIR } from "@/components/CopyPath";
 import {
   COLOR_OF, FAMILIES, Legend, ShareBar, WeightChips, familyShares, pc, pp,
   type Family, type Priority, type Slice,
@@ -32,6 +33,9 @@ interface Preset {
 interface Status {
   ok: boolean;
   error: string | null;
+  /** direct: l'API locale scrive nel gioco. download: nel browser, si scarica il file */
+  mode: "direct" | "download";
+  file: string;
   path: string | null;
   writable: boolean;
   backup: boolean;
@@ -45,6 +49,57 @@ interface Status {
 }
 
 type Labels = ReturnType<typeof useSettings>["t"]["presets"];
+
+/** Nel browser: il file completo si scarica e l'utente lo copia nel gioco,
+ *  perche' Chrome non scrive sotto Program Files (vedi ROADMAP). */
+function DownloadBox({ file, t, onMsg }: { file: string; t: Labels; onMsg: (m: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const download = async () => {
+    setBusy(true);
+    try {
+      const d = await api<{ file: string; content: string }>("/api/presets/export");
+      const url = URL.createObjectURL(new Blob([d.content], { type: "application/json" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = d.file;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      onMsg(t.dlDone.replace("{file}", d.file));
+    } catch (e) {
+      onMsg(String(e).replace(/^Error: /, ""));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const step = (n: number, body: React.ReactNode) => (
+    <li className="flex gap-2">
+      <span className="display text-accent shrink-0">{n} ·</span>
+      <div className="flex-1 min-w-0 space-y-1.5">{body}</div>
+    </li>
+  );
+  return (
+    <div className="border border-edge-lit bg-panel p-3 mb-3 max-w-3xl">
+      <div className="display text-[12px] uppercase tracking-[.06em] text-dim mb-1">{t.dlTitle}</div>
+      <p className="text-[12px] text-dim mb-3">{t.dlWhy}</p>
+      <ol className="space-y-2.5 text-[12.5px] list-none">
+        {step(1, <>
+          <p className="text-dim">{t.dlStep1}</p>
+          <Button tone="primary" onClick={download} disabled={busy}>
+            {t.dlButton.replace("{file}", file)}
+          </Button>
+        </>)}
+        {step(2, <>
+          <p className="text-dim">{t.dlStep2}</p>
+          <CopyPath path={GAME_TEMPLATES_DIR} />
+          <p className="text-faint text-[11.5px]">{t.dlOtherDisk}</p>
+        </>)}
+        {step(3, <p className="text-dim">{t.dlStep3.replace("{file}", file)}</p>)}
+        {step(4, <p className="text-dim">{t.dlStep4}</p>)}
+      </ol>
+      <p className="text-warn text-[11.5px] mt-3">{t.dlRedo}</p>
+    </div>
+  );
+}
 
 /** Quanto prende ogni famiglia, e quanto cambia rispetto al riferimento. */
 function FamilyDelta({ p, base, t, knowledge }: {
@@ -69,9 +124,11 @@ function FamilyDelta({ p, base, t, knowledge }: {
   );
 }
 
-function Row({ p, base, t, knowledge, onEdit, onDuplicate, isDefault }: {
+function Row({ p, base, t, knowledge, onEdit, onDuplicate, isDefault, known }: {
   p: Preset; base: Preset | null; t: Labels; knowledge: string;
   onEdit?: () => void; onDuplicate: () => void; isDefault: boolean;
+  /** sappiamo cosa c'e' nel gioco? No dal browser, che non legge il template */
+  known: boolean;
 }) {
   const isBase = base?.id === p.id;
   const compare = base && !isBase;
@@ -83,7 +140,7 @@ function Row({ p, base, t, knowledge, onEdit, onDuplicate, isDefault }: {
         {p.faction && <span className="text-faint text-[11.5px]">{p.faction}</span>}
         {p.mine && p.installed && !p.stale && <Tag tone="mine">{t.inGame}</Tag>}
         {p.mine && p.stale && <Tag tone="warn">{t.staleTag}</Tag>}
-        {p.mine && !p.installed && <Tag>{t.notInGame}</Tag>}
+        {known && p.mine && !p.installed && <Tag>{t.notInGame}</Tag>}
         {isBase && <Tag>{t.reference}</Tag>}
         {isDefault && <span title={t.defaultHint}><Tag tone="free">{t.defaultTag}</Tag></span>}
         <span className="ml-auto flex gap-3 text-[12px] items-baseline">
@@ -282,7 +339,8 @@ export default function PresetsPage() {
       : await call(`/api/presets/custom${q}`, "POST", body);
     if (!d) return;                 // l'errore l'ha già messo call() nella modale
     setDraft(null);
-    setMsg(d.install?.ok ? t.savedRestart
+    setMsg(st.mode === "download" ? t.dlAfterSave
+      : d.install?.ok ? t.savedRestart
       : d.install ? `${t.savedNotInstalled} ${d.install.error}` : t.saved);
   }
 
@@ -316,6 +374,7 @@ export default function PresetsPage() {
   const rowProps = (p: Preset) => ({
     p, base, t, knowledge,
     isDefault: p.id === st.defaultPreset,
+    known: st.mode !== "download",
     onDuplicate: () => openDraft({ id: null, name: `${p.name} (2)`, weights: { ...p.weights } }),
     onEdit: p.editable
       ? () => openDraft({ id: p.id, name: p.name, weights: { ...p.weights } })
@@ -334,12 +393,16 @@ export default function PresetsPage() {
             { title: t.guideReadTitle, body: [t.familiesHint, t.compareHint] },
             { title: t.guideEditTitle, body: [
               t.editorHint,
-              <span key="f" className="break-all text-faint">{t.file}: {st.path}</span>,
+              <span key="f" className="break-all text-faint">{t.file}: {st.path ?? `${GAME_TEMPLATES_DIR}\\${st.file}`}</span>,
             ] },
           ]} />
         }>
         <p className="text-warn text-[12px] mb-3">{t.achievementsShort}</p>
 
+        {st.mode === "download" ? <>
+          <DownloadBox file={st.file} t={t} onMsg={setMsg} />
+          {msg && <p className="text-[12px] text-dim mb-3">{msg}</p>}
+        </> : <>
         <div className="flex items-center gap-2 flex-wrap mb-3">
           <Button onClick={() => act("install")} tone="primary"
             disabled={busy || !st.writable}>
@@ -353,6 +416,7 @@ export default function PresetsPage() {
         </div>
         {st.stale > 0 && <p className="text-warn text-[12px] mb-3">{t.staleMsg}</p>}
         {!st.writable && <p className="text-bad text-[12px] mb-3">{t.notWritable}</p>}
+        </>}
 
         <div className="flex items-center gap-3 flex-wrap mb-4 border-t border-edge pt-3">
           <label className="text-[12px] text-dim flex items-center gap-1.5 cursor-pointer">
@@ -387,7 +451,8 @@ export default function PresetsPage() {
                     : <Button onClick={() => setConfirmDelete(true)} disabled={busy}>{t.remove}</Button>
               )}
               <p className="text-warn text-[11.5px] m-0 flex-1 min-w-[260px]">
-                {st.writable ? t.restartWarning : t.notWritable}
+                {st.mode === "download" ? t.dlSaveNote
+                  : st.writable ? t.restartWarning : t.notWritable}
               </p>
               <Button onClick={() => setDraft(null)} disabled={busy}>{t.cancel}</Button>
               <Button tone="primary" onClick={saveDraft}

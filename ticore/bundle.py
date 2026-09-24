@@ -20,7 +20,7 @@ import os
 import re
 import sys
 
-from . import gamedata, paths
+from . import gamedata, paths, presets
 
 STEAM_APP_ID = "1176470"
 
@@ -105,6 +105,11 @@ def build(out):
         sizes["loc/%s.json" % lang] = _dump(
             os.path.join(out, "loc", "%s.json" % lang), s)
 
+    # i preset del gioco, senza le nostre voci: nel browser la scheda Preset ci
+    # costruisce il file completo da scaricare
+    sizes["presets-template.json"] = _dump(os.path.join(out, "presets-template.json"),
+                                           presets.game_original() or [])
+
     manifest = {
         "gameVersion": game_version(),
         "steamBuild": steam_build(),
@@ -126,6 +131,10 @@ def load(src):
         with open(os.path.join(src, "loc", "%s.json" % lang), encoding="utf-8") as f:
             strings[lang] = json.load(f)
     gamedata.use_bundle(tpl, strings, list(manifest["languages"]))
+    p = os.path.join(src, "presets-template.json")
+    if os.path.isfile(p):
+        with open(p, encoding="utf-8") as f:
+            presets.use_bundled_template(json.load(f))
     return manifest
 
 
