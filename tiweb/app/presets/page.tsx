@@ -82,16 +82,17 @@ function DownloadBox({ file, t, onMsg }: { file: string; t: Labels; onMsg: (m: s
       <div className="display text-[12px] uppercase tracking-[.06em] text-dim mb-1">{t.dlTitle}</div>
       <p className="text-[12px] text-dim mb-3">{t.dlWhy}</p>
       <ol className="space-y-2.5 text-[12.5px] list-none">
+        {/* prima la cartella aperta, poi il file: si incolla dove si e' gia' */}
         {step(1, <>
           <p className="text-dim">{t.dlStep1}</p>
-          <Button tone="primary" onClick={download} disabled={busy}>
-            {t.dlButton.replace("{file}", file)}
-          </Button>
+          <CopyPath path={GAME_TEMPLATES_DIR} />
+          <p className="text-faint text-[11.5px]">{t.dlOtherDisk}</p>
         </>)}
         {step(2, <>
           <p className="text-dim">{t.dlStep2}</p>
-          <CopyPath path={GAME_TEMPLATES_DIR} />
-          <p className="text-faint text-[11.5px]">{t.dlOtherDisk}</p>
+          <Button tone="primary" onClick={download} disabled={busy}>
+            {t.dlButton.replace("{file}", file)}
+          </Button>
         </>)}
         {step(3, <p className="text-dim">{t.dlStep3}</p>)}
       </ol>
