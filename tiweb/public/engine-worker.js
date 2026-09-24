@@ -29,6 +29,14 @@ let lastKey = "";
 let busy = false;
 const loadedLangs = new Set();
 
+// Le richieste che vogliono uno snapshot aspettano il primo salvataggio letto:
+// prima Service risponderebbe «Cartella dei salvataggi non trovata», che nel
+// browser e' falso (la cartella c'e', la si sta leggendo). Le altre rotte non
+// dipendono dal salvataggio e passano subito.
+let snapshotLoaded;
+const firstSnapshot = new Promise((ok) => { snapshotLoaded = ok; });
+const WITHOUT_SNAPSHOT = /^\/api\/(health|languages|campaigns|data|presets)(\/|$)/;
+
 const post = (m) => postMessage(m);
 const status = (state, detail = null) => post({ t: "status", state, detail });
 
@@ -171,6 +179,7 @@ async function poll() {
       return;
     }
     lastKey = key;
+    snapshotLoaded();
     await persistFiles();
     const ev = py.runPython(`json.dumps(s.event(${JSON.stringify(first ? "hello" : "snapshot")}), default=str)`);
     post({ t: "event", ev: JSON.parse(ev) });
@@ -187,6 +196,7 @@ async function poll() {
 async function request({ id, method, path, query, body }) {
   try {
     if (!service) throw Object.assign(new Error("Motore non ancora pronto"), { status: 503 });
+    if (!WITHOUT_SNAPSHOT.test(path)) await firstSnapshot;
     await ensureLang(query?.lang);
     py.globals.set("REQ", py.toPy({ method, path, query: query || {}, body: body ?? null }));
     const out = py.runPython(`
