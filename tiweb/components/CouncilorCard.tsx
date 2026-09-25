@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useSettings } from "@/lib/settings";
-import type { Dict } from "@/lib/i18n";
+import { currentDict, type Dict } from "@/lib/i18n";
 import { AttrIcon, MissionIcon, ResourceIcon, Tag, nf } from "@/components/ui";
 import { ATTRS, type Attr, type Councilor, type Income, type TraitEffect } from "@/lib/types";
 
@@ -10,10 +10,9 @@ import { ATTRS, type Attr, type Councilor, type Income, type TraitEffect } from 
    due pagine passano solo quello che le distingue (variante, azione in alto,
    attributo evidenziato). Tutto il resto vive qui, così non divergono. */
 
-export const SHORT: Record<Attr, string> = {
-  Persuasion: "PER", Investigation: "IND", Espionage: "SPI", Command: "CMD",
-  Administration: "AMM", Science: "SCI", Security: "SIC",
-};
+/** Sigla dell'attributo nella lingua dell'interfaccia (IND/INV, SPI/ESP…). */
+export const short = (a: string): string =>
+  (currentDict().council.attrShort as Record<string, string>)[a] ?? a;
 
 type ResLabel = "resMoney" | "resInfluence" | "resResearch" | "resOps" | "resBoost";
 
@@ -56,7 +55,7 @@ function describe(e: TraitEffect, t: Dict): { text: string; tone: "good" | "bad"
   const byValue = (v: number): "good" | "bad" | "dim" => (v > 0 ? "good" : v < 0 ? "bad" : "dim");
   switch (e.kind) {
     case "stat":
-      return { text: `${signed(e.value)} ${SHORT[e.stat] ?? e.stat}`,
+      return { text: `${signed(e.value)} ${short(e.stat)}`,
         tone: byValue(e.value), conditional: e.conditional };
     case "statFixed":
       return { text: `${e.stat} = ${e.value}`, tone: "dim", conditional: e.conditional };
@@ -200,11 +199,11 @@ function AttrRow({ c, sortAttr }: { c: Councilor; sortAttr?: Attr | null }) {
             className={`text-[12px] px-1.5 py-0.5 border inline-flex items-center gap-1 ${
               g > 0 ? "border-good/40 bg-good/10" : "border-edge"} ${
               sortAttr === a ? "outline outline-1 outline-accent" : ""}`}
-            title={[bonus ? `base ${c.base[a]} + ${bonus} org` : "",
-              g > 0 ? `+${g} sul massimo attuale del consiglio` : ""].filter(Boolean).join(" · ")
+            title={[bonus ? currentDict().council.attrBase.replace("{base}", String(c.base[a])).replace("{org}", String(bonus)) : "",
+              g > 0 ? currentDict().council.attrAboveMax.replace("{n}", String(g)) : ""].filter(Boolean).join(" · ")
               || undefined}>
-            <AttrIcon attr={a} size={13} title={SHORT[a]} />
-            <span className="text-faint">{SHORT[a]}</span>
+            <AttrIcon attr={a} size={13} title={short(a)} />
+            <span className="text-faint">{short(a)}</span>
             <span className={v >= 7 ? "font-semibold" : v <= 2 ? "text-dim" : ""}>{v}</span>
             {bonus > 0 && <sup className="text-accent">+{bonus}</sup>}
             {g > 0 && <span className="text-good ml-1">+{g}</span>}
@@ -281,8 +280,8 @@ export function CouncilorCard({ c, variant, action, sortAttr, highlighted }: {
           {depthAttrs.map((a) => (
             <Tag key={a}>
               <span className="inline-flex items-center gap-1" title={t.recruit.depthHint}>
-                <AttrIcon attr={a} size={12} title={SHORT[a]} />
-                {SHORT[a]} {depth[a]!.now} → <span className="text-good">{depth[a]!.after}</span>
+                <AttrIcon attr={a} size={12} title={short(a)} />
+                {short(a)} {depth[a]!.now} → <span className="text-good">{depth[a]!.after}</span>
               </span>
             </Tag>
           ))}
@@ -298,7 +297,7 @@ export function CouncilorCard({ c, variant, action, sortAttr, highlighted }: {
               ? <div className="text-dim">{t.council.noOrgs}</div>
               : c.orgs.map((o) => {
                 const bits: string[] = [];
-                for (const [k, v] of Object.entries(o.attributes)) if (v) bits.push(`+${v} ${SHORT[k as Attr]}`);
+                for (const [k, v] of Object.entries(o.attributes)) if (v) bits.push(`+${v} ${short(k)}`);
                 if (o.projectSlots) bits.push(`+${o.projectSlots} slot`);
                 return (
                   <div key={o.id} className="flex items-baseline gap-2 flex-wrap">
@@ -328,7 +327,7 @@ export function CouncilorCard({ c, variant, action, sortAttr, highlighted }: {
                     title={m.new ? t.recruit.missionsNewHint : undefined}>
                     <MissionIcon icon={m.icon} size={16} title={m.name} />
                     {m.name}
-                    {m.attribute && <AttrIcon attr={m.attribute} size={12} title={SHORT[m.attribute]} />}
+                    {m.attribute && <AttrIcon attr={m.attribute} size={12} title={short(m.attribute)} />}
                   </span>
                 </Tag>
               ))}

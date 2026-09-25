@@ -8,7 +8,7 @@ import { useSettings } from "@/lib/settings";
 import { engineMode, LOCKED_ENGINE, type EngineMode } from "@/lib/engine";
 import { EngineGate } from "@/components/EngineGate";
 import { EngineSplash } from "@/components/EngineSplash";
-import { ResourceIcon } from "@/components/ui";
+import { ResourceIcon, nf } from "@/components/ui";
 
 const TABS = [
   { href: "/", key: "overview" },
@@ -25,9 +25,9 @@ const TABS = [
 /* Terra Invicta tiene le risorse in una barra fissa in cima allo schermo.
    Stesso posto qui: è la riga che si guarda senza cercarla. */
 const RESOURCES = [
-  { key: "Money", label: "Denaro", icon: "ICO_currency", tone: "text-warn" },
-  { key: "Influence", label: "Influenza", icon: "ICO_influence", tone: "text-accent" },
-  { key: "Operations", label: "Operazioni", icon: "ICO_ops", tone: "text-other" },
+  { key: "Money", icon: "ICO_currency", tone: "text-warn" },
+  { key: "Influence", icon: "ICO_influence", tone: "text-accent" },
+  { key: "Operations", icon: "ICO_ops", tone: "text-other" },
 ] as const;
 
 // il motore non cambia senza ricaricare la pagina
@@ -115,10 +115,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               if (v == null) return null;
               return (
                 <span key={r.key} className="flex items-baseline gap-1.5">
-                  <ResourceIcon icon={r.icon} size={14} title={r.label} />
-                  <span className="text-faint text-[11px]">{r.label}</span>
+                  <ResourceIcon icon={r.icon} size={14} title={t.res[r.key]} />
+                  <span className="text-faint text-[11px]">{t.res[r.key]}</span>
                   <span className={`display text-[14px] ${r.tone}`}>
-                    {Math.round(v).toLocaleString("it-IT")}
+                    {nf(v, 0)}
                   </span>
                 </span>
               );
@@ -126,21 +126,21 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             {/* la ricerca utile e' quella che entra nei progetti ogni mese,
                 non la risorsa accumulata, che a inizio partita resta a zero */}
             <span className="flex items-baseline gap-1.5">
-              <ResourceIcon icon="ICO_research" size={14} title="Ricerca" />
-              <span className="text-faint text-[11px]">Ricerca/mese</span>
+              <ResourceIcon icon="ICO_research" size={14} title={t.res.research} />
+              <span className="text-faint text-[11px]">{t.res.researchMonth}</span>
               <span className="display text-[14px] text-good">
                 {Math.round(snap.projects?.rate ?? 0)}
               </span>
             </span>
             <span className="flex items-baseline gap-1.5">
-              <span className="text-faint text-[11px]">Consiglio</span>
+              <span className="text-faint text-[11px]">{t.res.council}</span>
               <span className="display text-[14px] text-ink">{snap.council?.size ?? "—"}</span>
             </span>
             {snap.controlPoints && (
               <span className="flex items-baseline gap-1.5 ml-auto">
                 <ResourceIcon icon="ICO_ControlPoint_empty" size={14}
-                  title="Punti di controllo" />
-                <span className="text-faint text-[11px]">Punti di controllo</span>
+                  title={t.res.cp} />
+                <span className="text-faint text-[11px]">{t.res.cp}</span>
                 <span className="display text-[14px] text-ink">
                   {snap.controlPoints.mine}
                   <span className="text-faint text-[12px]">/{snap.controlPoints.total}</span>

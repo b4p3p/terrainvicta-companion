@@ -34,7 +34,13 @@ KEEP_PREFIXES = (
     "TITraitTemplate.description.",
     "TICouncilorTypeTemplate.displayName.",
     "TIProjectTemplate.displayName.",
+    "TITechTemplate.displayName.",
     "TIFactionTemplate.displayName.",
+    # nomi di nazioni e regioni: il salvataggio li ha nella lingua del gioco,
+    # names.py li ritraduce (una nazione puo' usare anche il nome "di unione")
+    "TINationTemplate.displayName.",
+    "TINationTemplate.unionDisplayName.",
+    "TIRegionTemplate.displayName.",
     "TIObjectiveTemplate.displayName.",
     "TIPriorityPresetTemplate.displayName.",
     "UI.Global.",
@@ -171,8 +177,8 @@ def check(save_path=None):
                 "snapshot": snap,
                 "missions": missions.catalogue(snap, lang),
                 "factions": factions.compare(g, lang),
-                "details": {n["name"]: model.nation_detail(g, n["name"], lang)
-                            for n in model.nations(g)},
+                "details": {n["id"]: model.nation_detail(g, n["id"], lang)
+                            for n in model.nations(g, lang)},
             }
         return json.loads(json.dumps(out, default=str))
 

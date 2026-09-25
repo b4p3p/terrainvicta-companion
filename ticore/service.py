@@ -15,7 +15,8 @@ import re
 from urllib.parse import unquote
 
 from . import (Game, SaveLocked, alerts, factions, gamedata, load, missions,
-               model, paths, portable, presets, snapshot, store)
+               model, paths, portable, presets, snapshot, store, texts)
+from .texts import t
 
 
 class ServiceError(Exception):
@@ -38,6 +39,7 @@ class Service:
         self.lang = "ita"
         self.error = None
         self.loaded_mtime = 0.0
+        self.data_version = None         # nel browser: dal manifest dell'estratto
         # Nel browser non c'e' una cartella da scandire: il worker scrive il
         # salvataggio piu' recente in memoria e lo indica qui.
         self.pinned = None
@@ -77,7 +79,7 @@ class Service:
 
     def require(self):
         if self.snapshot is None and not self.reload(force=True):
-            raise ServiceError(503, self.error or "Nessuno snapshot disponibile")
+            raise ServiceError(503, self.error or t("err.noSnapshot"))
         return self.snapshot
 
     def campaign(self):
@@ -100,16 +102,75 @@ class Service:
             "lang": self.lang,
         }
 
-    def get_snapshot(self, lang=None):
+    def version(self):
+        """Versione dei dati del gioco che il companion usa, e del gioco che ha
+        scritto il salvataggio: se differiscono, nomi e numeri possono essere
+        di un'altra versione. Nel browser i dati sono quelli dell'estratto
+        (`data_version`, dal manifest); con l'API locale, il gioco installato."""
+        from . import bundle
+        data = self.data_version or {"gameVersion": bundle.game_version(),
+                                     "steamBuild": bundle.steam_build(),
+                                     "source": "install"}
+        g = self.game.globals if self.game else {}
+        return {"data": data,
+                "save": g.get("latestSaveVersion"),
+                "campaignStart": g.get("campaignStartVersion")}
+
+    def _switch(self, lang):
+        """Cambio della lingua di gioco: snapshot e allerte si ricostruiscono,
+        perche' nomi e testi sono scritti dentro. Lo storico non ne soffre:
+        l'archivio e' per (campagna, data di gioco), e lo snapshot rifatto
+        sostituisce quello della stessa data."""
         if lang and lang != self.lang:
             self.lang = lang
+            texts.LANG = lang
             self.reload(force=True)
+
+    def get_snapshot(self, lang=None):
+        self._switch(lang)
         return self.require()
 
-    def get_alerts(self):
+    def get_alerts(self, lang=None):
+        self._switch(lang)
         self.require()
         return {"alerts": self.alerts,
                 "comparedTo": (self.previous or {}).get("date")}
+
+    def research(self, lang=None):
+        """Slot di ricerca e avanzamento dal salvataggio precedente."""
+        self._switch(lang)
+        return model.research_delta(self.require(), self._research_previous())
+
+    def _research_previous(self):
+        """Il confronto per la ricerca. Di norma lo snapshot precedente; se e'
+        stato archiviato prima che ci fossero i contributi delle fazioni, il
+        salvataggio precedente della stessa partita letto dalla cartella (gli
+        autosave), una volta sola per salvataggio corrente."""
+        prev = self.previous
+        has = any(x.get("contributions") for x in ((prev or {}).get("research") or {}).get("slots", []))
+        if has:
+            return prev
+        cur = self.snapshot
+        key = (cur.get("save"), cur.get("mtime"), self.lang)
+        if getattr(self, "_rprev_key", None) == key:
+            return self._rprev or prev
+        self._rprev_key, self._rprev = key, None
+        try:
+            for _, path in paths.list_saves():
+                if os.path.basename(path) == cur.get("save"):
+                    continue
+                try:
+                    g = Game(path)
+                except Exception:
+                    continue
+                if g.campaign_key() != cur.get("campaignStart") or g.date_key() >= cur.get("dateKey", ""):
+                    continue
+                self._rprev = {"date": g.meta.get("gameTimeString", ""), "dateKey": g.date_key(),
+                               "research": model.research(g, self.lang)}
+                break
+        except Exception:
+            pass                           # nel browser non c'e' una cartella da leggere
+        return self._rprev or prev
 
     def languages(self):
         return {"current": self.lang,
@@ -121,10 +182,12 @@ class Service:
 
     # -- missioni, nazioni, fazioni ---------------------------------------
 
-    def mission_catalogue(self):
+    def mission_catalogue(self, lang=None):
+        self._switch(lang)
         return missions.catalogue(self.require(), self.lang)
 
-    def mission_plan(self, name, councilor=None):
+    def mission_plan(self, name, councilor=None, lang=None):
+        self._switch(lang)
         return missions.plan(self.require(), name, councilor)
 
     def history(self):
@@ -146,7 +209,7 @@ class Service:
         self.require()
         d = model.nation_detail(self.game, name, lang or self.lang)
         if d is None:
-            raise ServiceError(404, "Nazione non trovata.")
+            raise ServiceError(404, t("err.nationNotFound"))
         return d
 
     def faction_compare(self, lang=None):
@@ -242,7 +305,7 @@ class Service:
         try:
             presets.save_user(name, weights, data_name)
         except KeyError:
-            raise ServiceError(404, "Preset personale non trovato.")
+            raise ServiceError(404, t("err.presetNotFound"))
         except ValueError as e:
             raise ServiceError(400, str(e))
         inst = self._maybe_install(install, lang)
@@ -252,12 +315,11 @@ class Service:
         # il gioco lo cerca per nome al caricamento della partita: toglierlo
         # lascerebbe la fazione con un predefinito che non esiste
         if data_name == self._default_preset():
-            raise ServiceError(409, "E' il preset predefinito della tua fazione in partita: "
-                                    "scegline un altro come predefinito prima di eliminarlo.")
+            raise ServiceError(409, t("err.presetIsDefault"))
         try:
             presets.delete_user(data_name)
         except KeyError:
-            raise ServiceError(404, "Preset personale non trovato.")
+            raise ServiceError(404, t("err.presetNotFound"))
         return {"status": self.presets_status(lang)}
 
     # -- export e import dei dati ---------------------------------------------
@@ -272,7 +334,7 @@ class Service:
 
     def data_import(self, b64):
         if not b64:
-            raise ServiceError(400, "Nessun file.")
+            raise ServiceError(400, t("err.noFile"))
         try:
             res = portable.import_bytes(self.con, base64.b64decode(b64))
         except ValueError as e:
@@ -320,13 +382,15 @@ class Service:
         """(metodo, percorso) -> risposta. E' cio' che il worker del browser
         chiama al posto di una richiesta HTTP."""
         q, b = query or {}, body or {}
+        # i testi (errori compresi) nella lingua di questa richiesta
+        texts.LANG = q.get("lang") or self.lang
         for m, pattern, fn in _ROUTES:
             if m != method:
                 continue
             hit = re.fullmatch(pattern, path)
             if hit:
                 return fn(self, q, b, *(unquote(x) for x in hit.groups()))
-        raise ServiceError(404, "%s %s: rotta sconosciuta" % (method, path))
+        raise ServiceError(404, t("err.unknownRoute", None, method, path))
 
 
 def _bool(v, default=False):
@@ -338,13 +402,15 @@ def _bool(v, default=False):
 # Stesse rotte di tiserver/main.py: chi ne aggiunge una la aggiunge qui.
 _ROUTES = [
     ("GET", r"/api/health", lambda s, q, b: s.health()),
+    ("GET", r"/api/version", lambda s, q, b: s.version()),
+    ("GET", r"/api/research", lambda s, q, b: s.research(q.get("lang"))),
     ("GET", r"/api/snapshot", lambda s, q, b: s.get_snapshot(q.get("lang"))),
-    ("GET", r"/api/alerts", lambda s, q, b: s.get_alerts()),
+    ("GET", r"/api/alerts", lambda s, q, b: s.get_alerts(q.get("lang"))),
     ("GET", r"/api/languages", lambda s, q, b: s.languages()),
     ("GET", r"/api/saves", lambda s, q, b: s.saves()),
-    ("GET", r"/api/missions", lambda s, q, b: s.mission_catalogue()),
+    ("GET", r"/api/missions", lambda s, q, b: s.mission_catalogue(q.get("lang"))),
     ("GET", r"/api/missions/([^/]+)/plan",
-     lambda s, q, b, name: s.mission_plan(name, q.get("councilor"))),
+     lambda s, q, b, name: s.mission_plan(name, q.get("councilor"), q.get("lang"))),
     ("GET", r"/api/history", lambda s, q, b: s.history()),
     ("GET", r"/api/campaigns", lambda s, q, b: s.campaigns()),
     ("GET", r"/api/nations/trends", lambda s, q, b: s.nation_trends()),

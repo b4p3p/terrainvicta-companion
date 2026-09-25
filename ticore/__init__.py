@@ -14,6 +14,7 @@ from . import alerts, council, gamedata, missions, model, paths, store  # noqa: 
 from .model import snapshot  # noqa: F401
 from .paths import latest_save, list_saves, resolve_save  # noqa: F401
 from .save import Game, SaveLocked  # noqa: F401
+from .texts import t
 
 __all__ = ["load", "snapshot", "Game", "SaveLocked", "alerts", "council",
            "gamedata", "missions", "model", "paths", "store", "list_saves",
@@ -35,4 +36,4 @@ def load(which=None, fallback=True):
             return Game(path)
         except SaveLocked as e:
             last = e
-    raise last or SaveLocked("Nessun salvataggio leggibile.")
+    raise last or SaveLocked(t("err.noReadableSave"))

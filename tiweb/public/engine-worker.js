@@ -35,7 +35,7 @@ const loadedLangs = new Set();
 // dipendono dal salvataggio e passano subito.
 let snapshotLoaded;
 const firstSnapshot = new Promise((ok) => { snapshotLoaded = ok; });
-const WITHOUT_SNAPSHOT = /^\/api\/(health|languages|campaigns|data|presets)(\/|$)/;
+const WITHOUT_SNAPSHOT = /^\/api\/(health|version|languages|campaigns|data|presets)(\/|$)/;
 
 const post = (m) => postMessage(m);
 const status = (state, detail = null) => post({ t: "status", state, detail });
@@ -116,8 +116,8 @@ async function init(lang) {
   // presets.py cerca i preset distribuiti in <repo>/assets/presets: nel
   // file system del worker il "repo" e' /lib
   py.FS.mkdirTree("/lib/assets/presets");
-  py.FS.writeFile("/lib/assets/presets/TIPriorityPresetTemplate.json",
-                  await fetchText("/py/assets/presets/TIPriorityPresetTemplate.json"));
+  for (const f of ["TIPriorityPresetTemplate.json", "names.json"])   // names: nomi per lingua
+    py.FS.writeFile(`/lib/assets/presets/${f}`, await fetchText(`/py/assets/presets/${f}`));
   py.globals.set("PRESETS", await fetchText("/gamedata/presets-template.json"));
 
   await restoreFiles();
@@ -134,7 +134,11 @@ from ticore import presets
 presets.use_bundled_template(json.loads(PRESETS))
 del TPL, LOC, LANGS, PRESETS
 `);
-  service = py.runPython(`s = Service(); s.lang = ${JSON.stringify(lang)}; s`);
+  service = py.runPython(`s = Service(); s.lang = ${JSON.stringify(lang)}
+s.data_version = json.loads(${JSON.stringify(JSON.stringify({
+    gameVersion: manifest.gameVersion ?? null, steamBuild: manifest.steamBuild ?? null,
+    source: "bundle" }))})
+s`);
   post({ t: "ready", gameVersion: manifest.gameVersion });
   // senza cartella non e' "nosaves": la pagina puo' averne una in attesa del
   // permesso, e sa lei cosa mostrare (Engine.setStatus)
@@ -162,7 +166,8 @@ async function poll() {
       return;
     }
     const f = await newest();
-    if (!f) { status("nosaves", "nessun .gz nella cartella"); return; }
+    // il testo lo mette la pagina, nella sua lingua
+    if (!f) { status("nosaves"); return; }
     const key = `${f.name}|${f.lastModified}|${f.size}`;
     if (key === lastKey) return;
 
@@ -197,7 +202,7 @@ async function poll() {
 
 async function request({ id, method, path, query, body }) {
   try {
-    if (!service) throw Object.assign(new Error("Motore non ancora pronto"), { status: 503 });
+    if (!service) throw Object.assign(new Error("not-ready"), { status: 503 });
     if (!WITHOUT_SNAPSHOT.test(path)) await firstSnapshot;
     await ensureLang(query?.lang);
     py.globals.set("REQ", py.toPy({ method, path, query: query || {}, body: body ?? null }));

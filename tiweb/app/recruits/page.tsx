@@ -6,7 +6,7 @@ import { useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { AttrIcon, Empty, Panel, ResourceIcon } from "@/components/ui";
 import { Guide } from "@/components/Guide";
-import { CouncilorCard, RES, SHORT, signed } from "@/components/CouncilorCard";
+import { CouncilorCard, RES, short, signed } from "@/components/CouncilorCard";
 import { ATTRS, type Attr, type Councilor, type Coverage, type Income } from "@/lib/types";
 
 const MAX_COMPARE = 3;
@@ -32,7 +32,7 @@ function Compare({ picked, coverage, onClear }: {
 
   const rows: { label: ReactNode; ref?: ReactNode; vals: number[]; fmt?: (v: number) => string }[] = [
     ...ATTRS.map((a) => ({
-      label: <span className="inline-flex items-center gap-1"><AttrIcon attr={a} size={13} />{SHORT[a]}</span>,
+      label: <span className="inline-flex items-center gap-1"><AttrIcon attr={a} size={13} />{short(a)}</span>,
       ref: best[a],
       vals: picked.map((c) => c.attributes[a] ?? 0),
     })),
@@ -159,9 +159,9 @@ export default function RecruitsPage() {
         ))}
         <span className="text-dim">· {t.recruit.sortAttr}</span>
         {ATTRS.map((a) => (
-          <button key={a} onClick={() => setSort(a)} title={SHORT[a]}
+          <button key={a} onClick={() => setSort(a)} title={short(a)}
             className={`${btn(sort === a)} inline-flex items-center gap-1`}>
-            <AttrIcon attr={a} size={13} />{SHORT[a]}
+            <AttrIcon attr={a} size={13} />{short(a)}
           </button>
         ))}
       </div>

@@ -3,10 +3,17 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { iconUrl } from "@/lib/api";
 
+/* Locale dei numeri: lo imposta SettingsProvider dalla lingua di gioco,
+   prima che i figli si disegnino. Un modulo e non un contesto perche' nf e'
+   una funzione chiamata ovunque, anche fuori dai componenti. */
+let LOCALE = "it-IT";
+export const setNumberLocale = (l: string) => { LOCALE = l; };
+export const numberLocale = () => LOCALE;
+
 export const nf = (v: number | null | undefined, d = 1) =>
   v == null || Number.isNaN(v)
     ? "—"
-    : v.toLocaleString("it-IT", { minimumFractionDigits: d, maximumFractionDigits: d });
+    : v.toLocaleString(LOCALE, { minimumFractionDigits: d, maximumFractionDigits: d });
 
 export const bn = (v: number | null | undefined) => (v == null ? "—" : nf(v / 1e9, 0));
 export const pct = (v: number | null | undefined, d = 1) =>

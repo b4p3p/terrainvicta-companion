@@ -21,7 +21,6 @@ const isBool = (v: unknown): v is boolean => typeof v === "boolean";
  *  della serie (stessa unita' della colonna), `upIsBad` inverte i colori. */
 interface Metric {
   key: TrendKey;
-  title: string;
   /** icona del gioco per l'intestazione; senza, resta il titolo */
   icon?: string;
   value: (n: Nation) => number;
@@ -38,24 +37,24 @@ const dec = (digits: number) => ({
 
 const METRICS: Metric[] = [
   // la serie del PIL arriva gia' in miliardi; la colonna usa bn() sul valore grezzo
-  { key: "gdp", title: "PIL mld", icon: "ICO_economy_priority", value: (n) => n.gdp / 1e9, ...dec(0) },
+  { key: "gdp", icon: "ICO_economy_priority", value: (n) => n.gdp / 1e9, ...dec(0) },
   // ricavato da PIL e popolazione: il salvataggio non ne tiene una serie
-  { key: "gdpPc", title: "PIL/ab $", icon: "ICO_per_capita_GDP", value: (n) => n.gdpPc, ...dec(0) },
+  { key: "gdpPc", icon: "ICO_per_capita_GDP", value: (n) => n.gdpPc, ...dec(0) },
   // la popolazione si muove di poco: variazione a 2 decimali (decine di migliaia)
-  { key: "pop", title: "Pop. mln", icon: "ICO_population", value: (n) => n.pop, fmt: dec(1).fmt, fmtDelta: dec(2).fmtDelta },
-  { key: "research", title: "Ricerca/m", icon: "ICO_research", value: (n) => n.research, ...dec(0) },
-  { key: "ip", title: "Investim.", icon: "ICO_investments", value: (n) => n.ip, ...dec(1) },
-  { key: "education", title: "Istruz.", icon: "ICO_education", value: (n) => n.education, ...dec(1) },
-  { key: "democracy", title: "Democr.", icon: "ICO_gov_type", value: (n) => n.democracy, ...dec(1) },
-  { key: "cohesion", title: "Coesione", icon: "ICO_Cohesion_mid", value: (n) => n.cohesion, ...dec(1) },
-  { key: "unrest", title: "Disordini", icon: "ICO_Unrest_mid", value: (n) => n.unrest, ...dec(2), upIsBad: true },
-  { key: "inequality", title: "Disugu.", icon: "ICO_inequality", value: (n) => n.inequality, ...dec(1), upIsBad: true },
+  { key: "pop", icon: "ICO_population", value: (n) => n.pop, fmt: dec(1).fmt, fmtDelta: dec(2).fmtDelta },
+  { key: "research", icon: "ICO_research", value: (n) => n.research, ...dec(0) },
+  { key: "ip", icon: "ICO_investments", value: (n) => n.ip, ...dec(1) },
+  { key: "education", icon: "ICO_education", value: (n) => n.education, ...dec(1) },
+  { key: "democracy", icon: "ICO_gov_type", value: (n) => n.democracy, ...dec(1) },
+  { key: "cohesion", icon: "ICO_Cohesion_mid", value: (n) => n.cohesion, ...dec(1) },
+  { key: "unrest", icon: "ICO_Unrest_mid", value: (n) => n.unrest, ...dec(2), upIsBad: true },
+  { key: "inequality", icon: "ICO_inequality", value: (n) => n.inequality, ...dec(1), upIsBad: true },
   {
-    key: "support", title: "Sostegno", value: (n) => n.support,
+    key: "support", value: (n) => n.support,
     fmt: (v) => pct(v), fmtDelta: (d) => signed(nf(d * 100, 1), d) + " pt",
   },
-  { key: "miltech", title: "Miltech", icon: "tech_military_icon", value: (n) => n.miltech, ...dec(1) },
-  { key: "nukes", title: "Atomiche", icon: "ICO_nukes", value: (n) => n.nukes, ...dec(0) },
+  { key: "miltech", icon: "tech_military_icon", value: (n) => n.miltech, ...dec(1) },
+  { key: "nukes", icon: "ICO_nukes", value: (n) => n.nukes, ...dec(0) },
 ];
 const METRIC = Object.fromEntries(METRICS.map((m) => [m.key, m])) as Record<TrendKey, Metric>;
 const isMetric = (v: unknown): v is TrendKey => typeof v === "string" && v in METRIC;
@@ -113,11 +112,11 @@ const CLOSE_ENOUGH = 0.25;
 
 /** Il PIL arriva in dollari: in milioni si leggono le cause di un mese. Gli
  *  altri indicatori si muovono di millesimi, e a 1 decimale sparirebbero. */
-function fmtReason(stat: TrendKey, v: number) {
+function fmtReason(stat: TrendKey, v: number, million: string) {
   if (Math.abs(v) < 1e-9) return "·";
   // almeno due cifre significative: 0,00025 non deve diventare «0,000»
   const digits = Math.min(5, Math.max(3, Math.ceil(-Math.log10(Math.abs(v))) + 1));
-  const s = stat === "gdp" ? `${nf(Math.abs(v) / 1e6, 1)} mln` : nf(Math.abs(v), digits);
+  const s = stat === "gdp" ? `${nf(Math.abs(v) / 1e6, 1)} ${million}` : nf(Math.abs(v), digits);
   return (v > 0 ? "+" : "−") + s;
 }
 
@@ -134,7 +133,7 @@ function Reasons({ d }: { d: NationDetail }) {
             <tr className="text-faint">
               <th className="text-left font-normal pb-0.5">
                 <span className="text-dim inline-flex items-center gap-1">
-                  <GameIcon bundle="icons_2d" icon={METRIC[k].icon} size={14} />{METRIC[k].title}
+                  <GameIcon bundle="icons_2d" icon={METRIC[k].icon} size={14} />{t.nations.metric[k]}
                 </span>
               </th>
               <th className="text-right font-normal pb-0.5 pl-2 whitespace-nowrap">{d.columns.month}</th>
@@ -149,7 +148,7 @@ function Reasons({ d }: { d: NationDetail }) {
                 {(["month", "last", "all"] as const).map((c) => (
                   <td key={c} className={`text-right pl-2 whitespace-nowrap ${
                     r[c] === 0 ? "text-faint" : c === "all" ? "text-dim" : ""}`}>
-                    {fmtReason(k, r[c])}
+                    {fmtReason(k, r[c], t.nations.million)}
                   </td>
                 ))}
               </tr>
@@ -203,14 +202,14 @@ function MyPriorities({ d, knowledge }: { d: NationDetail; knowledge: string }) 
 }
 
 /** Tutti gli andamenti di una nazione, in piccolo, coi valori grezzi. */
-function Detail({ name, series, onClose }: {
-  name: string; series: Partial<Record<TrendKey, number[]>>; onClose: () => void;
+function Detail({ id, name, series, onClose }: {
+  id: string; name: string; series: Partial<Record<TrendKey, number[]>>; onClose: () => void;
 }) {
   const { t, game, live } = useSettings();
   const { data: why } = useApi<NationDetail>(
-    `/api/nations/${encodeURIComponent(name)}/detail?lang=${game}`, [live.version, game]);
+    `/api/nations/${encodeURIComponent(id)}/detail?lang=${game}`, [live.version, game]);
   const knowledge = why?.controlPoints.flatMap((c) => c.priorities)
-    .find((s) => s.id === "knowledge")?.name ?? "Conoscenza";
+    .find((s) => s.id === "knowledge")?.name ?? t.nations.knowledge;
   return (
     <div className="bg-panel border border-accent/50 p-3 mb-3.5">
       <div className="flex items-baseline gap-2 mb-2">
@@ -227,7 +226,7 @@ function Detail({ name, series, onClose }: {
             <div key={m.key} className="text-[11.5px]">
               <div className="flex items-baseline justify-between">
                 <span className="text-dim inline-flex items-center gap-1">
-                  <GameIcon bundle="icons_2d" icon={m.icon} size={14} />{m.title}
+                  <GameIcon bundle="icons_2d" icon={m.icon} size={14} />{t.nations.metric[m.key]}
                 </span>
                 <Delta m={m} series={s} />
               </div>
@@ -293,11 +292,11 @@ export default function NationsPage() {
   if (!snap) return <Empty>{t.common.loading}</Empty>;
 
   const seriesOf = (n: Nation, k: TrendKey) =>
-    trends?.nations[n.name]?.[k] ?? (k === "research" ? n.histResearch : undefined);
+    trends?.nations[n.id]?.[k] ?? (k === "research" ? n.histResearch : undefined);
 
   /** Colonna numerica con la variazione accanto, se richiesta. */
   const num = (k: TrendKey, render: (n: Nation) => ReactNode): Column<Nation> => ({
-    key: k, title: METRIC[k].title, icon: METRIC[k].icon,
+    key: k, title: t.nations.metric[k], icon: METRIC[k].icon,
     sort: (n) => METRIC[k].value(n),
     // flex centrato: valore, freccia e numero sulla stessa linea mediana
     render: (n) => (
@@ -315,8 +314,8 @@ export default function NationsPage() {
       sort: (r) => r.name,
       render: (r) => (
         <>
-          <button onClick={() => setSelected(selected === r.name ? null : r.name)}
-            className={`text-left hover:underline ${selected === r.name ? "text-accent" : ""}`}>
+          <button onClick={() => setSelected(selected === r.id ? null : r.id)}
+            className={`text-left hover:underline ${selected === r.id ? "text-accent" : ""}`}>
             {r.name}
           </button>{" "}
           {r.myCP > 0
@@ -333,7 +332,7 @@ export default function NationsPage() {
     num("research", (r) => nf(r.research, 0)),
     {
       // l'andamento dell'indicatore scelto nella combo; si ordina per variazione
-      key: "trend", title: `${t.nations.trend} ${m.title}`,
+      key: "trend", title: `${t.nations.trend} ${t.nations.metric[m.key]}`,
       sort: (r) => deltaOf(seriesOf(r, metric)) * (m.upIsBad ? -1 : 1),
       render: (r) => <Spark data={seriesOf(r, metric) ?? []} upIsBad={m.upIsBad} />,
     },
@@ -348,15 +347,15 @@ export default function NationsPage() {
     num("support", (r) => (
       <span className={r.support > 0.2 ? "text-good" : ""}>{pct(r.support)}</span>
     )),
-    { key: "difficulty", title: "Difficoltà", render: (r) => nf(r.difficulty) },
-    { key: "spaceFunding", title: "Fondi sp.", icon: "ICO_funding_priority", render: (r) => nf(r.spaceFunding, 0) },
+    { key: "difficulty", title: t.nations.difficulty, render: (r) => nf(r.difficulty) },
+    { key: "spaceFunding", title: t.nations.spaceFunding, icon: "ICO_funding_priority", render: (r) => nf(r.spaceFunding, 0) },
     {
-      key: "space", title: "Prog.sp.", icon: "ICO_spaceflightProgram_priority", sort: (r) => (r.space ? 1 : 0),
+      key: "space", title: t.nations.spaceProgShort, icon: "ICO_spaceflightProgram_priority", sort: (r) => (r.space ? 1 : 0),
       // l'icona del gioco per il programma spaziale; se manca resta il testo
       render: (r) => (r.space
         ? <span title={t.common.yes}>
             <GameIcon bundle="icons_2d" icon="ICO_spaceflightProgram_priority" size={16}
-              title="Programma spaziale" />
+              title={t.nations.spaceProgram} />
           </span>
         : <span className="text-faint">{t.common.no}</span>),
     },
@@ -364,7 +363,7 @@ export default function NationsPage() {
     num("miltech", (r) => nf(r.miltech)),
     ...(showOwners
       ? [{
-        key: "owners", title: "Proprietari", align: "left" as const,
+        key: "owners", title: t.common.owners, align: "left" as const,
         sort: (r: Nation) => r.owners.join(","),
         render: (r: Nation) => (
           <span className="text-dim text-[11.5px]">{r.owners.join(", ") || "—"}</span>
@@ -397,7 +396,7 @@ export default function NationsPage() {
         <label className="flex items-center gap-1.5 text-dim text-[12.5px]">
           {t.nations.trendOf}
           <select value={metric} onChange={(e) => setMetric(e.target.value as TrendKey)}>
-            {METRICS.map((x) => <option key={x.key} value={x.key}>{x.title}</option>)}
+            {METRICS.map((x) => <option key={x.key} value={x.key}>{t.nations.metric[x.key]}</option>)}
           </select>
         </label>
         <label className="flex items-center gap-1.5 text-dim text-[12.5px] cursor-pointer">
@@ -416,7 +415,8 @@ export default function NationsPage() {
       <p className="text-faint text-[11.5px] mb-3">{t.nations.detailHint}</p>
 
       {selected && detail && (
-        <Detail name={selected} series={detail} onClose={() => setSelected(null)} />
+        <Detail id={selected} name={snap.nations.find((n) => n.id === selected)?.name ?? selected}
+          series={detail} onClose={() => setSelected(null)} />
       )}
 
       <DataTable rows={rows as unknown as Record<string, unknown>[]}

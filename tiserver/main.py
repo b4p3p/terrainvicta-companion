@@ -17,13 +17,14 @@ import os
 import sys
 from contextlib import contextmanager
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from ticore import texts                          # noqa: E402
 from ticore.service import Service, ServiceError  # noqa: E402
 from . import icons                             # noqa: E402
 
@@ -44,6 +45,14 @@ if os.environ.get("TI_GAMEDATA"):
 
 state = Service()
 subscribers = set()
+
+
+@app.middleware("http")
+async def request_lang(request: Request, call_next):
+    """I testi di ticore (errori compresi) nella lingua di questa richiesta:
+    `?lang=` se c'e', altrimenti quella corrente del Service."""
+    texts.LANG = request.query_params.get("lang") or state.lang
+    return await call_next(request)
 
 
 @contextmanager
@@ -86,6 +95,17 @@ async def watcher():
 @app.get("/api/health")
 def health():
     return state.health()
+
+
+@app.get("/api/research")
+def research(lang: str = Query(None)):
+    with http_errors():
+        return state.research(lang)
+
+
+@app.get("/api/version")
+def version():
+    return state.version()
 
 
 @app.get("/api/presets")
@@ -167,9 +187,9 @@ def get_snapshot(lang: str = Query(None)):
 
 
 @app.get("/api/alerts")
-def get_alerts():
+def get_alerts(lang: str = Query(None)):
     with http_errors():
-        return state.get_alerts()
+        return state.get_alerts(lang)
 
 
 @app.get("/api/languages")
@@ -183,15 +203,15 @@ def saves():
 
 
 @app.get("/api/missions")
-def mission_catalogue():
+def mission_catalogue(lang: str = Query(None)):
     with http_errors():
-        return state.mission_catalogue()
+        return state.mission_catalogue(lang)
 
 
 @app.get("/api/missions/{name}/plan")
-def mission_plan(name: str, councilor: str = Query(None)):
+def mission_plan(name: str, councilor: str = Query(None), lang: str = Query(None)):
     with http_errors():
-        return state.mission_plan(name, councilor)
+        return state.mission_plan(name, councilor, lang)
 
 
 @app.get("/api/history")

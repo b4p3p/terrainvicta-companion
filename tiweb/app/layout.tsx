@@ -25,7 +25,7 @@ const saira = Saira_Semi_Condensed({
 
 export const metadata: Metadata = {
   title: "Terra Invicta Companion",
-  description: "Companion di partita: allerte, consiglio, missioni, nazioni.",
+  description: "Terra Invicta campaign companion: alerts, council, missions, nations / allerte, consiglio, missioni, nazioni.",
 };
 
 /* Decide prima dell'idratazione se il motore gira nel browser, con la stessa
@@ -51,7 +51,9 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: ENGINE_MODE_SCRIPT }} />
       </head>
-      <body>
+      {/* le estensioni del browser (es. ColorZilla: cz-shortcut-listen) aggiungono
+          attributi al body prima di React: non e' un errore nostro */}
+      <body suppressHydrationWarning>
         <SettingsProvider>
           <Shell>{children}</Shell>
         </SettingsProvider>

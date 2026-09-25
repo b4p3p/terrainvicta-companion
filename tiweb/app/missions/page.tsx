@@ -9,7 +9,7 @@ import type { CatalogueEntry, MissionPlan } from "@/lib/types";
 export default function MissionsPage() {
   const { t, game, live } = useSettings();
   const { data: snap } = useSnapshot(live.version, game);
-  const { data: cat } = useApi<CatalogueEntry[]>("/api/missions", [live.version, game]);
+  const { data: cat } = useApi<CatalogueEntry[]>(`/api/missions?lang=${game}`, [live.version, game]);
 
   const [picked, setPicked] = useState<string | null>(null);
   const [councilor, setCouncilor] = useState<string>("");
@@ -25,7 +25,7 @@ export default function MissionsPage() {
 
   useEffect(() => {
     if (!picked) return;
-    const q = councilor ? `?councilor=${encodeURIComponent(councilor)}` : "";
+    const q = `?lang=${game}` + (councilor ? `&councilor=${encodeURIComponent(councilor)}` : "");
     api<MissionPlan>(`/api/missions/${picked}/plan${q}`)
       .then(setPlan)
       .catch(() => setPlan(null));
@@ -133,9 +133,9 @@ export default function MissionsPage() {
                         <th>{t.missions.cohesion}</th>
                         <th>{t.missions.democracy}</th>
                         <th>{t.missions.support}</th>
-                        <th>PIL mld</th>
+                        <th>{t.common.gdpBn}</th>
                         <th>{t.missions.mine}</th>
-                        <th style={{ textAlign: "left" }}>Proprietari</th>
+                        <th style={{ textAlign: "left" }}>{t.common.owners}</th>
                       </tr>
                     </thead>
                     <tbody>

@@ -2,17 +2,26 @@
 
 from collections import defaultdict
 
-from . import council, gamedata
+from functools import lru_cache
 
+from . import council, gamedata, texts
+from .names import Namer, bare, nation_id
+
+# Il filtro «Europa» delle nazioni. Scritto coi nomi italiani del gioco per
+# leggibilita', confrontato per chiave di template (`_eu_ids`): i nomi
+# cambiano con la lingua del salvataggio, le chiavi no.
 EU = {"Francia", "Germania", "Regno Unito", "Italia", "Spagna", "Polonia",
       "Paesi Bassi", "Belgio-Lussemburgo", "Svizzera", "Svezia", "Irlanda",
       "Norvegia", "Austria", "Portogallo", "Danimarca", "Grecia", "Finlandia",
-      "Repubblica Ceca", "Romania", "Ungheria", "Ucraina", "Turchia",
-      # nomi inglesi, se il salvataggio e' in un'altra lingua
-      "France", "Germany", "United Kingdom", "Italy", "Spain", "Poland",
-      "Netherlands", "Belgium-Luxembourg", "Switzerland", "Sweden", "Ireland",
-      "Norway", "Austria", "Portugal", "Denmark", "Greece", "Finland",
-      "Czech Republic", "Romania", "Hungary", "Ukraine", "Turkey"}
+      "Repubblica Ceca", "Romania", "Ungheria", "Ucraina", "Turchia"}
+
+
+@lru_cache(maxsize=1)
+def _eu_ids():
+    s = gamedata.strings("ita")
+    return {k.rsplit(".", 1)[1] for k, v in s.items()
+            if k.startswith(("TINationTemplate.displayName.", "TINationTemplate.unionDisplayName."))
+            and v.split("	")[0].strip() in EU}
 
 RESOURCES = ["Money", "Influence", "Operations", "Research", "Projects",
              "Boost", "MissionControl"]
@@ -32,15 +41,16 @@ def _chrono(v):
     return list(reversed(v)) if isinstance(v, list) else []
 
 
-def nations(g):
+def nations(g, lang="ita"):
     me_key = (g.me.get("templateName") or "").replace("Council", "")
+    nm = Namer(g, lang)
     out = []
     for n in g.nations.values():
-        name = n.get("displayName")
         cps = n.get("controlPoints") or []
-        if not name or not cps:
+        if not n.get("displayName") or not cps:
             continue
-        owners, mine, free, taken = [], 0, 0, 0
+        name = nm.nation(n)
+        owners, mine, free, taken = {}, 0, 0, 0
         for c in cps:
             cp = g.cps.get(c["value"])
             fid = (cp.get("faction") or {}).get("value") if cp else None
@@ -50,14 +60,16 @@ def nations(g):
                 mine += 1
             else:
                 taken += 1
-                owners.append(g.faction_name.get(fid, "?"))
+                owners[(g.factions.get(fid) or {}).get("templateName") or "?"] = nm.faction_by_id(fid)
         pop = _now(n.get("historyPopulation")) or 0
         gdp = n.get("GDP") or 0
         hist = [round(x, 1) for x in _chrono(n.get("historyResearch"))][-32:]
         op = _now(n.get("historyPublicOpinion")) or n.get("publicOpinion") or {}
         out.append({
+            "id": nation_id(n),              # chiave stabile: il nome cambia con la lingua
             "name": name,
-            "eu": name in EU,
+            "saveName": n.get("displayName"),  # com'e' nel salvataggio: obiettivi e note vecchi
+            "eu": bare(nation_id(n)) in _eu_ids(),
             "gdp": gdp,
             "pop": pop,
             "gdpPc": (gdp / (pop * 1e6)) if pop else 0,
@@ -78,7 +90,8 @@ def nations(g):
             "miltech": n.get("militaryTechLevel") or 0,
             "cp": n.get("numControlPoints") or len(cps),
             "myCP": mine, "freeCP": free, "takenCP": taken,
-            "owners": sorted(set(owners)),
+            "owners": sorted(set(owners.values())),
+            "ownerIds": {k: owners[k] for k in sorted(owners)},   # id fazione -> nome
         })
     return out
 
@@ -114,8 +127,7 @@ def nation_trends(g):
     me_key = (g.me.get("templateName") or "").replace("Council", "")
     out, points = {}, 0
     for n in g.nations.values():
-        name = n.get("displayName")
-        if not name or not n.get("controlPoints"):
+        if not n.get("displayName") or not n.get("controlPoints"):
             continue
         s = {k: _series(_chrono(n.get(f)), d) for k, (f, d) in TREND_FIELDS.items()}
         # il PIL pro capite non ha una serie sua: si ricava punto per punto,
@@ -127,7 +139,7 @@ def nation_trends(g):
                         for op in _chrono(n.get("historyPublicOpinion"))
                         if isinstance(op, dict)]
         points = max(points, *(len(v) for v in s.values()))
-        out[name] = s
+        out[nation_id(n)] = s             # per id, come `nations()[i]["id"]`
     return {"points": points, "nations": out}
 
 
@@ -201,16 +213,19 @@ def _closest(weights, index):
     return {"name": best[0], "moved": round(best[1], 4)} if best else None
 
 
-def nation_detail(g, name, lang="ita"):
+def nation_detail(g, key, lang="ita"):
     """Perche' una nazione si muove: cause di variazione e priorita' in uso.
 
     Le cause sono i tracker che il gioco mostra nella scheda nazione. Le
     priorita' sono solo quelle dei NOSTRI punti di controllo: sono le uniche
     che il giocatore imposta e vede.
     """
-    n = next((x for x in g.nations.values() if x.get("displayName") == name), None)
+    # per id; il nome del salvataggio resta accettato per i link vecchi
+    n = next((x for x in g.nations.values()
+              if nation_id(x) == key or x.get("displayName") == key), None)
     if n is None:
         return None
+    nm = Namer(g, lang)
     index = None
     cps = []
     for c in n.get("controlPoints") or []:
@@ -226,7 +241,7 @@ def nation_detail(g, name, lang="ita"):
         order = list(gamedata.PRIORITIES)
         cps.append({
             "position": cp.get("positionInNation"),
-            "name": cp.get("displayName"),
+            "name": nm.control_point(cp),
             "benefitsDisabled": bool(cp.get("benefitsDisabled")),
             "total": total,
             # nessun campo dice quale preset e' stato scelto: si confrontano i
@@ -241,7 +256,8 @@ def nation_detail(g, name, lang="ita"):
     cps.sort(key=lambda c: c["position"] if c["position"] is not None else 99)
     strings = gamedata.strings(lang)
     return {
-        "name": name,
+        "id": nation_id(n),
+        "name": nm.nation(n),
         "columns": {k: strings.get(key) or gamedata.strings("en").get(key) or k
                     for k, key in (("cause", "UI.Nation.Cause"), ("month", "UI.Nation.MTD"),
                                    ("last", "UI.Nation.LastMonth"),
@@ -265,24 +281,31 @@ def flows(g, months_back=1, lang="ita"):
             if d.get("year") == y and d.get("month") == m:
                 agg[cat][tr["Resource"]] += tr["Amount"]
     net = defaultdict(float)
+    recurring = defaultdict(float)
     for cat in agg:
         for k, v in agg[cat].items():
             net[k] += v
+            if cat in RECURRING:
+                recurring[k] += v
     return {
         "year": y, "month": m,
         "byCategory": {c: dict(v) for c, v in agg.items()},
         "categories": [flow_category(c, lang) for c in agg],
         "net": dict(net),
+        # senza le spese una tantum (assunzioni, org, missioni, eventi): e'
+        # questo, non `net`, a dire se una risorsa cala da sola
+        "recurring": dict(recurring),
         "resources": {k: gamedata.resource_view(lang, k) for k in net},
     }
 
 
-# etichette che il salvataggio scrive in chiaro, in inglese
-_FLOW_LABELS = {
-    "Daily Income": "Entrate correnti",
-    "Objective Completed": "Obiettivo completato",
-    "Narrative Event": "Evento narrativo",
-}
+# le sole categorie che si ripetono ogni mese senza una scelta del giocatore
+RECURRING = ("Daily Income", "Spoils")
+
+# etichette che il salvataggio scrive in chiaro, in inglese: la traduzione
+# e' in texts.py (`flow.<etichetta>`)
+_FLOW_LABELS = ("Daily Income", "Objective Completed", "Narrative Event",
+                "Hire Councilor", "Purchase Org", "Spoils")
 
 
 def flow_category(cat, lang="ita"):
@@ -294,7 +317,7 @@ def flow_category(cat, lang="ita"):
     Quelli restano dichiarati come tali invece di inventare un nome.
     """
     if cat in _FLOW_LABELS:
-        return {"id": cat, "name": _FLOW_LABELS[cat], "kind": "label"}
+        return {"id": cat, "name": texts.t("flow." + cat, lang), "kind": "label"}
     if cat.lstrip("-").isdigit():
         return {"id": cat, "name": None, "kind": "unresolved"}
     name = gamedata.mission_name(lang, cat)
@@ -308,6 +331,9 @@ def projects(g, lang="ita"):
     prog = {p["projectTemplateName"]: p
             for p in (g.me.get("currentProjectProgress") or [])}
     rate = flows(g, 1)["byCategory"].get("Daily Income", {}).get("Research", 0)
+    # ogni slot riceve solo la sua quota (peso / somma dei pesi, vedi research()):
+    # con tutta la ricerca del mese, un progetto fermo sembrava quasi finito
+    share = {x["slot"]: x["share"] for x in research(g, lang)["slots"] if x["kind"] == "project"}
     out = []
     for name in (g.me.get("availableProjectNames") or []):
         t = tpl.get(name) or {}
@@ -324,27 +350,195 @@ def projects(g, lang="ita"):
             "active": bool(p),
             "slot": p.get("slot") if p else None,
             "accumulated": round(p.get("accumulatedResearch", 0), 1) if p else 0,
-            "monthsLeft": round((cost - (p.get("accumulatedResearch", 0) if p else 0))
-                                / rate, 1) if rate else None,
+            "share": share.get(p.get("slot")) if p else None,
+            "monthsLeft": (round((cost - p.get("accumulatedResearch", 0))
+                                 / (rate * share[p["slot"]]), 1)
+                           if p and rate and share.get(p.get("slot")) else None),
         })
     return {"rate": round(rate, 1), "items": out}
 
 
-def control_points(g):
-    by_nation = defaultdict(int)
+def research(g, lang="ita"):
+    """Gli slot di ricerca: tecnologie globali (0-2) e progetti (3-5).
+
+    Ripartizione letta dal codice del gioco (TIFactionState.PointsToSlot e
+    TotalResearchWeights): ogni slot riceve la ricerca effettiva per peso dello
+    slot / somma dei pesi. Nella somma entrano sempre i pesi 0-3; il 4 solo se
+    e' sbloccato lo slot del progetto di un'organizzazione
+    (`orgProjectSlotUnlocked`), il 5 solo con quello dell'habitat
+    (`habProjectSlotUnlocked`). La ricerca effettiva cambia per categoria
+    (bonus del gioco): per questo l'avanzamento vero si misura sul salvataggio
+    precedente, non si ricava dalla quota.
+
+    Delle tecnologie ci sono anche i contributi di ogni fazione: il gioco li
+    mostra nella schermata Ricerca (FactionContributionListItemController),
+    insieme al vincitore atteso. I pesi di ricerca delle altre fazioni invece
+    no, e restano fuori: il ritmo di ognuna si misura sui salvataggi.
+    """
+    w = list(g.me.get("researchWeights") or [])
+    org = bool(g.me.get("orgProjectSlotUnlocked"))
+    hab = bool(g.me.get("habProjectSlotUnlocked"))
+
+    def weight(slot):
+        if slot >= len(w) or (slot == 4 and not org) or (slot == 5 and not hab):
+            return 0
+        return w[slot]
+
+    total = sum(weight(i) for i in range(len(w)))
+    me_id = (g.me.get("ID") or {}).get("value")
+    nm = Namer(g, lang)
+    slots = []
+    state = next(iter(g.state("TIGlobalResearchState").values()), {})
+    techs = gamedata.templates()["techs"]
+    for i, tp in enumerate((state.get("techProgress") or [])[:3]):
+        name = tp.get("techTemplateName")
+        mine = next((c.get("Value", 0) for c in tp.get("factionContributions") or []
+                     if (c.get("Key") or {}).get("value") == me_id), 0)
+        slots.append({
+            "slot": i, "kind": "tech", "id": name,
+            "name": gamedata.tech_name(lang, name),
+            "category": (techs.get(name) or {}).get("techCategory"),
+            "cost": (techs.get(name) or {}).get("researchCost") or 0,
+            "accumulated": round(tp.get("accumulatedResearch") or 0, 2),
+            "mine": round(mine or 0, 2),
+            # tutte le fazioni umane, anche a zero: per id di template, che non
+            # cambia con la lingua (l'id di salvataggio si', fra partite)
+            "contributions": [
+                {"id": (g.factions.get(fid) or {}).get("templateName"),
+                 "name": nm.faction(g.factions.get(fid)),
+                 "mine": fid == me_id,
+                 "value": round(c.get("Value") or 0, 2)}
+                for c in tp.get("factionContributions") or []
+                for fid in [(c.get("Key") or {}).get("value")]
+                if g.factions.get(fid) and g.factions[fid].get("templateName") != "AlienCouncil"],
+            "weight": weight(i),
+            "share": weight(i) / total if total else 0,
+        })
+    ptpl = gamedata.templates()["projects"]
+    for p in sorted(g.me.get("currentProjectProgress") or [], key=lambda x: x.get("slot", 99)):
+        name, slot = p.get("projectTemplateName"), p.get("slot")
+        acc = round(p.get("accumulatedResearch") or 0, 2)
+        slots.append({
+            "slot": slot, "kind": "project", "id": name,
+            "name": gamedata.project_name(lang, name),
+            "category": (ptpl.get(name) or {}).get("techCategory"),
+            "cost": (ptpl.get(name) or {}).get("researchCost") or 0,
+            "accumulated": acc, "mine": acc,      # un progetto e' solo tuo
+            "weight": weight(slot) if isinstance(slot, int) else 0,
+            "share": (weight(slot) / total) if isinstance(slot, int) and total else 0,
+        })
+    return {"weights": w, "totalWeight": total, "orgSlot": org, "habSlot": hab,
+            "slots": slots}
+
+
+def _days(a, b):
+    """Giorni di gioco fra due `dateKey` AAAA-MM-GG."""
+    import datetime
+    try:
+        return (datetime.date.fromisoformat(a) - datetime.date.fromisoformat(b)).days
+    except (TypeError, ValueError):
+        return None
+
+
+def _race(s, b, days):
+    """Chi vince la tecnologia a questo ritmo.
+
+    Stessa regola del gioco (TechProgress.GetExpectedWinner): giorni alla fine
+    = costo mancante / somma dei ritmi; vince chi ha il contributo piu' alto
+    alla fine (attuale + giorni x ritmo); se il primo ha gia' piu' vantaggio
+    di quanto manca, ha vinto comunque. Il gioco usa il ritmo previsto dai
+    pesi di ognuno, che non vedi: qui c'e' quello OSSERVATO fra due
+    salvataggi. Senza un salvataggio precedente: solo la classifica attuale.
+    """
+    before = {c["id"]: c["value"] for c in (b or {}).get("contributions", [])}
+    left = max(s["cost"] - s["accumulated"], 0)
+    rows = []
+    for c in s["contributions"]:
+        r = dict(c)
+        if c["id"] in before and days:
+            r["delta"] = round(c["value"] - before[c["id"]], 2)
+            r["perDay"] = r["delta"] / days
+        rows.append(r)
+    paced = all("perDay" in r for r in rows)
+    total = sum(max(r.get("perDay", 0), 0) for r in rows) if paced else 0
+    days_left = left / total if total > 0 else None
+    for r in rows:
+        r["projected"] = round(r["value"] + (days_left or 0) * max(r.get("perDay", 0), 0), 1)             if days_left is not None else None
+    key = "projected" if days_left is not None else "value"
+    rows.sort(key=lambda r: -(r[key] or 0))
+    top = sorted(rows, key=lambda r: -r["value"])
+    locked = len(top) > 1 and top[0]["value"] - top[1]["value"] > left
+    winner = top[0] if locked else rows[0]
+    me = next((r for r in rows if r["mine"]), None)
+    lead_now = top[0]
+    out = {"rows": rows, "daysLeft": round(days_left) if days_left else None,
+           "winner": winner["id"], "locked": locked, "paced": paced}
+    if me:
+        others = [r for r in top if not r["mine"]]
+        best_other = others[0] if others else None
+        out["myRank"] = [r["id"] for r in top].index(me["id"]) + 1
+        # distacco dal migliore degli altri: positivo = sei davanti
+        if best_other:
+            out["gap"] = round(me["value"] - best_other["value"], 1)
+            out["gapTo"] = best_other["id"]
+            if me.get("delta") is not None and best_other.get("delta") is not None:
+                out["gapChange"] = round(me["delta"] - best_other["delta"], 1)
+    return out
+
+
+def research_delta(cur, prev):
+    """La ricerca di `cur` con l'avanzamento di ogni slot rispetto a `prev`:
+    punti guadagnati, in totale e dalla tua fazione, e la stima di quando
+    finisce a quel ritmo. Stima NOSTRA: il ritmo di un solo intervallo."""
+    r = dict(cur.get("research") or {})
+    before = {(s["kind"], s["id"]): s for s in ((prev or {}).get("research") or {}).get("slots", [])}
+    if prev and "research" not in prev:
+        # snapshot archiviato prima di questa sezione: dei progetti si sa
+        # l'accumulato, delle tecnologie no
+        before = {("project", x["id"]): {"accumulated": x["accumulated"], "mine": x["accumulated"]}
+                  for x in (prev.get("projects") or {}).get("items", []) if x.get("active")}
+    days = _days(cur.get("dateKey"), (prev or {}).get("dateKey")) if prev else None
+    out = []
+    for s in r.get("slots", []):
+        b = before.get((s["kind"], s["id"]))
+        d = dict(s)
+        if b is not None:
+            d["delta"] = round(s["accumulated"] - b["accumulated"], 2)
+            d["deltaMine"] = round(s["mine"] - b["mine"], 2)
+            left = s["cost"] - s["accumulated"]
+            per_day = d["delta"] / days if days else None
+            d["daysLeft"] = round(left / per_day) if per_day and per_day > 0 and left > 0 else None
+        if s["kind"] == "tech" and s.get("contributions"):
+            d["race"] = _race(s, b, days)
+        out.append(d)
+    r["slots"] = out
+    r["previous"] = {"date": prev.get("date"), "dateKey": prev.get("dateKey"),
+                     "days": days} if prev else None
+    return r
+
+
+def control_points(g, lang="ita"):
+    """({id nazione: punti miei}, {id nazione: nome}): per id, perche' le
+    allerte confrontano snapshot che possono essere in lingue diverse."""
+    nm = Namer(g, lang)
+    by_nation, names = defaultdict(int), {}
     for cp in g.my_control_points():
         n = g.ref(cp, "nation", g.nations)
-        by_nation[(n or {}).get("displayName") or "?"] += 1
-    return dict(by_nation)
+        key = nation_id(n) or "?"
+        by_nation[key] += 1
+        names[key] = nm.nation(n) or "?"
+    return dict(by_nation), names
 
 
-def alien_sites(g):
+def alien_sites(g, lang="ita"):
+    nm = Namer(g, lang)
     out = []
     for e in (g.me.get("knownAlienSites") or []):
         rid = (e.get("Key") or {}).get("value")
         d = e.get("Value") or {}
         out.append({
-            "region": g.region_label(rid),
+            "regionId": rid,
+            "region": nm.region_label(rid),
             "since": "%04d-%02d-%02d" % (d.get("year", 0), d.get("month", 0), d.get("day", 0)),
         })
     return out
@@ -352,10 +546,10 @@ def alien_sites(g):
 
 def snapshot(g, lang="ita"):
     """Payload completo. Niente informazione nascosta salvo dove esplicitato."""
-    ns = nations(g)
-    cpn = control_points(g)
+    ns = nations(g, lang)
+    cpn, cp_names = control_points(g, lang)
     return {
-        "faction": g.me.get("displayName"),
+        "faction": Namer(g, lang).faction(g.me),
         "date": g.meta.get("gameTimeString", ""),
         "dateKey": g.date_key(),
         "difficulty": g.meta.get("difficulty"),
@@ -367,13 +561,15 @@ def snapshot(g, lang="ita"):
         "resources": {k: round(v, 1) for k, v in (g.me.get("resources") or {}).items()
                       if k in RESOURCES},
         "flows": flows(g, 1, lang),
-        "controlPoints": {"byNation": cpn, "mine": sum(cpn.values()),
+        # byNation per id di nazione; `names` per mostrarli
+        "controlPoints": {"byNation": cpn, "names": cp_names, "mine": sum(cpn.values()),
                           "total": sum(n["cp"] for n in ns)},
         "nations": ns,
         "council": council.analyse(g, lang),
         "recruits": council.recruits(g, lang),
         "orgMarket": council.org_market(g, lang),
         "projects": projects(g, lang),
-        "alienSites": alien_sites(g),
+        "research": research(g, lang),
+        "alienSites": alien_sites(g, lang),
         "cpCapOverage": any(g.me.get("history_CPCapOverageByDay") or []),
     }

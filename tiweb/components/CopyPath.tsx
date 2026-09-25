@@ -5,12 +5,18 @@
    scelta, quindi il percorso lo porta l'utente. */
 
 import { useState } from "react";
+import { useSettings } from "@/lib/settings";
+
+/** StreamingAssets con l'installazione Steam predefinita: dentro ci sono
+ *  Templates e Localization, e lo zip dei preset si estrae qui. */
+export const GAME_STREAMING_DIR =
+  String.raw`C:\Program Files (x86)\Steam\steamapps\common\Terra Invicta\TerraInvicta_Data\StreamingAssets`;
 
 /** Cartella dei template con l'installazione Steam predefinita. */
-export const GAME_TEMPLATES_DIR =
-  String.raw`C:\Program Files (x86)\Steam\steamapps\common\Terra Invicta\TerraInvicta_Data\StreamingAssets\Templates`;
+export const GAME_TEMPLATES_DIR = String.raw`${GAME_STREAMING_DIR}\Templates`;
 
 export function CopyPath({ path }: { path: string }) {
+  const { t } = useSettings();
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -27,7 +33,7 @@ export function CopyPath({ path }: { path: string }) {
       <button type="button" onClick={copy}
         className={`shrink-0 px-3 border-l border-edge-lit display text-[11px] uppercase tracking-[.1em]
           ${copied ? "text-good" : "text-dim hover:text-ink hover:bg-sel"}`}>
-        {copied ? "Copiato" : "Copia"}
+        {copied ? t.common.copied : t.common.copy}
       </button>
     </div>
   );

@@ -7,9 +7,9 @@ import { Button, Empty, Panel, nf } from "@/components/ui";
 import type { HistoryPoint } from "@/lib/types";
 
 const SERIES = [
-  { key: "Money", label: "Denaro", color: "var(--good)" },
-  { key: "Influence", label: "Influenza", color: "var(--accent)" },
-  { key: "Operations", label: "Operazioni", color: "var(--other)" },
+  { key: "Money", color: "var(--good)" },
+  { key: "Influence", color: "var(--accent)" },
+  { key: "Operations", color: "var(--other)" },
 ] as const;
 
 /** Grafico a linee su SVG: niente librerie, i dati sono pochi e regolari. */
@@ -168,25 +168,25 @@ export default function HistoryPage() {
         sub={`${t.history.hint} — ${data.length} ${t.history.points}`}>
         <div className="grid gap-6 lg:grid-cols-2">
           {SERIES.map((s) => (
-            <Lines key={s.key} points={data} label={s.label} color={s.color}
+            <Lines key={s.key} points={data} label={t.res[s.key]} color={s.color}
               pick={(p) => p.resources[s.key] ?? 0} />
           ))}
-          <Lines points={data} label="Punti di controllo" color="var(--warn)"
+          <Lines points={data} label={t.res.cp} color="var(--warn)"
             pick={(p) => p.cp} />
-          <Lines points={data} label="Ricerca al mese" color="var(--accent)"
+          <Lines points={data} label={t.history.researchChart} color="var(--accent)"
             pick={(p) => p.research} />
-          <Lines points={data} label="Consiglieri" color="var(--other)"
+          <Lines points={data} label={t.res.councilors} color="var(--other)"
             pick={(p) => p.council} />
         </div>
       </Panel>
 
-      <Panel title="Rilevazioni">
+      <Panel title={t.history.samples}>
         <div className="overflow-auto max-h-[50vh]">
           <table className="data">
             <thead>
               <tr>
-                <th>Data</th><th>Denaro</th><th>Influenza</th><th>Operazioni</th>
-                <th>CP</th><th>Consiglio</th><th>Ricerca/m</th>
+                <th>{t.history.date}</th><th>{t.res.Money}</th><th>{t.res.Influence}</th><th>{t.res.Operations}</th>
+                <th>{t.res.cpShort}</th><th>{t.res.council}</th><th>{t.res.researchMonthShort}</th>
               </tr>
             </thead>
             <tbody>

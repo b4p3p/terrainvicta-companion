@@ -1,5 +1,6 @@
 "use client";
 
+import { currentDict } from "@/lib/i18n";
 import { GameIcon, nf } from "@/components/ui";
 
 /* Priorità nazionali: colori, barra della ripartizione e pesi grezzi.
@@ -75,7 +76,7 @@ export function familyShares(p: { priorities: Slice[] }) {
 
 /** Una barra impilata: un segmento per priorità, raggruppati per famiglia,
  *  separati da 2px di fondo. L'etichetta di ogni segmento sta nel tooltip. */
-export function ShareBar({ p, height = 14, weightLabel = "peso" }: {
+export function ShareBar({ p, height = 14, weightLabel = currentDict().common.weight }: {
   p: { priorities: Slice[] }; height?: number; weightLabel?: string;
 }) {
   // dentro la famiglia, nell'ordine della rampa: dal tono chiaro allo scuro

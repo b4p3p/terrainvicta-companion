@@ -19,6 +19,7 @@ import tempfile
 import zipfile
 
 from . import presets
+from .texts import t
 
 DB_NAME = "companion.db"
 PRESETS_NAME = "presets.json"
@@ -68,8 +69,7 @@ def import_bytes(con, data):
         try:
             parsed = json.loads(data.decode("utf-8-sig"))
         except (UnicodeDecodeError, ValueError):
-            raise ValueError("File non riconosciuto: serve un export del companion "
-                             "(.zip), un companion.db o un presets.json.")
+            raise ValueError(t("err.importUnknown"))
         out["presets"] = _merge_presets(parsed)
     return out
 
@@ -90,7 +90,7 @@ def _merge_db(con, raw):
             have = {r[0] for r in con.execute(
                 "SELECT name FROM src.sqlite_master WHERE type='table'")}
             if "snapshots" not in have:
-                raise ValueError("Il database non e' del companion: manca lo storico.")
+                raise ValueError(t("err.importNotCompanion"))
             before = con.total_changes
             new = con.execute(
                 "SELECT COUNT(*) FROM src.snapshots s WHERE NOT EXISTS (SELECT 1 FROM "

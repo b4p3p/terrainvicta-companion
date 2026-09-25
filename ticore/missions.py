@@ -14,41 +14,29 @@ sono sempre esposti accanto, cosi' la decisione resta tua.
 """
 
 from . import council, gamedata
+from .texts import TEXTS, t
 
-# modificatore del gioco -> (campo della nazione, verso, etichetta)
+# modificatore del gioco -> (campo della nazione, verso, etichetta in texts.py)
 # verso +1 = aiuta l'attaccante, -1 = aiuta il difensore
 NATION_FACTORS = {
-    "NationUnrest":                ("unrest",     +1, "disordini"),
-    "NationCohesion":              ("cohesion",   -1, "coesione"),
-    "NationDemocracy":             ("democracy",  -1, "democrazia"),
-    "TargetNationGDP":             ("gdp",        -1, "PIL"),
-    "NationPopulation":            ("pop",        -1, "popolazione"),
-    "AttackerPopulationIdeology":  ("support",    +1, "sostegno alla tua fazione"),
-    "DefenderPopulationIdeology":  ("support",    +1, "sostegno alla tua fazione"),
-    "NationalIndustries":          ("gdp",        +1, "industria nazionale"),
-    "SecurityApparatus":           ("miltech",    -1, "apparato di sicurezza"),
+    "NationUnrest":                ("unrest",     +1, "factor.unrest"),
+    "NationCohesion":              ("cohesion",   -1, "factor.cohesion"),
+    "NationDemocracy":             ("democracy",  -1, "factor.democracy"),
+    "TargetNationGDP":             ("gdp",        -1, "factor.gdp"),
+    "NationPopulation":            ("pop",        -1, "factor.population"),
+    "AttackerPopulationIdeology":  ("support",    +1, "factor.support"),
+    "DefenderPopulationIdeology":  ("support",    +1, "factor.support"),
+    "NationalIndustries":          ("gdp",        +1, "factor.industries"),
+    "SecurityApparatus":           ("miltech",    -1, "factor.security"),
 }
 
-# fattori che il gioco usa ma che non possiamo leggere dalla nazione:
-# li elenchiamo senza valore, per onesta'
-OPAQUE = {
-    "UnhappyElites": "elite scontenta",
-    "HappyElites": "elite soddisfatta",
-    "Oligarchs": "oligarchi",
-    "IdentityBlocs": "blocchi identitari",
-    "Warlords": "signori della guerra",
-    "JointControlPointStat": "consiglieri nemici sul punto",
-    "numDefendedControlPoints": "punti di controllo difesi",
-    "Defense": "difesa del punto",
-    "FlatModifier": "difficolta' di base",
-    "PherocyteResistance": "resistenza ai feromoni",
-    "IdeologicalDistance": "distanza ideologica",
-    "NationalRivalries": "rivalita' nazionali",
-    "DefendedAsset": "bersaglio protetto",
-    "AttackerAllyControlPoints": "punti di controllo alleati",
-    "AttackerAdjacentControlPoints": "punti di controllo adiacenti",
-    "ResourceSpent": "risorse spese sulla missione",
-}
+# fattori che il gioco usa ma che non possiamo leggere dalla nazione: li
+# elenchiamo senza valore, per onesta'. Etichetta in texts.py come
+# `factor.<nome>`; quelli senza voce mostrano il nome interno del gioco.
+
+
+def _opaque_label(s, lang):
+    return t("factor." + s, lang) if "factor." + s in TEXTS else s
 
 NATION_TARGET = "TIMissionTarget_Nation"
 
@@ -63,8 +51,11 @@ def _short(mod):
     return (mod.get("$type") or "").split("_")[-1]
 
 
-def factors(name):
-    """Fattori dichiarati dal gioco per questa missione, divisi fra leggibili e opachi."""
+def factors(name, lang="ita"):
+    """Fattori dichiarati dal gioco per questa missione, divisi fra leggibili e opachi.
+
+    `side` ("attacco"/"difesa") e' un valore interno che l'interfaccia
+    confronta: resta uguale in ogni lingua. Si traducono solo le etichette."""
     att, dfn = _modifiers(name)
     readable, opaque = [], []
     for mods, side in ((att, "attacco"), (dfn, "difesa")):
@@ -73,13 +64,13 @@ def factors(name):
             if s == "CouncilorAttackStat":
                 readable.append({"side": side, "kind": "councilor",
                                  "field": m.get("attackerAttribute"),
-                                 "label": "attributo del consigliere"})
+                                 "label": t("factor.councilor", lang)})
             elif s in NATION_FACTORS:
                 f, sign, label = NATION_FACTORS[s]
                 readable.append({"side": side, "kind": "nation", "field": f,
-                                 "sign": sign, "label": label})
+                                 "sign": sign, "label": t(label, lang)})
             else:
-                opaque.append({"side": side, "label": OPAQUE.get(s, s)})
+                opaque.append({"side": side, "label": _opaque_label(s, lang)})
     return {"readable": readable, "opaque": opaque}
 
 
@@ -89,7 +80,8 @@ def targets_nation(snap, name, councilor=None):
     `snap` e' il payload di model.snapshot(); `councilor` il dizionario di un
     consigliere (per mostrare il suo attributo rilevante).
     """
-    f = factors(name)
+    lang = gamedata_lang(snap)
+    f = factors(name, lang)
     nation_factors = [x for x in f["readable"] if x["kind"] == "nation"]
     if not nation_factors:
         return None
@@ -123,6 +115,7 @@ def targets_nation(snap, name, councilor=None):
                           "value": v, "sign": fac["sign"],
                           "contribution": round(contrib, 3)})
         out.append({
+            "id": r.get("id"),
             "name": r["name"],
             "eu": r["eu"],
             "myCP": r["myCP"], "freeCP": r["freeCP"], "takenCP": r["takenCP"],
@@ -137,9 +130,9 @@ def targets_nation(snap, name, councilor=None):
     out.sort(key=lambda x: (-x["score"], -x["gdp"]))
     return {
         "mission": name,
-        "missionName": gamedata.mission_name(gamedata_lang(snap), name),
+        "missionName": gamedata.mission_name(lang, name),
         "attribute": attr,
-        "attributeShort": council.ATTR_SHORT.get(attr),
+        "attributeShort": council.attr_short(attr, lang),
         "councilorValue": my_attr,
         "factors": f,
         "targets": out,
@@ -188,12 +181,12 @@ def plan(snap, name, councilor_name=None):
             c = holders[0]
     res = targets_nation(snap, name, c)
     if res is None:
+        lang = gamedata_lang(snap)
         return {"mission": name,
-                "missionName": gamedata.mission_name(gamedata_lang(snap), name),
-                "factors": factors(name), "targets": None,
+                "missionName": gamedata.mission_name(lang, name),
+                "factors": factors(name, lang), "targets": None,
                 "councilor": c["name"] if c else None,
-                "note": "Questa missione non prende una nazione come bersaglio: "
-                        "il confronto fra nazioni non si applica."}
+                "note": t("mission.noTargeting", lang)}
     res["councilor"] = c["name"] if c else None
     res["candidates"] = [x["name"] for x in team if name in x["missions"]]
     return res

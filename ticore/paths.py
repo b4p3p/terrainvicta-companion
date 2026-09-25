@@ -2,6 +2,8 @@
 
 import os
 
+from .texts import t
+
 SAVE_DIRS = [
     os.path.expanduser(r"~/OneDrive/Documenti/My Games/TerraInvicta/Saves"),
     os.path.expanduser(r"~/Documents/My Games/TerraInvicta/Saves"),
@@ -38,7 +40,7 @@ def save_dir():
                 p = line.split("savedGamesPath:", 1)[1].strip()
                 if os.path.isdir(p):
                     return p
-    raise NoSavesFound("Cartella dei salvataggi non trovata.")
+    raise NoSavesFound(t("err.noSaveDir"))
 
 
 def list_saves():
@@ -52,7 +54,7 @@ def list_saves():
 def latest_save():
     saves = list_saves()
     if not saves:
-        raise NoSavesFound("Nessun salvataggio .gz trovato in %s" % save_dir())
+        raise NoSavesFound(t("err.noSavesIn", None, save_dir()))
     return saves[0][1], saves[0][0]
 
 

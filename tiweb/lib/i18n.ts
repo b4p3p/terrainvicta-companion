@@ -9,6 +9,26 @@ export const UI_LANGS = [
 
 export type UiLang = (typeof UI_LANGS)[number]["id"];
 
+/** Lingua di gioco -> locale BCP 47, per numeri e date e per <html lang>.
+ *  Le chiavi sono quelle delle cartelle Localization del gioco. */
+export const GAME_LOCALES: Record<string, string> = {
+  en: "en-GB", ita: "it-IT", fr: "fr-FR", deu: "de-DE", esp: "es-ES",
+  por: "pt-BR", pol: "pl-PL", rus: "ru-RU", ukr: "uk-UA", cze: "cs-CZ",
+  chs: "zh-CN", cht: "zh-TW", jpn: "ja-JP", kor: "ko-KR",
+};
+
+/** Prima visita: la lingua di gioco che corrisponde al browser, se c'e'. */
+export function gameLangFromBrowser(): string {
+  const nav = typeof navigator === "undefined" ? [] : navigator.languages ?? [navigator.language];
+  for (const tag of nav) {
+    const l = tag.toLowerCase();
+    if (l === "zh-tw" || l === "zh-hk" || l.startsWith("zh-hant")) return "cht";
+    const hit = Object.entries(GAME_LOCALES).find(([, loc]) => loc.slice(0, 2) === l.slice(0, 2));
+    if (hit) return hit[0];
+  }
+  return "en";
+}
+
 const it = {
   appName: "Terra Invicta Companion",
   tabs: {
@@ -43,9 +63,59 @@ const it = {
     },
     donateFree: "quanto vuoi",
     donateHint: "Si apre PayPal con l'importo già scritto: puoi cambiarlo. Nessun progetto alieno verrà finanziato per errore.",
+    versionTitle: "Versione",
+    versionApp: "Companion",
+    versionData: "Dati di Terra Invicta",
+    versionSave: "Salvataggio scritto con",
+    devBuild: "sviluppo",
+    fromBundle: "estratto del sito",
+    fromInstall: "gioco installato",
+    versionMismatch: "Il salvataggio viene da Terra Invicta {save}, i dati del companion da {data}: nomi, template e numeri potrebbero non corrispondere.",
     disclaimer: "Progetto amatoriale, non affiliato a Pavonis Interactive né a Hooded Horse. Terra Invicta, i suoi nomi, testi, dati e icone appartengono ai rispettivi proprietari.",
   },
+  res: {
+    Money: "Denaro", Influence: "Influenza", Operations: "Operazioni",
+    research: "Ricerca", researchMonth: "Ricerca/mese", researchMonthShort: "Ricerca/m",
+    council: "Consiglio", councilors: "Consiglieri", cp: "Punti di controllo", cpShort: "CP",
+  },
+  research: {
+    title: "Corsa alla ricerca",
+    since: "Rispetto al salvataggio del {date} (+{days} giorni). Contributi come nella schermata Ricerca del gioco.",
+    noPrevious: "Nessun salvataggio precedente di questa partita: classifica attuale, il ritmo compare dal prossimo.",
+    projects: "Progetti (solo tuoi)",
+    tickHint: "Tick di priorità dello slot e quota della tua ricerca che riceve (peso / somma dei pesi, come nel gioco)",
+    idle: "peso zero: fermo",
+    endsIn: "finisce fra ~{n} giorni",
+    wins: "A questo ritmo vince {who}",
+    wonAlready: "Vince {who}: il vantaggio supera quanto manca",
+    leads: "In testa: {who}",
+    colFaction: "Fazione",
+    colNow: "Contributo",
+    colNowHint: "Punti che la fazione ha messo finora in questa tecnologia (come nella schermata Ricerca)",
+    colGained: "Ultimi {days} gg",
+    colGainedNone: "Ultimi giorni",
+    colGainedHint: "Punti aggiunti dal salvataggio precedente",
+    colPace: "Al mese",
+    colPaceHint: "Lo stesso ritmo, riportato a 30 giorni",
+    colEnd: "Al completamento",
+    colEndDays: "Al completamento (~{n} gg)",
+    colEndHint: "Stima del contributo quando la tecnologia sarà completata, se tutti continuano a questo ritmo. Vince chi ha il valore più alto (🏆).",
+    youWin: "A questo ritmo vinci tu",
+    youWonAlready: "Vinci tu: il vantaggio supera quanto manca",
+    youLead: "Sei in testa",
+    ahead: "sei {rank}° con {gap} di vantaggio su {who}",
+    behind: "sei {rank}°, a {gap} da {who}",
+    gaining: "guadagni {n} in {days} giorni",
+    losing: "perdi {n} in {days} giorni",
+    footnote: "Regola del gioco per il vincitore atteso (contributo attuale + giorni mancanti × ritmo), ma col ritmo osservato fra due salvataggi: i pesi di ricerca delle altre fazioni non si vedono. Un tick in più su uno slot sposta lì una parte più grande della tua ricerca.",
+  },
   common: {
+    code: "codice {code}",
+    copy: "Copia",
+    copied: "Copiato",
+    weight: "peso",
+    owners: "Proprietari",
+    gdpBn: "PIL mld",
     loading: "Caricamento…",
     error: "Errore",
     none: "nessuno",
@@ -87,6 +157,13 @@ const it = {
     capOverage: "Tetto dei punti di controllo superato",
   },
   council: {
+    moreMissions: "+ {n} missioni",
+    attrShort: {
+      Persuasion: "PER", Investigation: "IND", Espionage: "SPI", Command: "CMD",
+      Administration: "AMM", Science: "SCI", Security: "SIC",
+    },
+    attrBase: "base {base} + {org} org",
+    attrAboveMax: "+{n} sul massimo attuale del consiglio",
     title: "Consiglio",
     use: "missioni: {a} in attacco · {d} in difesa",
     unused: "nessuna missione lo usa: non è un buco",
@@ -208,17 +285,17 @@ const it = {
     undone: "Template riportato all'originale.",
     notWritable: "Il file dei template non è scrivibile: serve avviare il companion come amministratore.",
     dlTitle: "Portare i preset nel gioco",
-    dlWhy: "Dal browser il companion non può scrivere nella cartella del gioco: Chrome blocca tutto ciò che sta sotto Program Files. Il file lo prepara lui, a copiarlo ci pensi tu.",
+    dlWhy: "Dal browser il companion non può scrivere nella cartella del gioco: Chrome blocca tutto ciò che sta sotto Program Files. I file li prepara lui, a copiarli ci pensi tu.",
     dlButton: "Scarica {file}",
-    dlStep1: "Apri la cartella dei template in Esplora file: copia il percorso e incollalo nella barra degli indirizzi.",
-    dlStep2: "Scarica il file: contiene i preset del gioco più i nostri.",
-    dlStep3: "Incolla lì il file scaricato sovrascrivendo quello del gioco, poi riavvia Terra Invicta. Non si perde niente: il file contiene tutti i preset originali più i nostri.",
+    dlStep1: "Apri la cartella StreamingAssets del gioco in Esplora file: copia il percorso e incollalo nella barra degli indirizzi.",
+    dlStep2: "Scarica lo zip: contiene i preset del gioco più i nostri (Templates) e i loro nomi in tutte le lingue (Localization).",
+    dlStep3: "Estrai lo zip in StreamingAssets e conferma la sostituzione dei file, poi riavvia Terra Invicta. Non si perde niente: i file contengono tutti i preset e i nomi originali più i nostri. Senza i nomi, in partita vedresti TIPriorityPresetTemplate.displayName.TIC_….",
     dlRestore: "Per tornare al file originale: su Steam, Proprietà → File installati → Verifica integrità dei file.",
-    dlOtherDisk: "Steam su un altro disco? Il percorso finisce comunque con steamapps\\common\\Terra Invicta\\TerraInvicta_Data\\StreamingAssets\\Templates.",
+    dlOtherDisk: "Steam su un altro disco? Il percorso finisce comunque con steamapps\\common\\Terra Invicta\\TerraInvicta_Data\\StreamingAssets.",
     dlRedo: "Da rifare dopo ogni aggiornamento del gioco o «Verifica integrità dei file»: Steam rimette l'originale e i preset spariscono.",
-    dlAfterSave: "Salvato. Riscarica il file e sostituiscilo nel gioco perché la modifica arrivi in partita.",
-    dlSaveNote: "Dopo il salvataggio va riscaricato il file e copiato nel gioco.",
-    dlDone: "Scaricato {file}: ora copialo nella cartella dei template.",
+    dlAfterSave: "Salvato. Riscarica lo zip ed estrailo nel gioco perché la modifica arrivi in partita.",
+    dlSaveNote: "Dopo il salvataggio va riscaricato lo zip ed estratto nel gioco.",
+    dlDone: "Scaricato {file}: ora estrailo in StreamingAssets.",
     file: "File",
     ours: "Preset del companion",
     builtin: "Preset del gioco",
@@ -294,6 +371,18 @@ const it = {
     mine: "miei",
   },
   nations: {
+    metric: {
+      gdp: "PIL mld", gdpPc: "PIL/ab $", pop: "Pop. mln", research: "Ricerca/m",
+      ip: "Investim.", education: "Istruz.", democracy: "Democr.", cohesion: "Coesione",
+      unrest: "Disordini", inequality: "Disugu.", support: "Sostegno", miltech: "Miltech",
+      nukes: "Atomiche",
+    },
+    difficulty: "Difficoltà",
+    spaceFunding: "Fondi sp.",
+    spaceProgShort: "Prog.sp.",
+    spaceProgram: "Programma spaziale",
+    million: "mln",
+    knowledge: "Conoscenza",
     title: "Nazioni",
     scope: {
       all: "Tutte le nazioni",
@@ -365,6 +454,9 @@ const it = {
       "Il reddito mensile è la somma delle entrate correnti che il gioco ha registrato nell'ultimo mese chiuso. Per la tua fazione torna con quello dell'intestazione.",
   },
   history: {
+    researchChart: "Ricerca al mese",
+    samples: "Rilevazioni",
+    date: "Data",
     title: "Storico della partita",
     hint: "Uno snapshot per ogni salvataggio che il companion ha visto.",
     empty:
@@ -408,6 +500,12 @@ const it = {
   },
   severity: { critical: "critico", warning: "attenzione", info: "info" },
   engine: {
+    workerError: "errore nel worker",
+    noSavesIn: "In «{name}» non trovo salvataggi né My Games\TerraInvicta\Saves.",
+    unavailable: "Motore non disponibile",
+    genericError: "errore",
+    noGz: "nessun .gz nella cartella",
+    notReady: "Motore non ancora pronto",
     mode: "motore",
     server: "API locale",
     browser: "browser",
@@ -475,9 +573,59 @@ const en: typeof it = {
     },
     donateFree: "any amount",
     donateHint: "PayPal opens with the amount already filled in: you can change it. No alien project will be funded by mistake.",
+    versionTitle: "Version",
+    versionApp: "Companion",
+    versionData: "Terra Invicta data",
+    versionSave: "Save written with",
+    devBuild: "development",
+    fromBundle: "website extract",
+    fromInstall: "installed game",
+    versionMismatch: "The save comes from Terra Invicta {save}, the companion's data from {data}: names, templates and numbers may not match.",
     disclaimer: "Fan project, not affiliated with Pavonis Interactive or Hooded Horse. Terra Invicta, its names, texts, data and icons belong to their respective owners.",
   },
+  res: {
+    Money: "Money", Influence: "Influence", Operations: "Operations",
+    research: "Research", researchMonth: "Research/month", researchMonthShort: "Research/m",
+    council: "Council", councilors: "Councilors", cp: "Control points", cpShort: "CP",
+  },
+  research: {
+    title: "Research race",
+    since: "Compared with the save of {date} (+{days} days). Contributions as in the game's Research screen.",
+    noPrevious: "No earlier save of this campaign: current standings, the pace shows up from the next one.",
+    projects: "Projects (yours only)",
+    tickHint: "The slot's priority ticks and the share of your research it gets (weight / sum of weights, as in the game)",
+    idle: "zero weight: stalled",
+    endsIn: "ends in ~{n} days",
+    wins: "At this pace {who} wins",
+    wonAlready: "{who} wins: the lead exceeds what is left",
+    leads: "Leading: {who}",
+    colFaction: "Faction",
+    colNow: "Contribution",
+    colNowHint: "Points the faction has put into this tech so far (as in the Research screen)",
+    colGained: "Last {days} d",
+    colGainedNone: "Last days",
+    colGainedHint: "Points added since the previous save",
+    colPace: "Per month",
+    colPaceHint: "The same pace, scaled to 30 days",
+    colEnd: "At completion",
+    colEndDays: "At completion (~{n} d)",
+    colEndHint: "Estimated contribution when the tech completes, if everyone keeps this pace. Highest value wins (🏆).",
+    youWin: "At this pace you win",
+    youWonAlready: "You win: the lead exceeds what is left",
+    youLead: "You are leading",
+    ahead: "you are #{rank}, {gap} ahead of {who}",
+    behind: "you are #{rank}, {gap} behind {who}",
+    gaining: "gaining {n} in {days} days",
+    losing: "losing {n} in {days} days",
+    footnote: "The game's rule for the expected winner (current contribution + days left × pace), but with the pace observed between two saves: other factions' research weights are not visible. One more tick on a slot moves a bigger part of your research there.",
+  },
   common: {
+    code: "code {code}",
+    copy: "Copy",
+    copied: "Copied",
+    weight: "weight",
+    owners: "Owners",
+    gdpBn: "GDP bn",
     loading: "Loading…",
     error: "Error",
     none: "none",
@@ -519,6 +667,13 @@ const en: typeof it = {
     capOverage: "Control point cap exceeded",
   },
   council: {
+    moreMissions: "+ {n} missions",
+    attrShort: {
+      Persuasion: "PER", Investigation: "INV", Espionage: "ESP", Command: "CMD",
+      Administration: "ADM", Science: "SCI", Security: "SEC",
+    },
+    attrBase: "base {base} + {org} org",
+    attrAboveMax: "+{n} over the council's current best",
     title: "Council",
     use: "missions: {a} attacking · {d} defending",
     unused: "no mission uses it: not a gap",
@@ -640,17 +795,17 @@ const en: typeof it = {
     undone: "Template restored to the original.",
     notWritable: "The template file is not writable: run the companion as administrator.",
     dlTitle: "Getting the presets into the game",
-    dlWhy: "From the browser the companion can't write to the game folder: Chrome blocks everything under Program Files. It prepares the file, you copy it.",
+    dlWhy: "From the browser the companion can't write to the game folder: Chrome blocks everything under Program Files. It prepares the files, you copy them.",
     dlButton: "Download {file}",
-    dlStep1: "Open the templates folder in File Explorer: copy the path and paste it in the address bar.",
-    dlStep2: "Download the file: it holds the game's presets plus ours.",
-    dlStep3: "Paste the downloaded file there, overwriting the game's one, then restart Terra Invicta. Nothing is lost: the file holds all the original presets plus ours.",
+    dlStep1: "Open the game's StreamingAssets folder in File Explorer: copy the path and paste it in the address bar.",
+    dlStep2: "Download the zip: it holds the game's presets plus ours (Templates) and their names in every language (Localization).",
+    dlStep3: "Extract the zip into StreamingAssets and confirm replacing the files, then restart Terra Invicta. Nothing is lost: the files hold all the original presets and names plus ours. Without the names, in game you would see TIPriorityPresetTemplate.displayName.TIC_….",
     dlRestore: "To go back to the original file: in Steam, Properties → Installed Files → Verify integrity of game files.",
-    dlOtherDisk: "Steam on another drive? The path still ends with steamapps\\common\\Terra Invicta\\TerraInvicta_Data\\StreamingAssets\\Templates.",
+    dlOtherDisk: "Steam on another drive? The path still ends with steamapps\\common\\Terra Invicta\\TerraInvicta_Data\\StreamingAssets.",
     dlRedo: "Redo it after every game update or “Verify integrity of game files”: Steam puts the original back and the presets disappear.",
-    dlAfterSave: "Saved. Download the file again and replace it in the game for the change to reach your campaign.",
-    dlSaveNote: "After saving, download the file again and copy it into the game.",
-    dlDone: "Downloaded {file}: now copy it into the templates folder.",
+    dlAfterSave: "Saved. Download the zip again and extract it into the game for the change to reach your campaign.",
+    dlSaveNote: "After saving, download the zip again and extract it into the game.",
+    dlDone: "Downloaded {file}: now extract it into StreamingAssets.",
     file: "File",
     ours: "Companion presets",
     builtin: "Game presets",
@@ -726,6 +881,18 @@ const en: typeof it = {
     mine: "mine",
   },
   nations: {
+    metric: {
+      gdp: "GDP bn", gdpPc: "GDP/cap $", pop: "Pop. mn", research: "Research/m",
+      ip: "Invest.", education: "Educ.", democracy: "Democr.", cohesion: "Cohesion",
+      unrest: "Unrest", inequality: "Inequal.", support: "Support", miltech: "Miltech",
+      nukes: "Nukes",
+    },
+    difficulty: "Difficulty",
+    spaceFunding: "Space fund.",
+    spaceProgShort: "Space pr.",
+    spaceProgram: "Space program",
+    million: "mn",
+    knowledge: "Knowledge",
     title: "Nations",
     scope: {
       all: "All nations",
@@ -797,6 +964,9 @@ const en: typeof it = {
       "Monthly income is the sum of the current income the game recorded over the last full month. For your faction it matches the header.",
   },
   history: {
+    researchChart: "Research per month",
+    samples: "Samples",
+    date: "Date",
     title: "Campaign history",
     hint: "One snapshot per save the companion has seen.",
     empty:
@@ -840,6 +1010,12 @@ const en: typeof it = {
   },
   severity: { critical: "critical", warning: "warning", info: "info" },
   engine: {
+    workerError: "worker error",
+    noSavesIn: "No saves in «{name}», nor My Games\TerraInvicta\Saves.",
+    unavailable: "Engine unavailable",
+    genericError: "error",
+    noGz: "no .gz in the folder",
+    notReady: "Engine not ready yet",
     mode: "engine",
     server: "local API",
     browser: "browser",
@@ -879,3 +1055,10 @@ export type Dict = typeof it;
 export function dict(lang: UiLang): Dict {
   return DICT[lang] ?? it;
 }
+
+/* Il dizionario in uso, per le poche funzioni chiamate fuori dai componenti
+   (sigle degli attributi, messaggi del motore). Lo imposta SettingsProvider;
+   nei componenti si usa `t` da useSettings. */
+let current: Dict = it;
+export const setCurrentDict = (d: Dict) => { current = d; };
+export const currentDict = () => current;

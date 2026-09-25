@@ -11,6 +11,8 @@
    Chrome/Edge); il riferimento resta in IndexedDB, il permesso va richiesto
    con un clic. I dati del gioco arrivano dall'estratto in /gamedata. */
 
+import { currentDict, gameLangFromBrowser } from "./i18n";
+
 export type EngineMode = "browser" | "server";
 
 /** Motore fissato in build (`NEXT_PUBLIC_ENGINE`): il sito online e' costruito
@@ -128,7 +130,7 @@ async function resolveSaves(dir: DirHandle): Promise<{ dir: DirHandle; label: st
 
 /** Lingua di gioco scelta (lib/settings.tsx), per partire gia' con quella. */
 function savedGameLang() {
-  try { return localStorage.getItem("ti.game") || "ita"; } catch { return "ita"; }
+  try { return localStorage.getItem("ti.game") || gameLangFromBrowser(); } catch { return gameLangFromBrowser(); }
 }
 
 type Pending = { ok: (v: unknown) => void; ko: (e: Error) => void };
@@ -157,7 +159,7 @@ class Engine {
       return;
     }
     this.worker = new Worker("/engine-worker.js", { type: "module" });
-    this.worker.onerror = (e) => this.setStatus("error", e.message || "errore nel worker");
+    this.worker.onerror = (e) => this.setStatus("error", e.message || currentDict().engine.workerError);
     this.worker.onmessage = ({ data }) => this.onMessage(data);
     this.worker.postMessage({ t: "init", lang });
     void this.restoreFolder();
@@ -197,7 +199,7 @@ class Engine {
       return null;                                  // annullata
     }
     const saves = await resolveSaves(chosen);
-    if (!saves) return `In «${chosen.name}» non trovo salvataggi né My Games\\TerraInvicta\\Saves.`;
+    if (!saves) return currentDict().engine.noSavesIn.replace("{name}", chosen.name);
     await idb("readwrite", (s) => s.put(saves.dir, "savesDir"));
     await idb("readwrite", (s) => s.put(saves.label, "savesLabel"));
     this.dir = saves.dir;
@@ -214,7 +216,7 @@ class Engine {
 
   request<T>(method: string, path: string, query: Record<string, string>, body?: unknown): Promise<T> {
     this.start();
-    if (!this.worker) return Promise.reject(new EngineError(503, this.status.detail ?? "Motore non disponibile"));
+    if (!this.worker) return Promise.reject(new EngineError(503, this.status.detail ?? currentDict().engine.unavailable));
     const id = ++this.seq;
     return new Promise<T>((ok, ko) => {
       this.pending.set(id, { ok: ok as (v: unknown) => void, ko });
@@ -263,7 +265,9 @@ class Engine {
       this.pending.delete(m.id);
       if (!p) return;
       if (m.ok) p.ok(m.data);
-      else p.ko(new EngineError(m.status ?? 500, m.error ?? "errore"));
+      else p.ko(new EngineError(m.status ?? 500,
+        m.error === "not-ready" ? currentDict().engine.notReady      // codice dal worker
+          : m.error ?? currentDict().engine.genericError));
     } else if (m.t === "event" && m.ev) {
       this.last = m.ev;
       this.eventSubs.forEach((f) => f(m.ev!));

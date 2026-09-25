@@ -8,17 +8,29 @@ Regole verificate sui template del gioco:
 - ogni missione tira su un attributo, leggibile dai modificatori di risoluzione.
 """
 
-from . import gamedata
+from . import gamedata, texts
+from .names import Namer, nation_id
 
 ATTRS = ["Persuasion", "Investigation", "Espionage", "Command",
          "Administration", "Science", "Security"]
 
-# sigle italiane storiche, usate anche dalla CLI
+# sigle degli attributi: italiane (quelle storiche, anche della CLI) e inglesi
 ATTR_SHORT = {
     "Persuasion": "PER", "Investigation": "IND", "Espionage": "SPI",
     "Command": "CMD", "Administration": "AMM", "Science": "SCI",
     "Security": "SIC",
 }
+ATTR_SHORT_EN = {
+    "Persuasion": "PER", "Investigation": "INV", "Espionage": "ESP",
+    "Command": "CMD", "Administration": "ADM", "Science": "SCI",
+    "Security": "SEC",
+}
+
+
+def attr_short(attr, lang="ita"):
+    """Sigla dell'attributo nella lingua d'interfaccia (it se il gioco e' in
+    italiano, en per tutte le altre lingue)."""
+    return (ATTR_SHORT if texts.ui(lang) == "it" else ATTR_SHORT_EN).get(attr)
 
 ORG_ATTR_FIELD = {a: a[0].lower() + a[1:] for a in ATTRS}
 
@@ -29,7 +41,7 @@ def org_view(g, o, lang="ita"):
     home = g.region_nation((o.get("homeRegion") or {}).get("value"))
     return {
         "id": (o.get("ID") or {}).get("value"),
-        "name": o.get("displayName"),
+        "name": Namer(g, lang).org(o),
         "template": o.get("templateName"),
         "type": tpl.get("orgType"),
         "tier": o.get("tier"),
@@ -54,7 +66,8 @@ def org_view(g, o, lang="ita"):
         "requiresNationality": bool(tpl.get("requiresNationality")),
         "requiredTraits": tpl.get("requiredOwnerTraits") or [],
         "prohibitedTraits": tpl.get("prohibitedOwnerTraits") or [],
-        "homeNation": (home or {}).get("displayName"),
+        "homeNation": Namer(g, lang).nation(home),
+        "homeNationId": nation_id(home),
         "assigned": ((o.get("assignedCouncilor") or {}) or {}).get("value"),
     }
 
@@ -62,7 +75,8 @@ def org_view(g, o, lang="ita"):
 def can_hold(org, nationality, traits):
     """(bool, [motivi]) — perche' un consigliere non puo' tenere questa org."""
     why = []
-    if org["requiresNationality"] and org["homeNation"] and nationality != org["homeNation"]:
+    # si confrontano gli id: i nomi dipendono dalla lingua
+    if org["requiresNationality"] and org["homeNationId"] and nationality != org["homeNationId"]:
         why.append({"kind": "nationality", "value": org["homeNation"]})
     req = set(org["requiredTraits"])
     if req and not (req & set(traits)):
@@ -169,8 +183,9 @@ def councilor_view(g, c, lang="ita", known=True):
         "name": c.get("displayName"),
         "type": ctype,
         "typeName": gamedata.councilor_type_name(lang, ctype),
-        "nationality": (home or {}).get("displayName"),
-        "location": g.region_label((c.get("location") or {}).get("value")),
+        "nationality": Namer(g, lang).nation(home),
+        "nationalityId": nation_id(home),
+        "location": Namer(g, lang).region_label((c.get("location") or {}).get("value")),
         "xp": c.get("XP") or 0,
         "age": age_of(g, c),
         "declineAt": AGE_DECLINE_AT,
@@ -222,7 +237,7 @@ def mission_view(lang, name, team):
         "name": gamedata.mission_name(lang, name),
         "icon": gamedata.mission_icon(name),
         "attribute": attr,
-        "attributeShort": ATTR_SHORT.get(attr),
+        "attributeShort": attr_short(attr, lang),
         "cost": ({"resource": res, "value": val,
                   "resourceName": gamedata.resource_name(lang, res),
                   "icon": gamedata.RESOURCE_ICONS.get(res)} if res else None),
@@ -246,7 +261,7 @@ def analyse(g, lang="ita"):
         used = bool(use[a]["attack"] or use[a]["defense"])
         coverage[a] = {
             "attribute": a,
-            "short": ATTR_SHORT[a],
+            "short": attr_short(a, lang),
             "best": {"name": best["name"], "value": best["attributes"].get(a, 0)}
                     if best else None,
             "total": sum(vals),
@@ -319,7 +334,7 @@ def recruits(g, lang="ita", include_hidden=False):
                      for a in ATTRS if v["attributes"].get(a, 0) > best_now[a]}
         # WEAK_AT: sotto questa soglia nessuno del consiglio e' credibile
         v["fixesWeak"] = sorted(
-            ATTR_SHORT[a] for a in ATTRS
+            attr_short(a, lang) for a in ATTRS
             if best_now[a] < WEAK_AT <= v["attributes"].get(a, 0) and used_attr(a))
         # quanti consiglieri forti su quell'attributo, prima e dopo
         v["depth"] = {a: {"now": strong_now[a], "after": strong_now[a] + 1}
@@ -343,7 +358,7 @@ def org_market(g, lang="ita"):
         ov = org_view(g, o, lang)
         eligible, blocked = [], []
         for c in team:
-            ok, why = can_hold(ov, c["nationality"], [t["id"] for t in c["traits"]])
+            ok, why = can_hold(ov, c["nationalityId"], [t["id"] for t in c["traits"]])
             (eligible if ok else blocked).append(
                 {"name": c["name"], "why": why})
         ov["eligible"] = [e["name"] for e in eligible]

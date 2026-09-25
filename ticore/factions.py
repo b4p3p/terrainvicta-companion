@@ -13,6 +13,7 @@ gioco lo nasconde, e visibile dove il gioco lo lascia visibile.
 """
 
 from . import gamedata
+from .names import Namer
 
 # campo -> (soglia, misura). Valori di TIGlobalConfig.intelToSeeFaction*.
 GATES = {
@@ -76,7 +77,7 @@ def _view(g, f, lang, level, highest, mine):
 
     out = {
         "id": f.get("ID", {}).get("value"),
-        "name": g.faction_name.get(f.get("ID", {}).get("value")) or f.get("displayName"),
+        "name": Namer(g, lang).faction(f) or "?",
         "template": template,
         "colors": gamedata.faction_colors(template),
         "mine": mine,

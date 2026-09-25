@@ -8,7 +8,7 @@ import { Button, Empty, GameIcon, Panel, Tag } from "@/components/ui";
 import { Combo, type ComboOption } from "@/components/Combo";
 import { Guide } from "@/components/Guide";
 import { Modal } from "@/components/Modal";
-import { CopyPath, GAME_TEMPLATES_DIR } from "@/components/CopyPath";
+import { CopyPath, GAME_STREAMING_DIR, GAME_TEMPLATES_DIR } from "@/components/CopyPath";
 import {
   COLOR_OF, FAMILIES, Legend, ShareBar, WeightChips, familyShares, pc, pp,
   type Family, type Priority, type Slice,
@@ -17,6 +17,8 @@ import {
 interface Preset {
   id: string;
   name: string;
+  /** solo i preset distribuiti: il gioco non ha un campo per mostrarla */
+  description: string | null;
   faction: string | null;
   mine: boolean;
   editable: boolean;
@@ -36,6 +38,8 @@ interface Status {
   /** direct: l'API locale scrive nel gioco. download: nel browser, si scarica il file */
   mode: "direct" | "download";
   file: string;
+  /** lo zip scaricato dal browser: Templates/ e Localization/ */
+  archive: string;
   path: string | null;
   writable: boolean;
   backup: boolean;
@@ -50,15 +54,18 @@ interface Status {
 
 type Labels = ReturnType<typeof useSettings>["t"]["presets"];
 
-/** Nel browser: il file completo si scarica e l'utente lo copia nel gioco,
- *  perche' Chrome non scrive sotto Program Files (vedi ROADMAP). */
+/** Nel browser: si scarica uno zip e l'utente lo estrae nel gioco, perche'
+ *  Chrome non scrive sotto Program Files (vedi ROADMAP). Dentro c'e' il
+ *  template e, per ogni lingua, il file con i nomi: senza, in partita i
+ *  preset si chiamano TIPriorityPresetTemplate.displayName.TIC_… */
 function DownloadBox({ file, t, onMsg }: { file: string; t: Labels; onMsg: (m: string) => void }) {
   const [busy, setBusy] = useState(false);
   const download = async () => {
     setBusy(true);
     try {
-      const d = await api<{ file: string; content: string }>("/api/presets/export");
-      const url = URL.createObjectURL(new Blob([d.content], { type: "application/json" }));
+      const d = await api<{ file: string; base64: string }>("/api/presets/export");
+      const bytes = Uint8Array.from(atob(d.base64), (c) => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" }));
       const a = document.createElement("a");
       a.href = url;
       a.download = d.file;
@@ -85,7 +92,7 @@ function DownloadBox({ file, t, onMsg }: { file: string; t: Labels; onMsg: (m: s
         {/* prima la cartella aperta, poi il file: si incolla dove si e' gia' */}
         {step(1, <>
           <p className="text-dim">{t.dlStep1}</p>
-          <CopyPath path={GAME_TEMPLATES_DIR} />
+          <CopyPath path={GAME_STREAMING_DIR} />
           <p className="text-faint text-[11.5px]">{t.dlOtherDisk}</p>
         </>)}
         {step(2, <>
@@ -158,6 +165,7 @@ function Row({ p, base, t, knowledge, onEdit, onDuplicate, isDefault, known }: {
           )}
         </span>
       </div>
+      {p.description && <p className="text-dim text-[11.5px] mt-0.5">{p.description}</p>}
 
       {base ? (
         /* col confronto acceso tutte le righe usano la stessa griglia, anche
@@ -279,7 +287,7 @@ function Editor({ draft, setDraft, catalog, t, knowledge }: {
 }
 
 export default function PresetsPage() {
-  const { t: all } = useSettings();
+  const { t: all, game } = useSettings();
   const t = all.presets;
   const [st, setSt] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
@@ -292,16 +300,19 @@ export default function PresetsPage() {
   const [comparing, setComparing] = usePersistentState<boolean>(
     "presets.compare", false, (v): v is boolean => typeof v === "boolean");
 
+  // la lingua va in ogni rotta: nomi dei preset, priorità ed errori escono in quella
+  const withLang = useCallback(
+    (path: string) => `${path}${path.includes("?") ? "&" : "?"}lang=${game}`, [game]);
   const load = useCallback(() => {
-    api<Status>("/api/presets").then(setSt).catch((e) => setMsg(String(e)));
-  }, []);
+    api<Status>(withLang("/api/presets")).then(setSt).catch((e) => setMsg(String(e)));
+  }, [withLang]);
   useEffect(load, [load]);
 
   async function call(path: string, method: string, body?: unknown) {
     setBusy(true);
     setMsg(null);
     try {
-      const d = await api<{ status: Status; install?: { ok: boolean; error: string | null } | null }>(path, {
+      const d = await api<{ status: Status; install?: { ok: boolean; error: string | null } | null }>(withLang(path), {
         method,
         body: body ? JSON.stringify(body) : undefined,
       });
@@ -401,7 +412,7 @@ export default function PresetsPage() {
         <p className="text-warn text-[12px] mb-3">{t.achievementsShort}</p>
 
         {st.mode === "download" ? <>
-          <DownloadBox file={st.file} t={t} onMsg={setMsg} />
+          <DownloadBox file={st.archive} t={t} onMsg={setMsg} />
           {msg && <p className="text-[12px] text-dim mb-3">{msg}</p>}
         </> : <>
         <div className="flex items-center gap-2 flex-wrap mb-3">

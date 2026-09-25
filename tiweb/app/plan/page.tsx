@@ -43,9 +43,18 @@ export default function PlanPage() {
   const subjects = [
     { id: "general", label: t.plan.general },
     ...(snap?.nations.filter((n) => n.myCP > 0)
-      .map((n) => ({ id: `nation:${n.name}`, label: n.name })) ?? []),
+      .map((n) => ({ id: `nation:${n.id}`, label: n.name })) ?? []),
     ...(snap?.council.team.map((c) => ({ id: `councilor:${c.name}`, label: c.name })) ?? []),
   ];
+
+  // le note vecchie hanno `nation:<nome nel salvataggio>`, le nuove `nation:<id>`
+  const subjectLabel = (subject: string) => {
+    const hit = subjects.find((s) => s.id === subject);
+    if (hit) return hit.label;
+    const [kind, key] = [subject.slice(0, subject.indexOf(":")), subject.slice(subject.indexOf(":") + 1)];
+    const n = kind === "nation" ? snap?.nations.find((x) => x.id === key || x.saveName === key) : null;
+    return n?.name ?? subject;
+  };
 
   return (
     <div className="grid gap-5 lg:grid-cols-2 items-start">
@@ -114,7 +123,7 @@ export default function PlanPage() {
                 <select value={form.target} onChange={(e) => setForm({ ...form, target: e.target.value })}>
                   <option value="">{t.plan.target}…</option>
                   {snap?.nations.filter((n) => n.cp).sort((a, b) => b.gdp - a.gdp).slice(0, 60)
-                    .map((n) => <option key={n.name} value={n.name}>{n.name}</option>)}
+                    .map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
                 </select>
               )}
               {form.kind === "project" && (
@@ -149,7 +158,7 @@ export default function PlanPage() {
             {notes.map((n) => (
               <div key={n.id} className="bg-panel border border-edge rounded-md px-3 py-2">
                 <div className="flex justify-between items-baseline">
-                  <Tag>{subjects.find((s) => s.id === n.subject)?.label ?? n.subject}</Tag>
+                  <Tag>{subjectLabel(n.subject)}</Tag>
                   <button onClick={async () => {
                     await api(`/api/notes/${n.id}`, { method: "DELETE" });
                     reloadNotes();

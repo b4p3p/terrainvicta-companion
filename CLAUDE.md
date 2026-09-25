@@ -144,6 +144,17 @@ con `isAI == false`.
 - **Costo di reclutamento**: 60 influenza; 30 se il tipo ha affinità con la fazione
   (`affinities` in `TICouncilorTypeTemplate`: l'Agente sul campo con la Resistenza),
   120 se ha anti-affinità.
+- **Nome di un preset in partita**: il gioco **ignora `friendlyName`** e legge
+  `TIPriorityPresetTemplate.displayName.<dataName>` da
+  `Localization/<lingua>/TIPriorityPresetTemplate.<lingua>`. Senza quella riga
+  mostra la chiave nuda. `presets.install()`/`export()` scrivono entrambi.
+- **Nomi nel salvataggio**: nazioni, regioni, fazioni, org e punti di controllo
+  sono scritti **nella lingua in cui girava il gioco**. `ticore/names.py` li
+  ritraduce risalendo alla chiave. I template di nazioni e regioni hanno il
+  prefisso dello scenario (`2026_FRA`), la localizzazione no (`FRA`); una nazione
+  può usare `displayName` o `unionDisplayName` («Inghilterra»/«Regno Unito»). Le
+  org generate a caso non hanno chiave e restano com'è. **Come chiave si usa
+  sempre il `templateName`** (id), mai il nome: cambia con la lingua.
 - **Identità di una partita**: `TIGlobalValuesState.realWorldCampaignStart` è l'ora
   reale in cui la campagna è stata avviata — stabile per tutti i salvataggi della
   stessa partita, diversa fra partite. È l'unico modo per distinguerle: fazione e

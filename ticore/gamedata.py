@@ -28,6 +28,7 @@ _TEMPLATE_FILES = {
     "traits": "TITraitTemplate.json",
     "effects": "TIEffectTemplate.json",
     "factions": "TIFactionTemplate.json",
+    "techs": "TITechTemplate.json",
 }
 
 
@@ -390,6 +391,12 @@ def trait_effects(lang, data_name):
 def councilor_type_name(lang, data_name):
     t = templates()["councilorTypes"].get(data_name) or {}
     return loc(lang, "TICouncilorTypeTemplate", "displayName", data_name,
+               t.get("friendlyName", data_name))
+
+
+def tech_name(lang, data_name):
+    t = templates()["techs"].get(data_name) or {}
+    return loc(lang, "TITechTemplate", "displayName", data_name,
                t.get("friendlyName", data_name))
 
 

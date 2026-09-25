@@ -11,27 +11,46 @@ preset **non sono confezionati come mod**: si scrivono direttamente in
 `TIPriorityPresetTemplate.json`, aggiungendo voci con un `dataName` nuovo. Il
 gioco non le vede come mod e `playedWithMods` resta falso.
 
+Il nome che il gioco mostra **non e' `friendlyName`**: e' la chiave
+`TIPriorityPresetTemplate.displayName.<dataName>` in
+`Localization/<lingua>/TIPriorityPresetTemplate.<lingua>`. Senza quella riga
+la lista in partita mostra la chiave nuda. Per questo si scrive anche li', in
+tutte le lingue. I preset distribuiti hanno il nome tradotto in
+`assets/presets/names.json` (italiano per "ita", inglese per le altre: le due
+lingue dell'interfaccia); nel template resta `friendlyName`, che il gioco
+ignora, perche' voci con campi sconosciuti il gioco non le deserializza. I
+preset dell'utente hanno un nome solo, uguale in ogni lingua.
+
 Il prezzo e' che un aggiornamento di Steam, o "verifica integrita' file",
-riscrive i template e cancella l'aggiunta. `status()` se ne accorge e
-`install()` e' idempotente, cosi' basta rilanciarla.
+riscrive template e localizzazione e cancella l'aggiunta. `status()` se ne
+accorge e `install()` e' idempotente, cosi' basta rilanciarla.
 
 Questi preset non concedono nulla che non si possa gia' impostare a mano in
 partita: sono una scorciatoia, non un vantaggio.
 """
 
+import base64
+import io
 import json
 import os
 import shutil
 import time
+import zipfile
 
 from . import gamedata, paths
+from . import texts
+from .texts import t
 
 TEMPLATE = "TIPriorityPresetTemplate.json"
+LOC_KEY = "TIPriorityPresetTemplate.displayName."
+ARCHIVE = "terrainvicta-companion-preset.zip"   # il download dal browser
+BAK = ".ti-companion.bak"
 PREFIX = "TIC_"                 # marca le voci nostre: mai toccare le altre
 USER_PREFIX = PREFIX + "U_"     # ...e fra le nostre, quelle create dall'utente
 MARK = "- "                     # davanti al nome, solo nella lista del gioco
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _SOURCE = os.path.join(_REPO, "assets", "presets", TEMPLATE)
+_NAMES = os.path.join(_REPO, "assets", "presets", "names.json")
 
 # quali priorita' contano come spesa militare, per il riepilogo
 _MILITARY = ("military", "foundMilitary", "army", "navy",
@@ -42,6 +61,94 @@ def template_file():
     d = paths.template_dir()
     p = os.path.join(d, TEMPLATE) if d else None
     return p if p and os.path.isfile(p) else None
+
+
+# --------------------------------------------------------------- nomi in gioco
+# File di testo `chiave=valore`, UTF-8 senza BOM, righe CRLF, niente a capo
+# finale: lo stesso formato si riscrive uguale.
+
+def loc_files():
+    """[(lingua, percorso)] dei file di localizzazione dei preset installati."""
+    d = paths.localization_dir()
+    if not d:
+        return []
+    out = []
+    for lang in sorted(os.listdir(d)):
+        p = os.path.join(d, lang, "TIPriorityPresetTemplate.%s" % lang)
+        if os.path.isfile(p):
+            out.append((lang, p))
+    return out
+
+
+def _is_ours(line):
+    return line.startswith(LOC_KEY + PREFIX)
+
+
+def _read_lines(path):
+    with open(path, encoding="utf-8-sig") as f:
+        return f.read().splitlines()
+
+
+def loc_original(lang):
+    """Le righe del gioco, senza le nostre: dal backup se c'e', altrimenti dal
+    file ripulito; nel browser dall'estratto, che ha tutti i displayName."""
+    if _bundled is not None:
+        s = gamedata.strings(lang)
+        return ["%s=%s" % (k, v.rstrip("\r")) for k, v in s.items()
+                if k.startswith(LOC_KEY) and not k.startswith(LOC_KEY + PREFIX)]
+    p = dict(loc_files()).get(lang)
+    if not p:
+        return None
+    lines = _read_lines(p + BAK if os.path.isfile(p + BAK) else p)
+    return [l for l in lines if not _is_ours(l)]
+
+
+def shipped_names():
+    """{dataName: {"it": nome, "en": nome, "desc": {...}}} dei preset
+    distribuiti; i preset del gioco hanno solo "desc"."""
+    try:
+        return _read(_NAMES)
+    except (OSError, ValueError):
+        return {}
+
+
+def display_name(preset, lang="ita", names=None):
+    """Nome di un nostro preset nella lingua di gioco `lang`, trattino
+    compreso: tradotto se e' distribuito, altrimenti quello dato dall'utente."""
+    n = (names if names is not None else shipped_names()).get(preset["dataName"])
+    if n:
+        return n.get(texts.ui(lang)) or n.get("en") or n.get("it")
+    return preset.get("friendlyName") or preset["dataName"]
+
+
+def _loc_line(preset, lang, names=None):
+    return "%s%s=%s" % (LOC_KEY, preset["dataName"], display_name(preset, lang, names))
+
+
+def _merge_loc(lines, mine, lang):
+    kept = [l for l in lines if l.strip() and not _is_ours(l)]
+    names = shipped_names()
+    return kept + [_loc_line(p, lang, names) for p in mine
+                   if p["dataName"].startswith(PREFIX)]
+
+
+def _loc_text(lines):
+    return "\r\n".join(lines)
+
+
+def _loc_missing(mine):
+    """dataName dei nostri preset il cui nome manca (o e' vecchio) in almeno
+    una lingua: in partita comparirebbero come chiave nuda."""
+    names = shipped_names()
+    missing = set()
+    for lang, path in loc_files():
+        want = {p["dataName"]: _loc_line(p, lang, names) for p in mine}
+        try:
+            have = set(_read_lines(path))
+        except OSError:
+            return {p["dataName"] for p in mine}
+        missing |= {dn for dn, line in want.items() if line not in have}
+    return missing
 
 
 # Nel browser il template del gioco non si puo' ne' leggere ne' scrivere
@@ -125,12 +232,18 @@ def custom():
 
 
 def view(preset, lang="ita", installed=False, stale=False):
-    name = gamedata.loc(lang, "TIPriorityPresetTemplate", "displayName",
-                        preset["dataName"],
-                        preset.get("friendlyName") or preset["dataName"])
     mine = preset["dataName"].startswith(PREFIX)
+    # i nostri dal nome tradotto, non dalla localizzazione del gioco: li'
+    # c'e' solo se installati, e magari una versione vecchia
+    name = display_name(preset, lang) if mine else gamedata.loc(
+        lang, "TIPriorityPresetTemplate", "displayName", preset["dataName"],
+        preset.get("friendlyName") or preset["dataName"])
     if mine and name.startswith(MARK):
         name = name[len(MARK):]           # il trattino serve solo in partita
+    # la descrizione esiste solo nel companion: il gioco non ha un campo per
+    # mostrarla. In names.json c'e' per i nostri e per quelli del giocatore
+    # del gioco (lettura nostra dei pesi, non testo di Pavonis).
+    desc = (shipped_names().get(preset["dataName"]) or {}).get("desc") or {}
     a = analyse(preset)
     order = list(gamedata.PRIORITIES)
     rank = {k: i for i, k in enumerate(order)}
@@ -139,6 +252,7 @@ def view(preset, lang="ita", installed=False, stale=False):
     return dict(a,
                 id=preset["dataName"],
                 name=name,
+                description=desc.get(texts.ui(lang)) or desc.get("en"),
                 faction=preset.get("factionName"),
                 mine=mine,
                 editable=preset["dataName"].startswith(USER_PREFIX),
@@ -165,21 +279,21 @@ def save_user(name, weights, data_name=None):
     """
     name = (name or "").strip()
     if not name:
-        raise ValueError("Il preset deve avere un nome.")
+        raise ValueError(t("err.presetName"))
     clean = {}
     for k, v in (weights or {}).items():
         if k not in gamedata.PRIORITIES:
-            raise ValueError("Priorita' sconosciuta: %s" % k)
+            raise ValueError(t("err.unknownPriority", None, k))
         try:
             v = int(v)
         except (TypeError, ValueError):
-            raise ValueError("Peso non numerico per %s" % k)
+            raise ValueError(t("err.weightNotNumber", None, k))
         if not 0 <= v <= 3:
-            raise ValueError("Il peso di %s deve stare fra 0 e 3" % k)
+            raise ValueError(t("err.weightRange", None, k))
         if v:
             clean[k] = v
     if not clean:
-        raise ValueError("Il preset deve accendere almeno una priorita'.")
+        raise ValueError(t("err.presetEmpty"))
 
     mine = user()
     if data_name:
@@ -226,7 +340,7 @@ def status(lang="ita"):
     if not path and _bundled is not None:
         return _status(_bundled, lang, mode="download")
     if not path:
-        return {"ok": False, "error": "Template del gioco non trovato.",
+        return {"ok": False, "error": t("err.noTemplate"),
                 "path": None, "presets": [], "pending": []}
     try:
         data = _read(path)
@@ -250,9 +364,12 @@ def _status(data, lang, path=None, mode="direct"):
               if not o.get("nationalAIOption")
               and not str(o.get("dataName", "")).startswith(PREFIX)]
     ours = custom()
-    # `stale`: nel gioco c'e' una versione diversa, va reinstallato
+    # `stale`: nel gioco c'e' una versione diversa, o manca il nome in qualche
+    # lingua (in partita si vedrebbe la chiave): va reinstallato
+    no_name = _loc_missing(ours) if direct else set()
     pending = [view(o, lang, installed=direct and o["dataName"] in have,
-                    stale=direct and o["dataName"] in have and have[o["dataName"]] != o)
+                    stale=direct and o["dataName"] in have
+                    and (have[o["dataName"]] != o or o["dataName"] in no_name))
                for o in ours]
     # voci nostre rimaste nel gioco dopo che l'utente le ha cancellate
     names = {o["dataName"] for o in ours}
@@ -263,6 +380,7 @@ def _status(data, lang, path=None, mode="direct"):
         "mode": mode,
         "path": path,
         "file": TEMPLATE,
+        "archive": ARCHIVE,
         "writable": direct and os.access(path, os.W_OK),
         "backup": direct and os.path.isfile(path + ".ti-companion.bak"),
         "installed": sum(1 for p in pending if p["installed"]),
@@ -282,34 +400,53 @@ def install(lang="ita"):
     """
     path = template_file()
     if not path:
-        raise FileNotFoundError("Template del gioco non trovato.")
+        raise FileNotFoundError(t("err.noTemplate"))
     mine = custom()
     if not mine:
-        raise ValueError("Nessun preset da installare.")
+        raise ValueError(t("err.noPresets"))
 
     data = _read(path)
-    backup = path + ".ti-companion.bak"
+    backup = path + BAK
     if not os.path.isfile(backup):
         shutil.copy2(path, backup)
 
     data, added, updated, removed = _merge(data, mine)
     _write_atomic(path, data)
+
+    langs = []
+    for lang, p in loc_files():
+        if not os.path.isfile(p + BAK):
+            shutil.copy2(p, p + BAK)
+        _write_text_atomic(p, _loc_text(_merge_loc(_read_lines(p), mine, lang)))
+        langs.append(lang)
     return {"added": added, "updated": updated, "removed": removed,
-            "backup": backup}
+            "backup": backup, "languages": langs}
 
 
 def export():
-    """Il template completo, gioco + nostri, come testo: nel browser si
-    scarica e l'utente lo copia in Templates al posto dell'originale."""
+    """Template e nomi, gioco + nostri, in uno zip con la struttura di
+    StreamingAssets (Templates/, Localization/<lingua>/): nel browser si
+    scarica e l'utente lo estrae nella cartella del gioco."""
     base = _bundled if _bundled is not None else game_original()
     if base is None:
-        raise FileNotFoundError("Template del gioco non trovato.")
+        raise FileNotFoundError(t("err.noTemplate"))
     mine = custom()
     if not mine:
-        raise ValueError("Nessun preset da installare.")
+        raise ValueError(t("err.noPresets"))
     data, added, _, _ = _merge([dict(o) for o in base], mine)
-    return {"file": TEMPLATE, "count": added,
-            "content": json.dumps(data, ensure_ascii=False, indent=2) + "\n"}
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("Templates/" + TEMPLATE,
+                   json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+        for lang in gamedata.available_languages():
+            lines = loc_original(lang)
+            if lines is None:
+                continue
+            z.writestr("Localization/%s/TIPriorityPresetTemplate.%s" % (lang, lang),
+                       _loc_text(_merge_loc(lines, mine, lang)).encode("utf-8"))
+    return {"file": ARCHIVE, "count": added,
+            "base64": base64.b64encode(buf.getvalue()).decode("ascii")}
 
 
 def _merge(data, mine):
@@ -337,11 +474,20 @@ def _merge(data, mine):
 
 
 def restore():
-    """Riporta il template com'era, o toglie solo le nostre voci."""
+    """Riporta template e nomi com'erano, o toglie solo le nostre voci."""
     path = template_file()
     if not path:
-        raise FileNotFoundError("Template del gioco non trovato.")
-    backup = path + ".ti-companion.bak"
+        raise FileNotFoundError(t("err.noTemplate"))
+    for _, p in loc_files():
+        if os.path.isfile(p + BAK):
+            shutil.copy2(p + BAK, p)
+            os.remove(p + BAK)
+        else:
+            lines = _read_lines(p)
+            if any(_is_ours(l) for l in lines):
+                _write_text_atomic(p, _loc_text([l for l in lines if not _is_ours(l)]))
+
+    backup = path + BAK
     if os.path.isfile(backup):
         shutil.copy2(backup, path)
         os.remove(backup)
@@ -359,4 +505,11 @@ def _write_atomic(path, data):
     tmp = "%s.%d.tmp" % (path, int(time.time()))
     with open(tmp, "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
+
+
+def _write_text_atomic(path, text):
+    tmp = "%s.%d.tmp" % (path, int(time.time()))
+    with open(tmp, "w", encoding="utf-8", newline="") as f:   # CRLF gia' nel testo
+        f.write(text)
     os.replace(tmp, path)

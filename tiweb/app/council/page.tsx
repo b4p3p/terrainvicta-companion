@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { AttrIcon, Empty, MissionIcon, Panel, ResourceIcon, Tag } from "@/components/ui";
-import { CouncilorCard, SHORT } from "@/components/CouncilorCard";
-import type { Attr, Councilor } from "@/lib/types";
+import { CouncilorCard, short } from "@/components/CouncilorCard";
+import type { Councilor } from "@/lib/types";
 
 export default function CouncilPage() {
   const { t, game, live } = useSettings();
@@ -131,7 +131,7 @@ export default function CouncilPage() {
           {snap.orgMarket.map((o) => {
             const bits: string[] = [];
             for (const [k, v] of Object.entries(o.income)) if (v) bits.push(`${v > 0 ? "+" : ""}${v} ${k}`);
-            for (const [k, v] of Object.entries(o.attributes)) if (v) bits.push(`+${v} ${SHORT[k as Attr]}`);
+            for (const [k, v] of Object.entries(o.attributes)) if (v) bits.push(`+${v} ${short(k)}`);
             if (o.projectSlots) bits.push(`+${o.projectSlots} slot`);
             const cost = Object.entries(o.cost).filter(([, v]) => v)
               .map(([k, v]) => `${v} ${k}`).join(" + ");
@@ -157,7 +157,7 @@ export default function CouncilPage() {
                 </div>
                 {o.missionsGranted.length > 0 && (
                   <div className="text-[11.5px] text-accent mt-1">
-                    + {o.missionsGranted.length} missioni
+                    {t.council.moreMissions.replace("{n}", String(o.missionsGranted.length))}
                   </div>
                 )}
               </div>

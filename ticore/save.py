@@ -10,6 +10,8 @@ import json
 import os
 import time
 
+from .texts import t
+
 NS = "PavonisInteractive.TerraInvicta."
 
 
@@ -32,7 +34,7 @@ def read_save(path, retries=6, delay=0.4):
         except (PermissionError, EOFError, gzip.BadGzipFile, OSError) as e:
             last = e
             time.sleep(delay * (i + 1))
-    raise SaveLocked("%s non leggibile: %s" % (os.path.basename(path), last))
+    raise SaveLocked(t("err.saveLocked", None, os.path.basename(path), last))
 
 
 class Game:
@@ -70,7 +72,7 @@ class Game:
         for f in self.factions.values():
             if (f.get("displayName") or "").lower() == want:
                 return f
-        raise RuntimeError("Impossibile identificare la fazione del giocatore.")
+        raise RuntimeError(t("err.noFaction"))
 
     # -- helper ----------------------------------------------------------
 

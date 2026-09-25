@@ -20,16 +20,26 @@ pulsante nella scheda.
 
 ## Cosa contengono
 
-Il valore della Conoscenza è 3 in tutti — come nel preset `Resist` del gioco.
-Non è lì la differenza: conta **su quante voci si divide il bilancio della
-nazione**, che si ripartisce per peso fra le priorità accese.
+Due famiglie. I preset di **ricerca** tengono la Conoscenza a 3, come il
+preset `Resist` del gioco: la differenza la fa **su quante voci si divide il
+bilancio della nazione**, che si ripartisce per peso fra le priorità accese.
+Gli altri servono a una situazione precisa e poi si tolgono.
 
-| preset | voci | ricerca | militare |
-|---|---|---|---|
-| `Resist` (del gioco, per confronto) | 14 | 9,1% | 45,5% |
-| - Ricerca e economia | 4 | **33,3%** | 0% |
-| - Ricerca e spazio | 7 | 16,7% | 0% |
-| - Resisti senza riarmo | 8 | 15,0% | 5% |
+| preset | voci | ricerca | militare | quando |
+|---|---|---|---|---|
+| `Resist` (del gioco, per confronto) | 14 | 9,1% | 45,5% | |
+| - Ricerca e economia | 3 | **37,5%** | 0% | nazione ricca e stabile, senza programma spaziale |
+| - Ricerca e spazio | 7 | 16,7% | 0% | nazione con programma spaziale |
+| - Consolida | 4 | 12,5% | 0% | nazione appena presa o contesa (Unità: coesione e opinione pubblica) |
+| - Controllo missioni | 3 | 0% | 0% | vicino al tetto di controllo missioni |
+| - Arsenale | 4 | 0% | 75% | una sola nazione militare, senza disordini |
+
+Ambiente e Welfare sono fuori dai preset di ricerca: l'Ambiente non tocca
+disordini, coesione né PIL; il Welfare serve solo quando la disuguaglianza
+sale, e il gioco lo segnala con un avviso sulla priorità.
+
+Nomi e descrizioni tradotti stanno in `names.json`. La descrizione la mostra
+solo il companion: il template del gioco non ha un campo per lei.
 
 Il trattino iniziale serve a riconoscerli nella lista del gioco, dove non c'è
 altro modo di distinguere le voci aggiunte da quelle originali.

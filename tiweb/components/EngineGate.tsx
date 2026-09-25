@@ -40,7 +40,9 @@ export function EngineGate() {
   switch (st.state) {
     case "loading":
       return box(e.loading, <>
-        {st.detail && <p>{e.loadingStep.replace("{step}", st.detail)}</p>}
+        {st.detail && <p>{e.loadingStep.replace("{step}", ({
+          runtime: e.stepRuntime, code: e.stepCode, gamedata: e.stepGamedata, save: e.stepSave,
+        } as Record<string, string>)[st.detail] ?? st.detail)}</p>}
         <p>{e.firstLoad}</p>
       </>);
     case "nofolder":
@@ -52,7 +54,7 @@ export function EngineGate() {
         <Button onClick={pick}>{e.change}</Button>
       </>, "border-warn/50");
     case "nosaves":
-      return box(e.noSaves, <p>{st.detail}</p>,
+      return box(e.noSaves, <p>{st.detail ?? e.noGz}</p>,
         <Button onClick={pick}>{e.change}</Button>, "border-warn/50");
     case "unsupported":
       return box(e.unsupported, null, undefined, "border-bad/60");

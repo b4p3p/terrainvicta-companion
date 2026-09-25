@@ -6,6 +6,7 @@ cosi' il frontend puo' non ripetere una notifica gia' mostrata.
 """
 
 from . import gamedata
+from .texts import t
 
 SEVERITY_ORDER = {"critical": 0, "warning": 1, "info": 2}
 
@@ -19,6 +20,11 @@ _INCOME_RESOURCE = {
 
 # soglie: sotto queste una risorsa blocca le operazioni
 LOW = {"Influence": 15, "Operations": 10, "Money": 50}
+
+
+def _lang(snap):
+    """Lingua di gioco dello snapshot: i testi escono nella sua lingua."""
+    return (snap or {}).get("lang") or "ita"
 
 
 def _alert(aid, severity, title, detail, tab=None, **extra):
@@ -39,9 +45,9 @@ def stalled_projects(cur, prev):
         if p["accumulated"] <= before[p["id"]] + 0.05:
             out.append(_alert(
                 "stalled:%s" % p["id"], "warning",
-                "Progetto fermo: %s" % p["name"],
-                "Slot %s: %.1f/%s, invariato dal %s. Quello slot non riceve ricerca."
-                % (p["slot"], p["accumulated"], p["cost"], prev["date"]),
+                t("alert.stalled.title", _lang(cur), p["name"]),
+                t("alert.stalled.detail", _lang(cur),
+                  p["slot"], p["accumulated"], p["cost"], prev["date"]),
                 tab="projects", project=p["id"]))
     return out
 
@@ -49,55 +55,73 @@ def stalled_projects(cur, prev):
 def low_resources(cur, prev):
     out = []
     res = cur.get("resources") or {}
-    net = (cur.get("flows") or {}).get("net") or {}
+    # il netto ricorrente: un acquisto una tantum (un'org da 182) non e' un
+    # calo. Gli snapshot archiviati prima di `recurring` ricadono su `net`.
+    flows = cur.get("flows") or {}
+    net = flows.get("recurring", flows.get("net")) or {}
+    lang = _lang(cur)
     for r, threshold in LOW.items():
         v = res.get(r)
         if v is None:
             continue
+        # il nome della risorsa dalla localizzazione del gioco, non l'id "Money"
+        name = gamedata.resource_name(lang, r)
         if v < threshold:
             sev = "critical" if v < threshold / 2 else "warning"
             out.append(_alert(
-                "low:%s" % r, sev, "%s in esaurimento" % r,
-                "In cassa %.1f (soglia %s), netto del mese %+.1f."
-                % (v, threshold, net.get(r, 0)), tab="overview", resource=r))
+                "low:%s" % r, sev, t("alert.low.title", lang, name),
+                t("alert.low.detail", lang, v, threshold, net.get(r, 0)),
+                tab="overview", resource=r))
         elif net.get(r, 0) < 0 and v < threshold * 3:
             out.append(_alert(
-                "drain:%s" % r, "info", "%s in calo" % r,
-                "Netto del mese %+.1f con %.1f in cassa." % (net[r], v),
+                "drain:%s" % r, "info", t("alert.drain.title", lang, name),
+                t("alert.drain.detail", lang, net[r], v),
                 tab="overview", resource=r))
     return out
 
 
+def _by_id(snap):
+    """Lo snapshot tiene nazioni e fazioni per id? Quelli archiviati prima
+    dei nomi tradotti le tenevano per nome, nella lingua del salvataggio:
+    confrontarli con uno nuovo darebbe allerte false su tutto."""
+    return "names" in (snap.get("controlPoints") or {})
+
+
 def control_points(cur, prev):
-    if not prev:
+    if not prev or not _by_id(prev):
         return []
     out = []
     a = (prev.get("controlPoints") or {}).get("byNation", {})
     b = (cur.get("controlPoints") or {}).get("byNation", {})
+    names = {**(prev.get("controlPoints") or {}).get("names", {}),
+             **(cur.get("controlPoints") or {}).get("names", {})}
     for n in set(a) | set(b):
         d = b.get(n, 0) - a.get(n, 0)
+        label = names.get(n, n)
         if d < 0:
             out.append(_alert(
-                "cplost:%s" % n, "critical", "Punto di controllo perso: %s" % n,
-                "Da %d a %d. Qualcuno te l'ha portato via." % (a.get(n, 0), b.get(n, 0)),
+                "cplost:%s" % n, "critical", t("alert.cplost.title", _lang(cur), label),
+                t("alert.cplost.detail", _lang(cur), a.get(n, 0), b.get(n, 0)),
                 tab="nations", nation=n))
         elif d > 0:
             out.append(_alert(
-                "cpgain:%s" % n, "info", "Punto di controllo preso: %s" % n,
-                "Ora ne hai %d." % b.get(n, 0), tab="nations", nation=n))
+                "cpgain:%s" % n, "info", t("alert.cpgain.title", _lang(cur), label),
+                t("alert.cpgain.detail", _lang(cur), b.get(n, 0)), tab="nations", nation=n))
 
-    # nuove fazioni entrate dove sono presente
-    prev_owners = {x["name"]: set(x["owners"]) for x in prev.get("nations", [])}
+    # nuove fazioni entrate dove sono presente: per id di fazione, i nomi
+    # dipendono dalla lingua
+    prev_owners = {x["id"]: set(x.get("ownerIds", [])) for x in prev.get("nations", [])}
     for n in cur.get("nations", []):
         if not n["myCP"]:
             continue
-        new = set(n["owners"]) - prev_owners.get(n["name"], set())
+        new = set(n.get("ownerIds", [])) - prev_owners.get(n["id"], set())
         if new:
+            shown = [n["ownerIds"][i] for i in new]
             out.append(_alert(
-                "contested:%s" % n["name"], "warning",
-                "Nuova fazione in %s" % n["name"],
-                "%s e' entrata in una nazione dove sei presente."
-                % ", ".join(sorted(new)), tab="nations", nation=n["name"]))
+                "contested:%s" % n["id"], "warning",
+                t("alert.contested.title", _lang(cur), n["name"]),
+                t("alert.contested.detail", _lang(cur), ", ".join(sorted(shown))),
+                tab="nations", nation=n["id"]))
     return out
 
 
@@ -113,14 +137,14 @@ def council_watch(cur, prev):
         if old is not None and la < old - 1:
             out.append(_alert(
                 "loyalty:%s" % c["name"], "warning",
-                "Lealta' in calo: %s" % c["name"],
-                "Apparente da %s a %s. Qualcuno potrebbe stare lavorando per portartelo via."
-                % (old, la), tab="council", councilor=c["name"]))
+                t("alert.loyalty.title", _lang(cur), c["name"]),
+                t("alert.loyalty.detail", _lang(cur), old, la),
+                tab="council", councilor=c["name"]))
         elif la <= 6:
             out.append(_alert(
                 "loyaltylow:%s" % c["name"], "info",
-                "Lealta' bassa: %s" % c["name"],
-                "Apparente %s. Un'organizzazione che dia lealta' lo mette al sicuro." % la,
+                t("alert.loyaltylow.title", _lang(cur), c["name"]),
+                t("alert.loyaltylow.detail", _lang(cur), la),
                 tab="council", councilor=c["name"]))
     return out
 
@@ -128,36 +152,40 @@ def council_watch(cur, prev):
 def alien_watch(cur, prev):
     if not prev:
         return []
-    old = {s["region"] for s in prev.get("alienSites", [])}
-    return [_alert("alien:%s" % s["region"], "warning",
-                   "Nuovo sito alieno: %s" % s["region"],
-                   "Rilevato il %s." % s["since"], tab="overview")
-            for s in cur.get("alienSites", []) if s["region"] not in old]
+    key = lambda s: s.get("regionId", s["region"])      # id; il nome solo nei vecchi snapshot
+    old = {key(s) for s in prev.get("alienSites", [])}
+    if not _by_id(prev):
+        old |= {s.get("regionId") for s in cur.get("alienSites", [])}   # niente allerte false
+    return [_alert("alien:%s" % key(s), "warning",
+                   t("alert.alien.title", _lang(cur), s["region"]),
+                   t("alert.alien.detail", _lang(cur), s["since"]), tab="overview")
+            for s in cur.get("alienSites", []) if key(s) not in old]
 
 
 def opportunities(cur, prev):
     """Cose che ora puoi fare e prima no."""
     out = []
-    prev_afford = {o["name"] for o in (prev or {}).get("orgMarket", [])
+    # per id: il nome dell'org cambia con la lingua
+    prev_afford = {o["id"] for o in (prev or {}).get("orgMarket", [])
                    if o.get("affordable")}
     for o in cur.get("orgMarket", []):
-        if o.get("affordable") and o["name"] not in prev_afford and o["eligible"]:
-            lang = cur.get("lang", "ita")
+        if o.get("affordable") and o["id"] not in prev_afford and o["eligible"]:
+            lang = _lang(cur)
             gains = ", ".join(
                 "%+g %s" % (v, gamedata.resource_name(lang, _INCOME_RESOURCE.get(k, k)))
                 for k, v in o["income"].items() if v)
             out.append(_alert(
-                "org:%s" % o["name"], "info",
-                "Organizzazione acquistabile: %s" % o["name"],
-                "%s. Può tenerla: %s." % (gains or "nessuna rendita",
-                                          ", ".join(o["eligible"])),
+                "org:%s" % o["id"], "info",
+                t("alert.org.title", lang, o["name"]),
+                t("alert.org.detail", lang, gains or t("alert.org.noIncome", lang),
+                  ", ".join(o["eligible"])),
                 tab="orgs", org=o["name"]))
     for p in (cur.get("projects") or {}).get("items", []):
         if p["active"] and p["monthsLeft"] is not None and 0 < p["monthsLeft"] <= 0.5:
             out.append(_alert(
                 "soon:%s" % p["id"], "info",
-                "Progetto quasi concluso: %s" % p["name"],
-                "Mancano circa %.0f giorni." % (p["monthsLeft"] * 30),
+                t("alert.soon.title", _lang(cur), p["name"]),
+                t("alert.soon.detail", _lang(cur), p["monthsLeft"] * 30),
                 tab="projects", project=p["id"]))
     return out
 
@@ -167,23 +195,24 @@ def structural(cur, prev):
     out = []
     if cur.get("cpCapOverage"):
         out.append(_alert(
-            "cpcap", "warning", "Tetto dei punti di controllo superato",
-            "Stai pagando una penalita'. Management Research alza il tetto.",
+            "cpcap", "warning", t("alert.cpcap.title", _lang(cur)),
+            t("alert.cpcap.detail", _lang(cur),
+              gamedata.project_name(_lang(cur), "Project_ManagementResearch")),
             tab="projects"))
     missing = (cur.get("council") or {}).get("missions", {}).get("missing", [])
     key = [m for m in missing if m["id"] in ("Coup", "Purge", "Crackdown",
                                              "HostileTakeover", "Detain", "Protect")]
     if key:
         out.append(_alert(
-            "missions", "info", "Missioni chiave non coperte",
-            "Nessuno nel consiglio sa fare: %s."
-            % ", ".join(m["name"] for m in key), tab="missions"))
+            "missions", "info", t("alert.missions.title", _lang(cur)),
+            t("alert.missions.detail", _lang(cur), ", ".join(m["name"] for m in key)),
+            tab="missions"))
     weak = [c for c in (cur.get("council") or {}).get("coverage", []) if c["weak"]]
     if weak:
         out.append(_alert(
-            "weakattrs", "info", "Attributi scoperti",
-            "Nessun consigliere arriva a 4 in: %s."
-            % ", ".join(c["short"] for c in weak), tab="council"))
+            "weakattrs", "info", t("alert.weakattrs.title", _lang(cur)),
+            t("alert.weakattrs.detail", _lang(cur), ", ".join(c["short"] for c in weak)),
+            tab="council"))
     return out
 
 
@@ -198,6 +227,7 @@ def evaluate(cur, prev=None):
             out.extend(rule(cur, prev) or [])
         except Exception as e:  # una regola rotta non deve spegnere le altre
             out.append(_alert("ruleerror:%s" % rule.__name__, "info",
-                              "Regola non valutata", "%s: %s" % (rule.__name__, e)))
+                              t("alert.ruleerror.title", _lang(cur)),
+                              "%s: %s" % (rule.__name__, e)))
     out.sort(key=lambda a: (SEVERITY_ORDER.get(a["severity"], 9), a["title"]))
     return out

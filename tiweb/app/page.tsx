@@ -1,6 +1,7 @@
 "use client";
 
 import { useSnapshot } from "@/lib/api";
+import { ResearchPanel } from "@/components/ResearchPanel";
 import { useSettings } from "@/lib/settings";
 import { Bars, Empty, MissionIcon, Panel, ResourceIcon, Tag, nf } from "@/components/ui";
 import type { Alert, Snapshot } from "@/lib/types";
@@ -81,7 +82,7 @@ export default function Overview() {
                       {meta?.kind === "unresolved" ? (
                         // il salvataggio scrive un hash, non un id risolvibile:
                         // dirlo è più onesto che inventare un nome
-                        <span className="text-faint italic" title={`codice ${cat}`}>
+                        <span className="text-faint italic" title={t.common.code.replace("{code}", cat)}>
                           {t.overview.flowUnresolved}
                         </span>
                       ) : (
@@ -109,37 +110,11 @@ export default function Overview() {
         </div>
 
         <div>
-          <Panel title={t.overview.projects}>
-            {active.length === 0 ? <Empty>{t.common.noData}</Empty> : (
-              <div className="flex flex-col gap-2.5">
-                {active.map((p) => {
-                  const pctDone = p.cost ? (p.accumulated / p.cost) * 100 : 0;
-                  return (
-                    <div key={p.id}>
-                      <div className="flex justify-between text-[12.5px] mb-1">
-                        <span>{p.name} <span className="text-dim">slot {p.slot}</span></span>
-                        <span className="text-dim">
-                          {nf(p.accumulated, 0)}/{p.cost}
-                          {p.monthsLeft != null && p.monthsLeft > 0 &&
-                            ` · ~${Math.round(p.monthsLeft * 30)} ${t.common.days}`}
-                        </span>
-                      </div>
-                      <div className="h-1.5 bg-panel rounded-full overflow-hidden">
-                        <div className="h-full rounded-full"
-                          style={{
-                            width: `${Math.min(pctDone, 100)}%`,
-                            background: pctDone < 1 ? "var(--bad)" : "var(--accent)",
-                          }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </Panel>
+          <ResearchPanel />
 
           <Panel title={t.overview.controlPoints}>
-            <Bars rows={cps} value={(r) => r[1]} label={(r) => r[0]}
+            <Bars rows={cps} value={(r) => r[1]}
+              label={(r) => snap.controlPoints.names?.[r[0]] ?? r[0]}
               format={(r) => String(r[1])} highlight={() => true} />
             {snap.cpCapOverage && (
               <p className="text-warn text-[12.5px] mt-3 mb-0">⚠ {t.overview.capOverage}</p>

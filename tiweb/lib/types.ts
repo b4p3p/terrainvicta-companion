@@ -131,7 +131,13 @@ export interface MissionInfo {
 }
 
 export interface Nation {
+  /** templateName (`2026_FRA`): la chiave. Il nome cambia con la lingua */
+  id: string;
   name: string;
+  /** il nome com'e' nel salvataggio: obiettivi e note creati prima degli id */
+  saveName: string;
+  /** id fazione -> nome, per le fazioni con punti qui */
+  ownerIds: Record<string, string>;
   eu: boolean;
   gdp: number;
   pop: number;
@@ -197,7 +203,9 @@ export interface Snapshot {
     /* nome tradotto e icona di ogni risorsa che compare nei flussi */
     resources: Record<string, { id: string; name: string; icon: string | null }>;
   };
-  controlPoints: { byNation: Record<string, number>; mine: number; total: number };
+  /** byNation e names per id di nazione */
+  controlPoints: { byNation: Record<string, number>; names: Record<string, string>;
+                   mine: number; total: number };
   nations: Nation[];
   council: {
     team: Councilor[];

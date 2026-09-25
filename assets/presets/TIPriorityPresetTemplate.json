@@ -5,8 +5,7 @@
     "nationalAIOption": false,
     "economySetting": 3,
     "knowledgeSetting": 3,
-    "governmentSetting": 2,
-    "environmentSetting": 1
+    "governmentSetting": 2
   },
   {
     "dataName": "TIC_Spazio",
@@ -21,16 +20,29 @@
     "missionControlSetting": 3
   },
   {
-    "dataName": "TIC_ResistiSenzaArmi",
-    "friendlyName": "- Resisti senza riarmo",
+    "dataName": "TIC_Consolida",
+    "friendlyName": "- Consolida",
     "nationalAIOption": false,
     "economySetting": 2,
-    "knowledgeSetting": 3,
-    "governmentSetting": 2,
-    "spaceProgramSetting": 3,
-    "initSpaceProgramSetting": 3,
-    "boostSetting": 3,
-    "missionControlSetting": 3,
-    "spaceDefenseSetting": 1
+    "welfareSetting": 2,
+    "knowledgeSetting": 1,
+    "unitySetting": 3
+  },
+  {
+    "dataName": "TIC_ControlloMissioni",
+    "friendlyName": "- Controllo missioni",
+    "nationalAIOption": false,
+    "economySetting": 2,
+    "boostSetting": 1,
+    "missionControlSetting": 3
+  },
+  {
+    "dataName": "TIC_Arsenale",
+    "friendlyName": "- Arsenale",
+    "nationalAIOption": false,
+    "economySetting": 2,
+    "militarySetting": 3,
+    "armySetting": 2,
+    "navySetting": 1
   }
 ]

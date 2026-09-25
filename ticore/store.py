@@ -185,9 +185,14 @@ def goal_progress(con, campaign, snap):
     for gl in list_goals(con, campaign):
         cur, total = None, gl["amount"]
         if gl["kind"] == "controlNation" and gl["target"]:
-            cur = by_nation.get(gl["target"], 0)
+            # il bersaglio e' l'id della nazione; gli obiettivi creati prima
+            # hanno il nome com'era nel salvataggio
+            n = next((x for x in snap["nations"]
+                      if gl["target"] in (x.get("id"), x.get("saveName"), x["name"])), None)
+            cur = by_nation.get(n["id"] if n and n.get("id") else gl["target"], 0)
+            if n:
+                gl = dict(gl, targetName=n["name"])
             if not total:
-                n = next((x for x in snap["nations"] if x["name"] == gl["target"]), None)
                 total = n["cp"] if n else None
         elif gl["kind"] == "resource" and gl["target"]:
             cur = res.get(gl["target"])
