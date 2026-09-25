@@ -25,7 +25,8 @@ const it = {
   about: {
     title: "Chi sono",
     whoTitle: "Chi c'è dietro",
-    who: "Sono {author}, programmatore e giocatore di Terra Invicta. Ho scritto il companion per avere su un secondo monitor quello che il gioco sparge in dieci schermate diverse: nazioni, consiglieri, missioni e preset uno accanto all'altro.",
+    who: "Sono {author}. Di giorno faccio il programmatore: fogli di calcolo, riunioni, numeri che non tornano. La sera, per staccare, apro Terra Invicta: fogli di calcolo, riunioni del consiglio, numeri che non tornano. Qualcuno la chiama cattiva gestione del tempo libero; io la chiamo coerenza.",
+    who2: "Dopo l'ennesima partita passata a saltare fra dieci schermate per capire quale consigliere mandare dove, ho fatto quello che fa ogni programmatore davanti a un problema da cinque minuti: ci ho passato settimane a scrivere un programma. Eccolo. Nazioni, consiglieri, missioni e preset uno accanto all'altro, su un secondo monitor, mentre gli alieni fanno i fatti loro.",
     whatTitle: "Cos'è, e cosa non è",
     what: "Uno strumento di lettura, non un aimbot. Mostra solo quello che il gioco già ti fa vedere: la lealtà reale dei consiglieri, l'intel che non hai e le altre informazioni nascoste restano nascoste.",
     heuristics: "Quando un numero è un'elaborazione nostra, come il punteggio dei bersagli di una missione, lo diciamo e mettiamo accanto i valori grezzi.",
@@ -34,8 +35,14 @@ const it = {
     contactTitle: "Contatti",
     showEmail: "Mostra email",
     supportTitle: "Sostieni il progetto",
-    support: "Il companion è gratuito e resta gratuito, senza pubblicità. Se ti è utile, puoi offrirmi un caffè.",
-    donate: "Dona con PayPal",
+    support: "Il companion è gratuito e resta gratuito, senza pubblicità. Se ti ha salvato un Colpo di Stato, o almeno qualche alt-tab, puoi offrirmi qualcosa: il caffè serve per il turno in ufficio, la pizza per quello su Terra Invicta.",
+    donate: {
+      coffee: { icon: "☕", label: "Un caffè" },
+      pizza: { icon: "🍕", label: "Una pizza" },
+      project: { icon: "🚀", label: "Finanzia un progetto" },
+    },
+    donateFree: "quanto vuoi",
+    donateHint: "Si apre PayPal con l'importo già scritto: puoi cambiarlo. Nessun progetto alieno verrà finanziato per errore.",
     disclaimer: "Progetto amatoriale, non affiliato a Pavonis Interactive né a Hooded Horse. Terra Invicta, i suoi nomi, testi, dati e icone appartengono ai rispettivi proprietari.",
   },
   common: {
@@ -401,6 +408,10 @@ const it = {
   },
   severity: { critical: "critico", warning: "attenzione", info: "info" },
   engine: {
+    mode: "motore",
+    server: "API locale",
+    browser: "browser",
+    switchHint: "API locale: l'interfaccia di start.ps1. Browser: la versione del sito, solo per questa scheda.",
     waiting: "in attesa del salvataggio",
     loading: "Avvio del companion nel browser…",
     loadingStep: "passo: {step}",
@@ -422,6 +433,8 @@ const it = {
       "Chrome dimentica il permesso quando chiudi tutte le schede del sito. Nella finestra che si apre scegli «Consenti a ogni visita» e non te lo chiederà più.",
     allow: "Consenti",
     noSaves: "Nella cartella scelta non ci sono salvataggi (.gz).",
+    folder: "Cartella",
+    folderHint: "Il browser dà solo i nomi delle cartelle, non il percorso completo.",
     unsupported:
       "Questo browser non permette di leggere una cartella del PC: serve Chrome o Edge.",
     error: "Il motore del companion si è fermato:",
@@ -444,7 +457,8 @@ const en: typeof it = {
   about: {
     title: "About",
     whoTitle: "Who's behind it",
-    who: "I'm {author}, a programmer and Terra Invicta player. I wrote the companion to have on a second screen what the game spreads over ten different screens: nations, councilors, missions and presets side by side.",
+    who: "I'm {author}. By day I'm a programmer: spreadsheets, meetings, numbers that don't add up. In the evening, to unwind, I open Terra Invicta: spreadsheets, council meetings, numbers that don't add up. Some call it poor use of free time; I call it consistency.",
+    who2: "After yet another campaign spent jumping between ten screens to figure out which councilor to send where, I did what every programmer does with a five-minute problem: I spent weeks writing a program. Here it is. Nations, councilors, missions and presets side by side, on a second screen, while the aliens mind their own business.",
     whatTitle: "What it is, and what it isn't",
     what: "A reading tool, not an aimbot. It only shows what the game already lets you see: councilors' real loyalty, intel you don't have and other hidden information stay hidden.",
     heuristics: "When a number is our own computation, like a mission's target score, we say so and show the raw values next to it.",
@@ -453,8 +467,14 @@ const en: typeof it = {
     contactTitle: "Contact",
     showEmail: "Show email",
     supportTitle: "Support the project",
-    support: "The companion is free and stays free, with no ads. If you find it useful, you can buy me a coffee.",
-    donate: "Donate with PayPal",
+    support: "The companion is free and stays free, with no ads. If it saved you a Coup, or at least a few alt-tabs, you can buy me something: the coffee is for the office shift, the pizza for the Terra Invicta one.",
+    donate: {
+      coffee: { icon: "☕", label: "A coffee" },
+      pizza: { icon: "🍕", label: "A pizza" },
+      project: { icon: "🚀", label: "Fund a project" },
+    },
+    donateFree: "any amount",
+    donateHint: "PayPal opens with the amount already filled in: you can change it. No alien project will be funded by mistake.",
     disclaimer: "Fan project, not affiliated with Pavonis Interactive or Hooded Horse. Terra Invicta, its names, texts, data and icons belong to their respective owners.",
   },
   common: {
@@ -820,6 +840,10 @@ const en: typeof it = {
   },
   severity: { critical: "critical", warning: "warning", info: "info" },
   engine: {
+    mode: "engine",
+    server: "local API",
+    browser: "browser",
+    switchHint: "Local API: the start.ps1 interface. Browser: the website version, for this tab only.",
     waiting: "waiting for a save",
     loading: "Starting the companion in the browser…",
     loadingStep: "step: {step}",
@@ -841,6 +865,8 @@ const en: typeof it = {
       "Chrome forgets the permission when you close every tab of the site. In the prompt choose “Allow on every visit” and it won't ask again.",
     allow: "Allow",
     noSaves: "The chosen folder has no saves (.gz).",
+    folder: "Folder",
+    folderHint: "The browser only gives folder names, not the full path.",
     unsupported:
       "This browser can't read a folder on your PC: use Chrome or Edge.",
     error: "The companion engine stopped:",

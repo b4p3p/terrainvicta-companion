@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { api, askNotificationPermission, useEngineStatus, useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
+import { engineMode, LOCKED_ENGINE, type EngineMode } from "@/lib/engine";
 import { EngineGate } from "@/components/EngineGate";
 import { EngineSplash } from "@/components/EngineSplash";
 import { ResourceIcon } from "@/components/ui";
@@ -18,7 +19,7 @@ const TABS = [
   { href: "/factions", key: "factions" },
   { href: "/presets", key: "presets" },
   { href: "/plan", key: "plan" },            // la meno usata: in fondo
-  { href: "/about", key: "about" },          // non e' una scheda di gioco: a destra
+  { href: "/about", key: "about" },          // in fila alle altre: staccata a destra non si notava
 ] as const;
 
 /* Terra Invicta tiene le risorse in una barra fissa in cima allo schermo.
@@ -29,6 +30,9 @@ const RESOURCES = [
   { key: "Operations", label: "Operazioni", icon: "ICO_ops", tone: "text-other" },
 ] as const;
 
+// il motore non cambia senza ricaricare la pagina
+const noSubscribe = () => () => {};
+
 export default function Shell({ children }: { children: React.ReactNode }) {
   const { t, game, setGame, live } = useSettings();
   const { data: snap } = useSnapshot(live.version, game);
@@ -36,6 +40,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const engineStatus = useEngineStatus();
   const path = usePathname();
   const [langs, setLangs] = useState<{ id: string; name: string }[]>([]);
+  // null nel render del server: dipende da URL e sessionStorage
+  const mode = useSyncExternalStore<EngineMode | null>(noSubscribe, engineMode, () => null);
 
   useEffect(() => { askNotificationPermission(); }, []);
   useEffect(() => {
@@ -82,6 +88,17 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               {live.connected ? t.common.live
                 : engineStatus ? t.engine.waiting : t.common.offline}
             </span>
+            {/* solo nella copia locale: il sito online ha il motore fissato.
+                Ricarica la pagina: il motore si sceglie una volta, all'avvio. */}
+            {mode && !LOCKED_ENGINE && (
+              <span className="flex items-center gap-1.5" title={t.engine.switchHint}>
+                <span className="text-faint">{t.engine.mode}</span>
+                {(["server", "browser"] as const).map((m) => m === mode
+                  ? <span key={m} className="text-ink">{t.engine[m]}</span>
+                  : <a key={m} href={`${path}?engine=${m}`}
+                      className="text-dim hover:text-ink underline">{t.engine[m]}</a>)}
+              </span>
+            )}
             <select value={game} aria-label={t.common.language}
               onChange={(e) => setGame(e.target.value)}>
               {langs.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -142,7 +159,6 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                 aria-current={active ? "page" : undefined}
                 className={`display text-[12px] uppercase tracking-[.07em]
                   px-4 h-8 flex items-center border-r border-edge transition-colors
-                  ${tab.key === "about" ? "ml-auto border-l" : ""}
                   ${active
                     ? "bg-sel text-ink border-t-2 border-t-accent"
                     : "text-dim hover:text-ink hover:bg-panel border-t-2 border-t-transparent"}`}>

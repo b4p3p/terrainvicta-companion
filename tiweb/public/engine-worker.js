@@ -11,7 +11,7 @@
      {t:"req", id, method, path, query, body}  risponde {t:"res", id, ok, status, data|error}
    Verso la pagina, oltre alle risposte:
      {t:"event", ev}      come l'SSE di tiserver: hello / snapshot
-     {t:"status", state, detail}   loading | ready | nosaves | permission | error;
+     {t:"status", state, detail}   loading | ready | nofolder | nosaves | permission | error;
                                    con loading, detail e' il passo: runtime code gamedata save
 
    Worker di tipo modulo: Pyodide 314 non supporta piu' quelli classici. */
@@ -136,7 +136,9 @@ del TPL, LOC, LANGS, PRESETS
 `);
   service = py.runPython(`s = Service(); s.lang = ${JSON.stringify(lang)}; s`);
   post({ t: "ready", gameVersion: manifest.gameVersion });
-  status(dir ? "loading" : "nosaves", dir ? "save" : null);
+  // senza cartella non e' "nosaves": la pagina puo' averne una in attesa del
+  // permesso, e sa lei cosa mostrare (Engine.setStatus)
+  status(dir ? "loading" : "nofolder", "save");
 }
 
 // ------------------------------------------------------------ salvataggi

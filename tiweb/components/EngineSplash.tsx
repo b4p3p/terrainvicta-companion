@@ -111,6 +111,12 @@ function Panel({ st }: { st: EngineStatus }) {
       </div>
 
       <div className="px-5 pt-3 pb-5 text-[12.5px] text-dim space-y-3 min-h-[92px]">
+        {st.folder && (
+          <p title={e.folderHint}>
+            <span className="text-faint">{e.folder}: </span>
+            <span className="font-mono text-[11.5px] text-ink break-all">{st.folder}</span>
+          </p>
+        )}
         {st.state === "nofolder" && <>
           <p>{e.noFolder}</p>
           <Button tone="primary" onClick={pick}>{e.pick}</Button>

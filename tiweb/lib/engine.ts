@@ -13,18 +13,26 @@
 
 export type EngineMode = "browser" | "server";
 
-/** browser in produzione, server in locale; `?engine=browser|server` forza e
- *  resta ricordato. */
+/** Motore fissato in build (`NEXT_PUBLIC_ENGINE`): il sito online e' costruito
+ *  con "browser" e non si puo' cambiare. Senza, e' la copia locale. */
+export const LOCKED_ENGINE: EngineMode | null =
+  process.env.NEXT_PUBLIC_ENGINE === "browser" || process.env.NEXT_PUBLIC_ENGINE === "server"
+    ? process.env.NEXT_PUBLIC_ENGINE : null;
+
+/** Sito online: sempre browser. Copia locale: server, salvo `?engine=browser`,
+ *  che vale per la scheda (sessionStorage) e non per le prossime aperture:
+ *  chi lancia start.ps1 ritrova sempre l'interfaccia collegata all'API. La
+ *  stessa regola e' ripetuta in app/layout.tsx, prima dell'idratazione. */
 export function engineMode(): EngineMode {
+  if (LOCKED_ENGINE) return LOCKED_ENGINE;
   if (typeof window === "undefined") return "server";
   try {
+    localStorage.removeItem("ti.engine");  // la vecchia scelta permanente
     const q = new URLSearchParams(window.location.search).get("engine");
-    if (q === "browser" || q === "server") localStorage.setItem("ti.engine", q);
-    const saved = localStorage.getItem("ti.engine");
+    if (q === "browser" || q === "server") sessionStorage.setItem("ti.engine", q);
+    const saved = sessionStorage.getItem("ti.engine");
     if (saved === "browser" || saved === "server") return saved;
   } catch { /* storage bloccato: si decide dall'ambiente */ }
-  const env = process.env.NEXT_PUBLIC_ENGINE;
-  if (env === "browser" || env === "server") return env;
   return ["localhost", "127.0.0.1"].includes(window.location.hostname) ? "server" : "browser";
 }
 
@@ -48,6 +56,8 @@ export interface EngineStatus {
   done: number;
   /** vero dal primo snapshot in poi: da li' l'avvio e' finito per sempre */
   everReady: boolean;
+  /** cartella dei salvataggi in uso, come «TerraInvicta\Saves» */
+  folder: string | null;
 }
 
 export interface LiveEvent {
@@ -98,14 +108,17 @@ async function hasSaves(dir: DirHandle) {
   return false;
 }
 
-async function resolveSaves(dir: DirHandle): Promise<DirHandle | null> {
-  if (await hasSaves(dir)) return dir;
+/** La cartella Saves e il percorso da quella scelta, da mostrare: il browser
+ *  non da' il percorso assoluto, solo i nomi. */
+async function resolveSaves(dir: DirHandle): Promise<{ dir: DirHandle; label: string } | null> {
+  if (await hasSaves(dir)) return { dir, label: dir.name };
   const at = TO_SAVES.indexOf(dir.name);
   for (const start of at >= 0 ? [at + 1] : [0, 1, 2]) {
     let cur = dir;
     try {
       for (const name of TO_SAVES.slice(start)) cur = await cur.getDirectoryHandle(name);
-      if (await hasSaves(cur)) return cur;
+      if (await hasSaves(cur))
+        return { dir: cur, label: [dir.name, ...TO_SAVES.slice(start)].join("\\") };
     } catch { /* percorso assente: si prova il prossimo */ }
   }
   return null;
@@ -125,10 +138,14 @@ class Engine {
   private seq = 0;
   private pending = new Map<number, Pending>();
   private dir: DirHandle | null = null;
+  private folder: string | null = null;
+  /* Cartella ricordata ma senza permesso: un flag e non lo stato corrente,
+     perche' durante l'avvio i "loading" del worker lo sovrascrivono. */
+  private needsPermission = false;
   private eventSubs = new Set<(e: LiveEvent) => void>();
   private statusSubs = new Set<(s: EngineStatus) => void>();
   private last: LiveEvent | null = null;
-  status: EngineStatus = { state: "loading", detail: "runtime", done: 0, everReady: false };
+  status: EngineStatus = { state: "loading", detail: "runtime", done: 0, everReady: false, folder: null };
   gameVersion: string | null = null;
 
   /** Avvia il worker, una volta sola. Lo chiama chi arriva prima: `useLive`
@@ -151,14 +168,20 @@ class Engine {
       const h = await idb<DirHandle | undefined>("readonly", (s) => s.get("savesDir"));
       if (!h) return this.setStatus("nofolder");
       this.dir = h;
+      // scelte fatte prima che si ricordasse il percorso: solo il nome
+      this.folder = (await idb<string | undefined>("readonly", (s) => s.get("savesLabel"))) ?? h.name;
       if ((await h.queryPermission({ mode: "read" })) === "granted") this.sendFolder();
-      else this.setStatus("permission");
+      else {
+        this.needsPermission = true;
+        this.setStatus("permission");
+      }
     } catch (e) {
       this.setStatus("error", String(e));
     }
   }
 
   private sendFolder() {
+    this.needsPermission = false;
     this.setStatus("loading", "save");
     this.worker?.postMessage({ t: "folder", handle: this.dir });
   }
@@ -175,8 +198,10 @@ class Engine {
     }
     const saves = await resolveSaves(chosen);
     if (!saves) return `In «${chosen.name}» non trovo salvataggi né My Games\\TerraInvicta\\Saves.`;
-    await idb("readwrite", (s) => s.put(saves, "savesDir"));
-    this.dir = saves;
+    await idb("readwrite", (s) => s.put(saves.dir, "savesDir"));
+    await idb("readwrite", (s) => s.put(saves.label, "savesLabel"));
+    this.dir = saves.dir;
+    this.folder = saves.label;
     this.sendFolder();
     return null;
   }
@@ -210,13 +235,20 @@ class Engine {
   }
 
   private setStatus(state: EngineState, detail: string | null = null) {
-    // senza cartella il worker dice "nosaves": per la pagina e' "nofolder"
-    if (state === "nosaves" && !this.dir) state = "nofolder";
+    /* Il worker dice "nofolder" quando ha finito l'avvio senza una cartella.
+       Ma la pagina puo' averne una ricordata e in attesa del permesso (o gia'
+       in viaggio verso il worker): in quel caso lo stato giusto e' il suo.
+       Prima qui arrivava "nosaves", e con il permesso da riconcedere la
+       pagina diceva «non ci sono salvataggi» di una cartella mai letta. */
+    if (this.needsPermission && (state === "loading" || state === "nofolder"))
+      state = "permission";          // i passi avanzano, il pulsante resta
+    else if (state === "nofolder" && this.dir)
+      state = "loading";             // cartella gia' in viaggio verso il worker
     let done = this.status.done;
     const i = BOOT_STEPS.indexOf(detail as BootStep);
-    if (state === "loading" && i >= 0) done = Math.max(done, i);
+    if (i >= 0) done = Math.max(done, i);
     if (state === "ready") done = BOOT_STEPS.length;
-    this.status = { state, detail, done,
+    this.status = { state, detail, done, folder: this.folder,
                     everReady: this.status.everReady || state === "ready" };
     this.statusSubs.forEach((f) => f(this.status));
   }

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:web": "node scripts/build-web.mjs",
     "start": "next start",
     "lint": "eslint",
     "predev": "node scripts/sync-ticore.mjs",

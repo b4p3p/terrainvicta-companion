@@ -23,7 +23,15 @@ export function EngineGate() {
   const box = (title: string, body: React.ReactNode, action?: React.ReactNode, tone = "border-edge-lit") => (
     <div className={`mx-4 mt-4 mb-2 p-4 bg-raised border ${tone}`}>
       <div className="display text-[14px] mb-1">{title}</div>
-      <div className="text-[13px] text-dim space-y-2">{body}</div>
+      <div className="text-[13px] text-dim space-y-2">
+        {body}
+        {st.folder && (
+          <p title={e.folderHint}>
+            <span className="text-faint">{e.folder}: </span>
+            <span className="font-mono text-[12px] text-ink break-all">{st.folder}</span>
+          </p>
+        )}
+      </div>
       {action && <div className="mt-3 flex items-center gap-3 flex-wrap">{action}</div>}
       {err && <p className="mt-2 text-bad text-[12.5px]">{err}</p>}
     </div>

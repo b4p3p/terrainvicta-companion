@@ -8,7 +8,17 @@ export const SITE = {
      arriva spam, si filtra in un colpo solo. */
   email: ["montrone.giuseppe+ticompanion", "gmail.com"] as const,
   /** paypal.me/<nome> per le donazioni; vuoto = pulsante nascosto */
-  paypal: "",
+  paypal: "https://paypal.me/b4p3p",
+  /** pulsanti delle donazioni: paypal.me accetta l'importo nel link
+   *  (/3EUR), chi dona lo trova gia' scritto e puo' cambiarlo; null = libero */
+  donations: [
+    { key: "coffee", amount: 3 },
+    { key: "pizza", amount: 10 },
+    { key: "project", amount: null },
+  ] as const,
 };
+
+export const donationUrl = (amount: number | null) =>
+  amount ? `${SITE.paypal}/${amount}EUR` : SITE.paypal;
 
 export const siteEmail = () => SITE.email.join("@");

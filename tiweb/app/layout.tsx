@@ -30,11 +30,17 @@ export const metadata: Metadata = {
 
 /* Decide prima dell'idratazione se il motore gira nel browser, con la stessa
    regola di lib/engine.ts (engineMode): cosi' la schermata d'avvio c'e' dal
-   primo fotogramma invece di comparire dopo che la pagina si e' vista. */
-const ENGINE_MODE_SCRIPT = `try{var q=new URLSearchParams(location.search).get("engine");
-if(q==="browser"||q==="server")localStorage.setItem("ti.engine",q);
-var m=localStorage.getItem("ti.engine")||${JSON.stringify(process.env.NEXT_PUBLIC_ENGINE ?? "")}||
-(["localhost","127.0.0.1"].indexOf(location.hostname)>=0?"server":"browser");
+   primo fotogramma invece di comparire dopo che la pagina si e' vista.
+   (LOCKED_ENGINE non si importa da li': in un server component un modulo
+   "use client" arriva come riferimento, non come valore.) */
+const LOCKED_ENGINE = ["browser", "server"].includes(process.env.NEXT_PUBLIC_ENGINE ?? "")
+  ? process.env.NEXT_PUBLIC_ENGINE : "";
+const ENGINE_MODE_SCRIPT = `try{var m=${JSON.stringify(LOCKED_ENGINE)};
+if(!m){localStorage.removeItem("ti.engine");
+var q=new URLSearchParams(location.search).get("engine");
+if(q==="browser"||q==="server")sessionStorage.setItem("ti.engine",q);
+m=sessionStorage.getItem("ti.engine")||
+(["localhost","127.0.0.1"].indexOf(location.hostname)>=0?"server":"browser")}
 document.documentElement.dataset.engine=m}catch(e){}`;
 
 export default function RootLayout({

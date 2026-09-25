@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSettings } from "@/lib/settings";
-import { SITE, siteEmail } from "@/lib/site";
+import { donationUrl, SITE, siteEmail } from "@/lib/site";
 import { Button, Panel } from "@/components/ui";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -26,6 +26,7 @@ export default function AboutPage() {
       <div className="grid gap-x-10 gap-y-6 py-1 lg:grid-cols-2">
         <Section title={a.whoTitle}>
           <p>{a.who.replace("{author}", SITE.author)}</p>
+          <p>{a.who2}</p>
         </Section>
 
         <Section title={a.whatTitle}>
@@ -46,11 +47,20 @@ export default function AboutPage() {
         {SITE.paypal && (
           <Section title={a.supportTitle}>
             <p>{a.support}</p>
-            <a href={SITE.paypal} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center px-3 h-8 border border-accent text-accent
-                display text-[12px] uppercase tracking-[.08em] hover:bg-sel">
-              {a.donate}
-            </a>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {SITE.donations.map((d) => (
+                <a key={d.key} href={donationUrl(d.amount)} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-3 h-9 border border-accent text-accent
+                    text-[13px] hover:bg-sel">
+                  <span aria-hidden>{a.donate[d.key].icon}</span>
+                  <span className="display text-[12px] uppercase tracking-[.08em]">{a.donate[d.key].label}</span>
+                  <span className="text-dim">
+                    {d.amount ? `${d.amount} €` : a.donateFree}
+                  </span>
+                </a>
+              ))}
+            </div>
+            <p className="text-faint text-[12px]">{a.donateHint}</p>
           </Section>
         )}
 
