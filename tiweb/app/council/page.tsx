@@ -5,6 +5,7 @@ import { useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { AttrIcon, Empty, MissionIcon, Panel, ResourceIcon, Tag } from "@/components/ui";
 import { CouncilorCard, short } from "@/components/CouncilorCard";
+import { MissionFinder } from "@/components/MissionFinder";
 import type { Councilor } from "@/lib/types";
 
 export default function CouncilPage() {
@@ -57,6 +58,8 @@ export default function CouncilPage() {
           ))}
         </div>
       </Panel>
+
+      <MissionFinder team={team} missions={missions} market={snap.orgMarket} />
 
       <Panel title={t.council.team}>
         <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">

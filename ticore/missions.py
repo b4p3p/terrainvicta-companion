@@ -48,7 +48,8 @@ def _modifiers(name):
 
 
 def _short(mod):
-    return (mod.get("$type") or "").split("_")[-1]
+    # TIMissionModifier_Oligarchs_Defense -> Oligarchs_Defense (non "Defense")
+    return (mod.get("$type") or "").replace("TIMissionModifier_", "", 1)
 
 
 def factors(name, lang="ita"):
@@ -72,6 +73,99 @@ def factors(name, lang="ita"):
             else:
                 opaque.append({"side": side, "label": _opaque_label(s, lang)})
     return {"readable": readable, "opaque": opaque}
+
+
+# --------------------------------------------------------------- la formula del gioco
+# Letta nel codice (Assembly-CSharp), non stimata: TIMissionResolution_Contested.
+#   D = somma dei modificatori d'attacco - somma di quelli di difesa
+#   probabilita' = 0,5 x 0,775^|D|, e 1 - quella se D >= 0
+# I modificatori per bersaglio nazione (GetModifier di ciascuno):
+_KNOWN = {"CouncilorAttackStat", "AttackerPopulationIdeology", "ResourceSpent",
+          "NationUnrest", "UnhappyElites", "Oligarchs", "FlatModifier",
+          "JointControlPointStat", "NationCohesion", "HappyElites", "NationDemocracy",
+          "TargetNationGDP", "numDefendedControlPoints", "Oligarchs_Defense",
+          "PherocyteResistance", "DefenderPopulationIdeology"}
+
+
+def _corruption(n):
+    """TINationState.corruption, senza gli effetti di fazione che lo spostano
+    (piccoli, e non tutti visibili): (75 - 3,98 dem - 0,86 coes - 0,0004 PIL/ab) / 150."""
+    return (75 - 3.982725 * n["democracy"] - 0.86013 * n["cohesion"]
+            - 0.000412312 * n["gdpPc"]) / 150
+
+
+def _mod_value(mod, n, councilor_value):
+    """(valore, noto?) di un modificatore per la nazione `n` (riga di nations())."""
+    s = _short(mod)
+    corr, fund = _corruption(n), n.get("fundingShare", 0)
+    if s == "CouncilorAttackStat":
+        return (councilor_value or 0) * (mod.get("multiplier") or 1), councilor_value is not None
+    if s == "AttackerPopulationIdeology":
+        return (10 + n["democracy"]) * (n["support"] or 0), True
+    if s == "ResourceSpent":
+        return 0.0, True                      # senza spendere risorse in piu'
+    if s == "NationUnrest":
+        return n["unrest"], True
+    if s == "UnhappyElites":
+        return ((corr - fund) * 15 if fund < corr else 0.0), True
+    if s == "Oligarchs":
+        return (3.0 if n.get("myOligarchs") else 0.0), True
+    if s == "FlatModifier":
+        return float(mod.get("flatModifier") or 0), True
+    if s == "JointControlPointStat":
+        # Comando dei consiglieri delle fazioni con punti qui: e' nei loro
+        # attributi, che il gioco non ti mostra. Resta fuori, e la
+        # probabilita' diventa un massimo.
+        return 0.0, not n.get("defendedByOthers")
+    if s == "NationCohesion":
+        return n["cohesion"], True
+    if s == "HappyElites":
+        return ((fund - corr) * 10 if corr < fund else 0.0), True
+    if s == "NationDemocracy":
+        return n["democracy"], True
+    if s == "TargetNationGDP":
+        return n["difficulty"] * 1.0, True    # TIMissionModifier_TargetNationGDP_Multiplier = 1
+    if s == "numDefendedControlPoints":
+        return float(n.get("defendedCP", 0)), True
+    # contro una nazione: niente fazione bersaglio (oligarchi in difesa,
+    # ideologia del difensore) e attaccante umano (feromoni)
+    return 0.0, True
+
+
+def _label(key, lang):
+    if key == "CouncilorAttackStat":
+        return t("factor.councilor", lang)
+    if key in NATION_FACTORS:
+        return t(NATION_FACTORS[key][2], lang)
+    return _opaque_label(key, lang)
+
+
+def game_chance(name, n, councilor_value, lang="ita"):
+    """Probabilita' del gioco per la missione `name` contro la nazione `n`, o
+    None se la missione usa modificatori che non sappiamo calcolare."""
+    att, dfn = _modifiers(name)
+    t_ = gamedata.templates()["missions"].get(name) or {}
+    if (t_.get("resolutionMethod") or {}).get("$type") != "TIMissionResolution_Contested":
+        return None
+    if any(_short(m) not in _KNOWN for m in att + dfn):
+        return None
+    parts, a_sum, d_sum, exact = [], 0.0, 0.0, True
+    for mods, side in ((att, "attacco"), (dfn, "difesa")):
+        for m in mods:
+            v, known = _mod_value(m, n, councilor_value)
+            exact &= known
+            if side == "attacco":
+                a_sum += v
+            else:
+                d_sum += v
+            if abs(v) > 0.005 or not known:
+                parts.append({"side": side, "key": _short(m), "label": _label(_short(m), lang),
+                              "value": round(v, 2), "known": known})
+    d = a_sum - d_sum
+    p = 0.5 * 0.775 ** abs(d)
+    chance = 1 - p if d >= 0 else p
+    return {"attack": round(a_sum, 2), "defense": round(d_sum, 2), "d": round(d, 2),
+            "chance": chance, "exact": exact, "parts": parts}
 
 
 def targets_nation(snap, name, councilor=None):
@@ -126,8 +220,13 @@ def targets_nation(snap, name, councilor=None):
             "democracy": r["democracy"], "support": r["support"],
             "score": round(score, 3),
             "factors": parts,
+            "game": game_chance(name, r, my_attr, lang),
         })
-    out.sort(key=lambda x: (-x["score"], -x["gdp"]))
+    # con la formula del gioco si ordina per probabilita'; senza, euristica
+    if all(o["game"] for o in out):
+        out.sort(key=lambda x: (-x["game"]["chance"], -x["gdp"]))
+    else:
+        out.sort(key=lambda x: (-x["score"], -x["gdp"]))
     return {
         "mission": name,
         "missionName": gamedata.mission_name(lang, name),

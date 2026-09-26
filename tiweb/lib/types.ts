@@ -63,7 +63,7 @@ export interface Councilor {
   depth?: Partial<Record<Attr, { now: number; after: number }>>;
   /* missioni non standard; `new` (solo candidati) = oggi nessuno la sa fare */
   missionList: { id: string; name: string; icon: string | null;
-    attribute: Attr | null; new: boolean }[];
+    attribute: Attr | null; new: boolean; sources?: MissionSource[] }[];
 }
 
 /** Effetto dichiarato dal template del tratto. Codici, tradotti dall'interfaccia. */
@@ -108,6 +108,13 @@ export interface Coverage {
   /** false = nessuna missione lo usa (oggi la Scienza): non può essere un buco */
   used: boolean;
   weak: boolean;
+}
+
+/** da dove un consigliere prende una missione; `id` e' il dataName (org: id) */
+export interface MissionSource {
+  kind: "type" | "base" | "trait" | "org" | "learned";
+  id: string | number | null;
+  name: string | null;
 }
 
 export interface MissionInfo {
@@ -237,7 +244,21 @@ export interface MissionFactor {
   label: string;
 }
 
+export interface GameChance {
+  attack: number;
+  defense: number;
+  /** attacco - difesa */
+  d: number;
+  /** 0-1, formula del gioco: 0,5 × 0,775^|d| (1 - quella se d >= 0) */
+  chance: number;
+  /** falso se manca un fattore che il gioco non ti mostra: chance e' un massimo */
+  exact: boolean;
+  parts: { side: string; key: string; label: string; value: number; known: boolean }[];
+}
+
 export interface MissionTarget {
+  id?: string;
+  game?: GameChance | null;
   name: string;
   eu: boolean;
   myCP: number; freeCP: number; takenCP: number; cp: number;

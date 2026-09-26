@@ -175,7 +175,8 @@ def councilor_view(g, c, lang="ita", known=True):
 
     ctype = c.get("typeTemplateName")
     traits = c.get("traitTemplateNames") or []
-    missions = missions_for(ctype, traits, orgs, c.get("learnedMissionsTemplateNames"))
+    sources = mission_sources(ctype, traits, orgs, c.get("learnedMissionsTemplateNames"))
+    missions = set(sources)
     home = g.region_nation((c.get("homeRegion") or {}).get("value"))
 
     out = {
@@ -205,7 +206,9 @@ def councilor_view(g, c, lang="ita", known=True):
         "missionList": [
             {"id": m, "name": gamedata.mission_name(lang, m),
              "icon": gamedata.mission_icon(m),
-             "attribute": gamedata.mission_attribute(m), "new": False}
+             "attribute": gamedata.mission_attribute(m), "new": False,
+             # da dove viene: serve a capire se un'org la darebbe a chi gia' ce l'ha
+             "sources": [_source_view(lang, k, ref, orgs) for k, ref in sources[m]]}
             for m in sorted(missions - gamedata.base_missions(),
                             key=lambda m: gamedata.mission_name(lang, m))],
     }
@@ -214,14 +217,49 @@ def councilor_view(g, c, lang="ita", known=True):
     return out
 
 
-def missions_for(ctype, traits, orgs, learned=None):
-    tpl = gamedata.templates()["councilorTypes"].get(ctype) or {}
-    m = set(tpl.get("missionNames") or [])
-    m.update(gamedata.base_missions())   # la categoria 'Standard', ce l'hanno tutti
-    m.update(learned or [])
+def _source_view(lang, kind, ref, orgs):
+    if kind == "type":
+        name = gamedata.councilor_type_name(lang, ref)
+    elif kind == "trait":
+        name = gamedata.trait_name(lang, ref)
+    elif kind == "org":
+        name = next((o["name"] for o in orgs if o["id"] == ref), None)
+    else:
+        name = None
+    return {"kind": kind, "id": ref, "name": name}
+
+
+def mission_sources(ctype, traits, orgs, learned=None):
+    """{missione: [fonti]}, con fonte = ("type"|"base"|"trait"|"org"|"learned", id).
+
+    Anche i tratti danno missioni (`missionsGrantedNames`: Personalita'
+    unitaria -> Stabilizza nazione) e le vietano (`restrictedMissionNames`:
+    Pacifista -> niente Uccidi). Il divieto qui vale su ogni fonte, org
+    comprese: e' una lettura dei template, non del codice del gioco.
+    """
+    all_tpl = gamedata.templates()
+    tpl = all_tpl["councilorTypes"].get(ctype) or {}
+    src = {}
+
+    def add(names, kind, ref=None):
+        for n in names or []:
+            src.setdefault(n, []).append((kind, ref))
+
+    add(tpl.get("missionNames"), "type", ctype)
+    add(gamedata.base_missions(), "base")   # la categoria 'Standard', ce l'hanno tutti
+    add(learned, "learned")
+    blocked = set()
+    for t in traits or []:
+        tt = all_tpl["traits"].get(t) or {}
+        add(tt.get("missionsGrantedNames"), "trait", t)
+        blocked.update(tt.get("restrictedMissionNames") or [])
     for o in orgs:
-        m.update(o["missionsGranted"])
-    return m
+        add(o["missionsGranted"], "org", o["id"])
+    return {m: v for m, v in src.items() if m not in blocked}
+
+
+def missions_for(ctype, traits, orgs, learned=None):
+    return set(mission_sources(ctype, traits, orgs, learned))
 
 
 def mission_view(lang, name, team):

@@ -63,6 +63,13 @@ def nations(g, lang="ita"):
                 owners[(g.factions.get(fid) or {}).get("templateName") or "?"] = nm.faction_by_id(fid)
         pop = _now(n.get("historyPopulation")) or 0
         gdp = n.get("GDP") or 0
+        # per la probabilita' delle missioni (missions.game_chance): dati che
+        # il gioco mostra nella scheda nazione e nei punti di controllo
+        cp_objs = [g.cps.get(c["value"]) for c in cps]
+        cp_objs = [c for c in cp_objs if c]
+        funding = [((c.get("controlPointPriorities") or {}).get("Funding") or 0)
+                   / c["totalWeightsForControlPoint"]
+                   for c in cp_objs if c.get("totalWeightsForControlPoint")]
         hist = [round(x, 1) for x in _chrono(n.get("historyResearch"))][-32:]
         op = _now(n.get("historyPublicOpinion")) or n.get("publicOpinion") or {}
         out.append({
@@ -92,6 +99,18 @@ def nations(g, lang="ita"):
             "myCP": mine, "freeCP": free, "takenCP": taken,
             "owners": sorted(set(owners.values())),
             "ownerIds": {k: owners[k] for k in sorted(owners)},   # id fazione -> nome
+            "defendedCP": sum(1 for c in cp_objs if c.get("defended")),
+            # il punto degli oligarchi e' tuo, coi benefici attivi: +3 al colpo di stato
+            "myOligarchs": any(c.get("controlPointType") == "Oligarchs"
+                               and g.factions.get((c.get("faction") or {}).get("value")) is g.me
+                               and not c.get("benefitsDisabled") for c in cp_objs),
+            # altre fazioni con punti coi benefici attivi: difesa congiunta dei
+            # loro consiglieri, che il companion non puo' leggere
+            "defendedByOthers": any((c.get("faction") or {}).get("value")
+                                    and g.factions.get(c["faction"]["value"]) is not g.me
+                                    and not c.get("benefitsDisabled") for c in cp_objs),
+            # quota media della priorita' Funding sui punti (TINationState.percentWeighttoPriority)
+            "fundingShare": sum(funding) / len(cp_objs) if cp_objs else 0,
         })
     return out
 
@@ -571,5 +590,7 @@ def snapshot(g, lang="ita"):
         "projects": projects(g, lang),
         "research": research(g, lang),
         "alienSites": alien_sites(g, lang),
-        "cpCapOverage": any(g.me.get("history_CPCapOverageByDay") or []),
+        # la serie e' dal piu' recente (vedi _chrono): conta solo oggi. Con
+        # any() l'allerta restava accesa per 32 giorni dopo essere rientrati
+        "cpCapOverage": bool((g.me.get("history_CPCapOverageByDay") or [0])[0]),
     }

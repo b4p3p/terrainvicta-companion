@@ -116,7 +116,9 @@ con `isAI == false`.
   l'utente non vuole barare. La reale resta accessibile da `ticore` per la CLI.
 - **Missioni di un consigliere** = `missionNames` del suo TIPO + `baseMission` (la
   categoria "Standard": Contact, Deorbit, GoToGround, Orbit, SetNationalPolicy,
-  Transfer) + `missionsGrantedNames` delle sue org + `learnedMissionsTemplateNames`.
+  Transfer) + `missionsGrantedNames` delle sue org + `learnedMissionsTemplateNames`
+  + `missionsGrantedNames` dei suoi **tratti** (Personalità unitaria → Stabilizza
+  nazione), meno i `restrictedMissionNames` dei tratti (Pacifista → niente Uccidi).
   Per le "mancanti" escludere il tipo `Alien` e le org non `allowedOnMarket`.
 - **Nomi interni**: `GainInfluence` = "Controlla nazione", `Propaganda` = "Campagna
   pubblica", `DefendInterests` costa **20 influenza fisse**, `HostileTakeover` si paga

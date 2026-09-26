@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api, useApi, useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { Empty, Panel, Tag, bn, nf, pct } from "@/components/ui";
-import type { CatalogueEntry, MissionPlan } from "@/lib/types";
+import type { GameChance, CatalogueEntry, MissionPlan } from "@/lib/types";
 
 export default function MissionsPage() {
   const { t, game, live } = useSettings();
@@ -35,6 +35,14 @@ export default function MissionsPage() {
 
   const entry = cat.find((c) => c.id === picked);
   const targets = (plan?.targets ?? []).filter((x) => scope === "all" || x.eu);
+
+  const hasGame = !!plan?.targets?.length && plan.targets.every((x) => x.game);
+  // il dettaglio della formula, voce per voce: la stessa lista che il gioco somma
+  const chanceTitle = (g: GameChance) => [
+    ...g.parts.map((p) => `${p.side === "attacco" ? "+" : "−"} ${p.label}: ${p.known ? nf(p.value, 1) : "?"}`),
+    `= ${nf(g.attack, 1)} − ${nf(g.defense, 1)} = ${nf(g.d, 1)}`,
+    ...(g.exact ? [] : [t.missions.chanceUnknown]),
+  ].join("\n");
 
   return (
     <div className="grid gap-5 lg:grid-cols-[300px_1fr] items-start">
@@ -128,7 +136,10 @@ export default function MissionsPage() {
                     <thead>
                       <tr>
                         <th>{t.common.nation}</th>
-                        <th>{t.missions.score}</th>
+                        {hasGame ? <>
+                          <th title={t.missions.chanceHint}>{t.missions.chance}</th>
+                          <th title={t.missions.attDefHint}>{t.missions.attDef}</th>
+                        </> : <th>{t.missions.score}</th>}
                         <th>{t.missions.unrest}</th>
                         <th>{t.missions.cohesion}</th>
                         <th>{t.missions.democracy}</th>
@@ -140,14 +151,23 @@ export default function MissionsPage() {
                     </thead>
                     <tbody>
                       {targets.map((x) => (
-                        <tr key={x.name}>
+                        <tr key={x.id ?? x.name}>
                           <td>
                             {x.name}{" "}
                             {x.myCP === x.cp && <Tag tone="mine">{x.myCP}/{x.cp}</Tag>}
                             {x.myCP > 0 && x.myCP < x.cp && <Tag tone="warn">{x.myCP}/{x.cp}</Tag>}
                           </td>
-                          <td className={x.score > 0.5 ? "text-good font-semibold"
-                            : x.score < 0 ? "text-dim" : ""}>{nf(x.score, 2)}</td>
+                          {x.game ? <>
+                            <td className={x.game.chance >= 0.6 ? "text-good font-semibold"
+                              : x.game.chance < 0.2 ? "text-dim" : ""}
+                              title={chanceTitle(x.game)}>
+                              {!x.game.exact && "≤ "}{nf(x.game.chance * 100, 0)}%
+                            </td>
+                            <td className="text-dim" title={chanceTitle(x.game)}>
+                              {nf(x.game.attack, 1)} / {nf(x.game.defense, 1)}{!x.game.exact && " +?"}
+                            </td>
+                          </> : <td className={x.score > 0.5 ? "text-good font-semibold"
+                            : x.score < 0 ? "text-dim" : ""}>{nf(x.score, 2)}</td>}
                           <td className={x.unrest >= 3 ? "text-good" : x.unrest === 0 ? "text-dim" : ""}>
                             {nf(x.unrest, 2)}
                           </td>

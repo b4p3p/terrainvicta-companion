@@ -100,6 +100,7 @@ TEXTS = {
     "factor.UnhappyElites": {"it": "élite scontenta", "en": "unhappy elites"},
     "factor.HappyElites": {"it": "élite soddisfatta", "en": "happy elites"},
     "factor.Oligarchs": {"it": "oligarchi", "en": "oligarchs"},
+    "factor.Oligarchs_Defense": {"it": "oligarchi (in difesa)", "en": "oligarchs (defending)"},
     "factor.IdentityBlocs": {"it": "blocchi identitari", "en": "identity blocs"},
     "factor.Warlords": {"it": "signori della guerra", "en": "warlords"},
     "factor.JointControlPointStat": {"it": "consiglieri nemici sul punto",
