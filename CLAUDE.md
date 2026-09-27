@@ -63,11 +63,12 @@ ti.py       CLI sottile sopra ticore (utile senza browser).
 | `portable.py` | export (zip con `companion.db` + `presets.json`) e import che **unisce**: accetta anche il `companion.db` dell'API locale. Nel browser è l'unico modo di non perdere lo storico |
 | `bundle.py` | estratto dei dati del gioco per la versione web (template + chiavi di localizzazione usate), in `tiweb/public/gamedata/`, gitignorato: sono dati di Pavonis. Chi aggiunge un `loc()` su una famiglia nuova la mette in `KEEP_PREFIXES`; `python -m ticore.bundle --check` confronta l'output dell'API coi file del gioco e con l'estratto |
 | `factions.py` | confronto fra fazioni, coi soli campi che l'intel sblocca: soglie e misure di `TIGlobalConfig`/`FactionView` |
+| `space.py` | scheda Spazio: habitat visibili (intel >= `intelToSeeSpaceAssetLocationandComposition`, 0,1: stessa regola della finestra Habitat), orbite terrestri coi posti, moduli sbloccati. Controllo missioni = ultima voce giornaliera delle `Transactions` |
 | `store.py` | SQLite in `~/.terrainvicta-companion/`: storico, note, obiettivi. La campagna è identificata da **fazione + difficoltà + `realWorldCampaignStart`** |
 
 ### API
 `/api/snapshot?lang=` · `/api/alerts` · `/api/missions` · `/api/missions/{id}/plan`
-· `/api/nations/trends` · `/api/nations/{name}/detail` · `/api/factions`
+· `/api/nations/trends` · `/api/nations/{name}/detail` · `/api/factions` · `/api/space`
 · `/api/presets` (+ `install`, `restore`, `custom`)
 · `/api/nations` (dentro snapshot) · `/api/history` · `/api/campaigns` · `/api/diff`
 · `/api/goals` · `/api/notes` · `/api/saves` · `/api/languages` · `/api/stream` (SSE)

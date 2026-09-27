@@ -43,6 +43,12 @@ KEEP_PREFIXES = (
     "TIRegionTemplate.displayName.",
     "TIObjectiveTemplate.displayName.",
     "TIPriorityPresetTemplate.displayName.",
+    # scheda Spazio: habitat coi nomi dei template, orbite, corpi, siti, moduli
+    "TIHabTemplate.displayName.",
+    "TIHabModuleTemplate.displayName.",
+    "TIOrbitTemplate.displayName.",
+    "TISpaceBodyTemplate.displayName.",
+    "TIHabSiteTemplate.displayName.",
     "UI.Global.",
     "UI.Nation.",
 )
@@ -166,7 +172,7 @@ def check(save_path=None):
     dall'estratto: va aggiunta a KEEP_PREFIXES/KEEP_PATTERNS.
     """
     import tempfile
-    from . import factions, missions, model, save
+    from . import factions, missions, model, save, space
     g = save.Game(save_path or paths.latest_save()[0])
 
     def run():
@@ -177,6 +183,7 @@ def check(save_path=None):
                 "snapshot": snap,
                 "missions": missions.catalogue(snap, lang),
                 "factions": factions.compare(g, lang),
+                "space": space.overview(g, lang),
                 "details": {n["id"]: model.nation_detail(g, n["id"], lang)
                             for n in model.nations(g, lang)},
             }

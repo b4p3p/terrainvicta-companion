@@ -243,6 +243,12 @@ def faction_compare(lang: str = Query(None)):
         return state.faction_compare(lang)
 
 
+@app.get("/api/space")
+def space(lang: str = Query(None)):
+    with http_errors():
+        return state.space(lang)
+
+
 @app.get("/api/diff")
 def diff():
     with http_errors():

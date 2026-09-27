@@ -29,6 +29,8 @@ _TEMPLATE_FILES = {
     "effects": "TIEffectTemplate.json",
     "factions": "TIFactionTemplate.json",
     "techs": "TITechTemplate.json",
+    "orbits": "TIOrbitTemplate.json",
+    "habModules": "TIHabModuleTemplate.json",
 }
 
 

@@ -15,7 +15,7 @@ import re
 from urllib.parse import unquote
 
 from . import (Game, SaveLocked, alerts, factions, gamedata, load, missions,
-               model, paths, portable, presets, snapshot, store, texts)
+               model, paths, portable, presets, snapshot, space, store, texts)
 from .texts import t
 
 
@@ -218,6 +218,12 @@ class Service:
         self.require()
         return factions.compare(self.game, lang or self.lang)
 
+    def space(self, lang=None):
+        """Habitat visibili, orbite terrestri, moduli costruibili: vedi
+        ticore/space.py per la soglia di visibilita'."""
+        self.require()
+        return space.overview(self.game, lang or self.lang)
+
     def diff(self):
         """Cosa e' cambiato rispetto allo snapshot precedente."""
         cur, prev = self.require(), self.previous
@@ -417,6 +423,7 @@ _ROUTES = [
     ("GET", r"/api/nations/([^/]+)/detail",
      lambda s, q, b, name: s.nation_detail(name, q.get("lang"))),
     ("GET", r"/api/factions", lambda s, q, b: s.faction_compare(q.get("lang"))),
+    ("GET", r"/api/space", lambda s, q, b: s.space(q.get("lang"))),
     ("GET", r"/api/diff", lambda s, q, b: s.diff()),
     ("GET", r"/api/presets", lambda s, q, b: s.presets_status(q.get("lang"))),
     ("GET", r"/api/presets/export", lambda s, q, b: s.presets_export()),
