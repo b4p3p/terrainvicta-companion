@@ -12,7 +12,7 @@ variant; these are the `_on` ones, with the suffix dropped, so the file name mat
 `missionIconImagePath` field in `TIMissionTemplate.json`
 (`councilor_missions/ICO_assassinate` → `ICO_assassinate.png`).
 
-`icons_2d/` holds 50 icons from the bundle of the same name: the seven resources
+`icons_2d/` holds 57 icons from the bundle of the same name: the seven resources
 (`ICO_currency`, `ICO_influence`, `ICO_ops`, `ICO_research`, `ICO_boost`,
 `ICO_mission_control`, `ICO_projects`), the control-point marker, the eight
 councilor attribute glyphs, the spaceflight-program marker
@@ -25,7 +25,9 @@ statistics used as table headers (`ICO_economy_priority`, `ICO_per_capita_GDP`,
 `ICO_nukes`, `tech_military_icon`), and the seventeen remaining national priority
 icons, so that every priority a preset can set has its game icon
 (`ICO_knowledge_priority`, `ICO_welfare_priority`, `ICO_military_priority`, …;
-the `*_priority` files).
+the `*_priority` files), and the other seven technology category icons
+(`tech_energy_icon`, `tech_info_icon`, `tech_life_icon`, `tech_material_icon`,
+`tech_social_icon`, `tech_space_icon`, `tech_xeno_icon`).
 
 ## Why they are here
 

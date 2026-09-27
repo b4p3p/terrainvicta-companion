@@ -6,6 +6,7 @@
    salvataggio e la proiezione con la regola del gioco (GetExpectedWinner),
    ma col ritmo osservato: i pesi di ricerca degli altri non si vedono. */
 
+import Link from "next/link";
 import { useApi } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { Empty, Panel, nf } from "@/components/ui";
@@ -64,6 +65,7 @@ export function ResearchPanel() {
 
   return (
     <Panel title={r.title}
+      right={<Link href="/techs" className="text-accent text-[12px] hover:underline">{r.choose}</Link>}
       sub={prev ? fill(r.since, { date: prev.date.split(" ")[0], days: prev.days ?? "?" }) : r.noPrevious}>
       {!data?.slots.length ? <Empty>{t.common.noData}</Empty> : (
         <div className="flex flex-col gap-4">

@@ -255,6 +255,12 @@ def space(lang: str = Query(None)):
         return state.space(lang)
 
 
+@app.get("/api/techs")
+def techs(lang: str = Query(None)):
+    with http_errors():
+        return state.techs(lang)
+
+
 @app.get("/api/diff")
 def diff():
     with http_errors():

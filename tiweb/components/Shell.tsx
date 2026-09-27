@@ -19,6 +19,7 @@ const TABS = [
   { href: "/history", key: "history" },
   { href: "/factions", key: "factions" },
   { href: "/space", key: "space" },
+  { href: "/techs", key: "techs" },
   { href: "/presets", key: "presets" },
   { href: "/plan", key: "plan" },            // la meno usata: in fondo
   { href: "/about", key: "about" },          // in fila alle altre: staccata a destra non si notava

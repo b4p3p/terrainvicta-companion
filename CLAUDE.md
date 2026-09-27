@@ -64,11 +64,12 @@ ti.py       CLI sottile sopra ticore (utile senza browser).
 | `bundle.py` | estratto dei dati del gioco per la versione web (template + chiavi di localizzazione usate), in `tiweb/public/gamedata/`, gitignorato: sono dati di Pavonis. Chi aggiunge un `loc()` su una famiglia nuova la mette in `KEEP_PREFIXES`; `python -m ticore.bundle --check` confronta l'output dell'API coi file del gioco e con l'estratto |
 | `factions.py` | confronto fra fazioni, coi soli campi che l'intel sblocca: soglie e misure di `TIGlobalConfig`/`FactionView`. `councilors()`: i consiglieri altrui con le regole di `CouncilorView` (0,10 posizione senza nome, 0,25 identità, 0,50 attributi veri, 0,75 missione, nascosta in fase missioni); sotto 0,50 gli attributi sono la stima del gioco dal tipo |
 | `space.py` | scheda Spazio: habitat visibili (intel >= `intelToSeeSpaceAssetLocationandComposition`, 0,1: stessa regola della finestra Habitat), orbite terrestri coi posti, moduli sbloccati. Controllo missioni = ultima voce giornaliera delle `Transactions` |
+| `techs.py` | scheda Tecnologie: le tecnologie avviabili e cosa sblocca ognuna per la tua fazione (UniqueProjectUnlocks/ShouldHide del gioco). Percentuale = `GetProjectUnlockChance` come nella schermata Ricerca; i mesi di comparsa sono una stima nostra dalle regole dei trigger |
 | `store.py` | SQLite in `~/.terrainvicta-companion/`: storico, note, obiettivi. La campagna è identificata da **fazione + difficoltà + `realWorldCampaignStart`** |
 
 ### API
 `/api/snapshot?lang=` · `/api/alerts` · `/api/missions` · `/api/missions/{id}/plan`
-· `/api/nations/trends` · `/api/nations/{name}/detail` · `/api/factions` (+ `councilors`) · `/api/space`
+· `/api/nations/trends` · `/api/nations/{name}/detail` · `/api/factions` (+ `councilors`) · `/api/space` · `/api/techs`
 · `/api/presets` (+ `install`, `restore`, `custom`)
 · `/api/nations` (dentro snapshot) · `/api/history` · `/api/campaigns` · `/api/diff`
 · `/api/goals` · `/api/notes` · `/api/saves` · `/api/languages` · `/api/stream` (SSE)
