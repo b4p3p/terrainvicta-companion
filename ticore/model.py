@@ -97,6 +97,8 @@ def nations(g, lang="ita"):
             "miltech": n.get("militaryTechLevel") or 0,
             "cp": n.get("numControlPoints") or len(cps),
             "myCP": mine, "freeCP": free, "takenCP": taken,
+            # quanto occupa un punto di questa nazione nel tetto dei punti di controllo
+            "cpCost": round(cp_cost(g, n), 2),
             "owners": sorted(set(owners.values())),
             "ownerIds": {k: owners[k] for k in sorted(owners)},   # id fazione -> nome
             "defendedCP": sum(1 for c in cp_objs if c.get("defended")),
@@ -549,6 +551,61 @@ def control_points(g, lang="ita"):
     return dict(by_nation), names
 
 
+# Capacita' dei punti di controllo: la barra «173/185» del gioco, con le
+# regole di TIFactionState/TINationState (IL, non documentate nei testi).
+# Il costo di mantenimento di una nazione e' (PIL / K)^0,6 / 2, diviso in parti
+# uguali fra i suoi punti; K e' fissato a inizio campagna e sta nel salvataggio.
+CP_COST_SCALING = 0.6         # TIGlobalConfig.controlPointCostScaling
+CP_COST_DIVISOR = 2.0         # TIGlobalConfig.controlPointMaintenanceDivisor
+CP_CAP_ATTRS = ("Persuasion", "Command", "Administration")   # TICouncilorState.controlPointCapacity
+
+
+def _global_values(g):
+    return next(iter(g.state("TIGlobalValuesState").values()), {})
+
+
+def cp_cost(g, n):
+    """Costo di un punto di controllo della nazione `n` (ControlPointMaintenanceCost).
+    Il moltiplicatore della data d'inizio (CPMaintenanceModifier) vale 1 in
+    tutti gli scenari del gioco."""
+    k = _global_values(g).get("fixedPCGDPToRaiseBaseCPMaintenanceCostBy1") or 0
+    num = n.get("numControlPoints") or len(n.get("controlPoints") or [])
+    if k <= 0 or not num or n.get("alienNation"):
+        return 0.0
+    return ((n.get("GDP") or 0) / k) ** CP_COST_SCALING / (CP_COST_DIVISOR * num)
+
+
+def cp_capacity(g):
+    """Uso e tetto dei punti di controllo, come nella barra in alto del gioco.
+
+    uso   = somma dei costi dei miei punti coi benefici attivi
+    tetto = bonus di scenario + PER+CMD+AMM dei consiglieri (org comprese)
+            + effetti ControlPointMaintenance (progetti) + habitat.
+    Gli habitat (moduli con controlPointCapacity) non sono calcolati: se ne hai,
+    `habsMissing` lo dice e il tetto e' una stima per difetto.
+    """
+    used = sum(cp_cost(g, g.ref(cp, "nation", g.nations))
+               for cp in g.my_control_points() if not cp.get("benefitsDisabled"))
+    base = _global_values(g).get("controlPointMaintenanceFreebies") or 0
+    councilors = 0
+    for c in g.my_councilors():
+        eff = council.councilor_view(g, c)["attributes"]
+        councilors += sum(eff.get(a, 0) for a in CP_CAP_ATTRS)
+    fx = next(iter(g.state("TIEffectsState").values()), {})
+    mine = next((e.get("Value") or {} for e in fx.get("factionEffectsNames") or []
+                 if (e.get("Key") or {}).get("value") == (g.me.get("ID") or {}).get("value")), {})
+    tpl = gamedata.templates()["effects"]
+    # effetti additivi con valore negativo = tetto piu' alto (showTotal: Invert)
+    effects = -sum((tpl.get(name) or {}).get("value") or 0
+                   for name in mine.get("ControlPointMaintenance") or [])
+    cap = base + councilors + effects
+    return {
+        "used": round(used, 2), "cap": cap, "free": round(cap - used, 2),
+        "base": base, "councilors": councilors, "effects": effects,
+        "habsMissing": bool(g.me.get("habs")),
+    }
+
+
 def alien_sites(g, lang="ita"):
     nm = Namer(g, lang)
     out = []
@@ -582,7 +639,8 @@ def snapshot(g, lang="ita"):
         "flows": flows(g, 1, lang),
         # byNation per id di nazione; `names` per mostrarli
         "controlPoints": {"byNation": cpn, "names": cp_names, "mine": sum(cpn.values()),
-                          "total": sum(n["cp"] for n in ns)},
+                          "total": sum(n["cp"] for n in ns),
+                          "capacity": cp_capacity(g)},
         "nations": ns,
         "council": council.analyse(g, lang),
         "recruits": council.recruits(g, lang),

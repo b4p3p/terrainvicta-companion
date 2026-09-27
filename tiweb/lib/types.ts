@@ -168,6 +168,8 @@ export interface Nation {
   myCP: number;
   freeCP: number;
   takenCP: number;
+  /** quanto occupa un punto di questa nazione nel tetto dei punti di controllo */
+  cpCost: number;
   owners: string[];
 }
 
@@ -212,7 +214,10 @@ export interface Snapshot {
   };
   /** byNation e names per id di nazione */
   controlPoints: { byNation: Record<string, number>; names: Record<string, string>;
-                   mine: number; total: number };
+                   mine: number; total: number;
+                   /** la barra «uso/tetto» del gioco, ricalcolata dal salvataggio */
+                   capacity: { used: number; cap: number; free: number; base: number;
+                               councilors: number; effects: number; habsMissing: boolean } };
   nations: Nation[];
   council: {
     team: Councilor[];

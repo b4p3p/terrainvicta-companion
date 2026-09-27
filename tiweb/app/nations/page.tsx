@@ -11,7 +11,7 @@ import {
 import { Guide } from "@/components/Guide";
 import type { Nation, NationTrends, TrendKey } from "@/lib/types";
 
-const SCOPES = ["all", "eu", "mine", "full", "partial", "free", "contested"] as const;
+const SCOPES = ["all", "eu", "mine", "full", "partial", "free", "affordable", "contested"] as const;
 type Scope = (typeof SCOPES)[number];
 const isScope = (v: unknown): v is Scope => SCOPES.includes(v as Scope);
 const isString = (v: unknown): v is string => typeof v === "string";
@@ -272,6 +272,8 @@ export default function NationsPage() {
   const [showDelta, setShowDelta] = usePersistentState("nations.delta", true, isBool);
   const [showOwners, setShowOwners] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  // margine nel tetto dei punti di controllo: quanto costa ancora prendere
+  const headroom = snap?.controlPoints.capacity?.free ?? 0;
 
   const rows = useMemo(() => {
     if (!snap) return [];
@@ -283,11 +285,12 @@ export default function NationsPage() {
         case "mine": return n.myCP > 0;
         case "full": return n.myCP > 0 && n.myCP === n.cp;
         case "partial": return n.myCP > 0 && n.myCP < n.cp;
+        case "affordable": return n.freeCP > 0 && n.cpCost <= headroom;
         case "contested": return n.takenCP > 0;
         default: return true;
       }
     });
-  }, [snap, scope, q]);
+  }, [snap, scope, q, headroom]);
 
   if (!snap) return <Empty>{t.common.loading}</Empty>;
 
@@ -347,6 +350,15 @@ export default function NationsPage() {
     num("support", (r) => (
       <span className={r.support > 0.2 ? "text-good" : ""}>{pct(r.support)}</span>
     )),
+    {
+      key: "cpCost", title: t.nations.cpCost, sort: (r) => r.cpCost,
+      render: (r) => (
+        <span title={t.nations.cpCostHint}
+          className={r.freeCP > 0 && r.cpCost <= headroom ? "text-good" : ""}>
+          {nf(r.cpCost, 1)}
+        </span>
+      ),
+    },
     { key: "difficulty", title: t.nations.difficulty, render: (r) => nf(r.difficulty) },
     { key: "spaceFunding", title: t.nations.spaceFunding, icon: "ICO_funding_priority", render: (r) => nf(r.spaceFunding, 0) },
     {

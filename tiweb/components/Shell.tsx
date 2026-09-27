@@ -137,6 +137,22 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                   {snap.controlPoints.mine}
                   <span className="text-faint text-[12px]">/{snap.controlPoints.total}</span>
                 </span>
+                {snap.controlPoints.capacity && (
+                  <span className="flex items-baseline gap-1.5 ml-3"
+                    title={`${t.overview.cpCapFree} ${nf(snap.controlPoints.capacity.free, 1)}`}>
+                    <span className="text-faint text-[11px]">{t.overview.cpCap}</span>
+                    <span className={`display text-[14px] ${
+                      snap.controlPoints.capacity.free < 0 ? "text-bad" : "text-ink"}`}>
+                      {Math.round(snap.controlPoints.capacity.used)}
+                      <span className="text-faint text-[12px]">/{snap.controlPoints.capacity.cap}</span>
+                    </span>
+                    <span className={`display text-[14px] ml-1 ${
+                      snap.controlPoints.capacity.free < 0 ? "text-bad" : "text-good"}`}>
+                      {snap.controlPoints.capacity.free >= 0 ? "+" : ""}
+                      {nf(snap.controlPoints.capacity.free, 1)}
+                    </span>
+                  </span>
+                )}
               </span>
             )}
           </div>

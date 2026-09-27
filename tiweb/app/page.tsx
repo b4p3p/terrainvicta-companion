@@ -56,6 +56,7 @@ export default function Overview() {
   const net = snap.flows.net;
   const active = snap.projects.items.filter((p) => p.active);
   const cps = Object.entries(snap.controlPoints.byNation).sort((a, b) => b[1] - a[1]);
+  const cap = snap.controlPoints.capacity;
 
   return (
     <>
@@ -116,6 +117,31 @@ export default function Overview() {
             <Bars rows={cps} value={(r) => r[1]}
               label={(r) => snap.controlPoints.names?.[r[0]] ?? r[0]}
               format={(r) => String(r[1])} highlight={() => true} />
+            {cap && (
+              <div className="mt-4 text-[12.5px]" title={t.overview.cpCapHint
+                .replace("{base}", String(cap.base)).replace("{councilors}", String(cap.councilors))
+                .replace("{effects}", String(cap.effects))}>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-faint">{t.overview.cpCap}</span>
+                  <span>
+                    <span className="display text-[15px]">{nf(cap.used, 1)}</span>
+                    <span className="text-faint"> / {cap.cap}</span>
+                  </span>
+                </div>
+                {/* barra: usato vs tetto; oltre il tetto diventa rossa */}
+                <div className="h-2 bg-bar-deep mt-1.5 relative overflow-hidden">
+                  <div className={`absolute inset-y-0 left-0 ${cap.free < 0 ? "bg-bad" : "bg-accent"}`}
+                    style={{ width: `${Math.min(100, (cap.used / Math.max(cap.cap, 1)) * 100)}%` }} />
+                </div>
+                <div className="flex items-baseline justify-between mt-2">
+                  <span className="text-faint">{cap.free < 0 ? t.overview.cpCapOver : t.overview.cpCapLeft}</span>
+                  <span className={`display text-[18px] ${cap.free < 0 ? "text-bad" : "text-good"}`}>
+                    {cap.free >= 0 ? "+" : ""}{nf(cap.free, 1)}
+                  </span>
+                </div>
+                {cap.habsMissing && <p className="text-faint mt-1 mb-0">{t.overview.cpCapHabs}</p>}
+              </div>
+            )}
             {snap.cpCapOverage && (
               <p className="text-warn text-[12.5px] mt-3 mb-0">⚠ {t.overview.capOverage}</p>
             )}

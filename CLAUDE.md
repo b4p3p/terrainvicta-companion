@@ -146,6 +146,12 @@ con `isAI == false`.
 - **Costo di reclutamento**: 60 influenza; 30 se il tipo ha affinità con la fazione
   (`affinities` in `TICouncilorTypeTemplate`: l'Agente sul campo con la Resistenza),
   120 se ha anti-affinità.
+- **Tetto dei punti di controllo** (la barra «173/185» in alto; IL di `TIFactionState`/
+  `TINationState`): un punto costa `(PIL / fixedPCGDPToRaiseBaseCPMaintenanceCostBy1)^0,6
+  / (2 × punti della nazione)`, zero se ha `benefitsDisabled`. Tetto =
+  `controlPointMaintenanceFreebies` (125, in `TIGlobalValuesState`) + PER+CMD+AMM dei
+  consiglieri (org comprese) + effetti `ControlPointMaintenance` + moduli degli habitat.
+  Non è il conteggio dei punti: `model.cp_capacity()`.
 - **Nome di un preset in partita**: il gioco **ignora `friendlyName`** e legge
   `TIPriorityPresetTemplate.displayName.<dataName>` da
   `Localization/<lingua>/TIPriorityPresetTemplate.<lingua>`. Senza quella riga
