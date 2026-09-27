@@ -38,7 +38,10 @@ $api = Start-Process -PassThru -WindowStyle Minimized python `
     -ArgumentList $apiArgs `
     -WorkingDirectory $root
 
-$web = Start-Process -PassThru -WindowStyle Minimized npm `
+# npm.cmd, non npm: Start-Process passa per ShellExecute, e il nome nudo puo'
+# risolvere su npm.ps1 o sullo script sh senza estensione, che si aprono nel
+# Blocco note invece di partire.
+$web = Start-Process -PassThru -WindowStyle Minimized npm.cmd `
     -ArgumentList "run", "dev" `
     -WorkingDirectory (Join-Path $root "tiweb")
 
