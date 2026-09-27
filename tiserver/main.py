@@ -243,6 +243,12 @@ def faction_compare(lang: str = Query(None)):
         return state.faction_compare(lang)
 
 
+@app.get("/api/factions/councilors")
+def faction_councilors(lang: str = Query(None)):
+    with http_errors():
+        return state.faction_councilors(lang)
+
+
 @app.get("/api/space")
 def space(lang: str = Query(None)):
     with http_errors():

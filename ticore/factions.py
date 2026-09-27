@@ -139,3 +139,176 @@ def compare(g, lang="ita"):
     out += [{"id": "unknown-%d" % i, "unknown": True} for i in range(unknown)]
     return {"gates": {k: {"need": v[0], "measure": v[1]} for k, v in GATES.items()},
             "factions": out}
+
+
+# -- consiglieri delle altre fazioni ------------------------------------------
+#
+# Le regole di `CouncilorView` e `TIFactionState` (IL), soglia per soglia:
+#   0,10  intelToSeeNeutralPawn: si sa DOVE e' (CurrentKnownCouncilors vuole una
+#         posizione), ma non chi e' ne' per chi lavora;
+#   0,25  intelToSeeCouncilorBasicData: nome, fazione, tipo, eta', citta', e i
+#         soli tratti `easilyVisible`. Col MASSIMO raggiunto (memoria) restano
+#         nome, fazione e tipo, e gli attributi diventano la stima del gioco
+#         dal tipo: base + casuale/2 (`EstimateAttributeFromJob`). La memoria
+#         non e' per sempre: il gioco puo' togliere il consigliere anche da
+#         `highestIntel` (Hanyi Shu, 0,47 il 16/09/2026, sparito il 24/09);
+#   0,50  intelToSeeCouncilorDetails: attributi veri, tutti i tratti, le org;
+#   0,75  intelToSeeCouncilorMission: la missione in corso, ma non durante la
+#         fase delle missioni (`InMissionPhase` -> null), quando anche la
+#         posizione e' quella di prima della fase;
+#   1,00  intelToSeeCouncilorSecrets: la lealta' vera. Qui non si usa: resta
+#         l'apparente, come per i nostri.
+
+COUNCILOR_GATES = {"location": 0.10, "basic": 0.25, "details": 0.50,
+                   "mission": 0.75}
+
+
+def _intel_on(me, field, suffix):
+    return {e["Key"]["value"]: e.get("Value") or 0
+            for e in me.get(field) or []
+            if str(e["Key"].get("$type", "")).endswith(suffix)}
+
+
+def _estimate(ctype, attrs):
+    """`EstimateAttributeFromJob`: base del tipo + meta' della parte casuale.
+    Vale anche per la lealta' (apparente e vera usano entrambe `Loyalty`)."""
+    t = gamedata.templates()["councilorTypes"].get(ctype) or {}
+    return {a: (t.get("base" + a) or 0) + (t.get("rand" + a) or 0) // 2 for a in attrs}
+
+
+def _place(g, nm, ref_id):
+    """Regione, habitat o flotta: il nome che il gioco mostrerebbe."""
+    label = nm.region_label(ref_id)
+    if label:
+        return label
+    for st in ("TIHabState", "TISpaceFleetState"):
+        x = g.state(st).get(ref_id)
+        if x:
+            return x.get("displayName")
+    return None
+
+
+def _target_name(g, nm, ref_id):
+    for table, fn in ((g.nations, nm.nation), (g.regions, nm.region),
+                      (g.factions, nm.faction), (g.orgs, nm.org),
+                      (g.councilors, lambda c: c.get("displayName")),
+                      (g.cps, nm.control_point)):
+        if ref_id in table:
+            return fn(table[ref_id])
+    return None
+
+
+def councilors(g, lang="ita"):
+    """Consiglieri delle altre fazioni che il gioco ci lascia vedere, piu' i
+    nostri come riferimento. Stessi campi del dossier di intelligence."""
+    from . import council
+    nm = Namer(g, lang)
+    now = _intel_on(g.me, "intel", "TICouncilorState")
+    top = _intel_on(g.me, "highestIntel", "TICouncilorState")
+    my_id = (g.me.get("ID") or {}).get("value")
+    mission_phase = any(v.get("phaseActive") for v in g.state("TIMissionPhaseState").values())
+    missions = g.state("TIMissionState")
+
+    rows = []
+    for c in g.my_councilors():
+        v = council.councilor_view(g, c, lang, known=False)
+        rows.append({
+            "id": v["id"], "mine": True, "identified": True, "level": "mine",
+            "intel": 1.0, "highest": 1.0,
+            "faction": _faction_ref(g, nm, g.me),
+            "name": v["name"], "typeName": v["typeName"], "age": v["age"],
+            "nationality": v["nationality"], "location": v["location"],
+            "attributes": v["attributes"], "estimated": False,
+            "apparentLoyalty": v["apparentLoyalty"],
+            "traits": [t["name"] for t in v["traits"]],
+            "orgs": [o["name"] for o in v["orgs"]],
+            "mission": _mission(g, nm, c, missions, lang),
+        })
+
+    anon = []
+    for fid, f in g.factions.items():
+        if fid == my_id:
+            continue
+        for ref in f.get("councilors") or []:
+            c = g.councilors.get(ref.get("value"))
+            if not c or c.get("status") not in ("Active", "Detained"):
+                continue
+            cid = ref["value"]
+            i, h = now.get(cid, 0) + 1e-6, top.get(cid, 0) + 1e-6
+            located = i >= COUNCILOR_GATES["location"]
+            basic_now = i >= COUNCILOR_GATES["basic"]
+            basic_mem = h >= COUNCILOR_GATES["basic"]
+            details = i >= COUNCILOR_GATES["details"]
+            if not located and not basic_mem:
+                continue            # il gioco non lo mostra da nessuna parte
+            loc_ref = (c.get("preMissionPhaseLocation") if mission_phase
+                       else c.get("location")) or {}
+            row = {
+                "mine": False, "identified": basic_mem,
+                "intel": round(now.get(cid, 0), 2), "highest": round(top.get(cid, 0), 2),
+                "level": ("mission" if i >= COUNCILOR_GATES["mission"] else
+                          "details" if details else "basic" if basic_now else
+                          "memory" if basic_mem else "location"),
+                "location": _place(g, nm, loc_ref.get("value")) if located else None,
+            }
+            if not basic_mem:
+                anon.append(row)
+                continue
+            view = council.councilor_view(g, c, lang, known=False)
+            ctype = c.get("typeTemplateName")
+            row.update({
+                "id": cid,
+                "faction": _faction_ref(g, nm, f),
+                "name": c.get("displayName"),
+                "typeName": gamedata.councilor_type_name(lang, ctype),
+            })
+            if basic_now:
+                row["age"] = view["age"]
+                row["nationality"] = view["nationality"]
+            if details:
+                row["attributes"] = view["attributes"]
+                row["estimated"] = False
+                row["apparentLoyalty"] = view["apparentLoyalty"]
+                row["traits"] = [t["name"] for t in view["traits"]]
+                row["orgs"] = [o["name"] for o in view["orgs"]]
+            else:
+                from .council import ATTRS
+                row["attributes"] = _estimate(ctype, ATTRS)
+                row["estimated"] = True
+                row["apparentLoyalty"] = _estimate(ctype, ["Loyalty"])["Loyalty"]
+                if basic_now:
+                    tpl = gamedata.templates()["traits"]
+                    row["traits"] = [gamedata.trait_name(lang, t)
+                                     for t in c.get("traitTemplateNames") or []
+                                     if (tpl.get(t) or {}).get("easilyVisible")]
+            if i >= COUNCILOR_GATES["mission"]:
+                row["mission"] = (None if mission_phase
+                                  else _mission(g, nm, c, missions, lang))
+                row["missionHidden"] = mission_phase
+            rows.append(row)
+    # Non identificati: si sa dove sono, non per chi lavorano. Ne' id veri ne'
+    # l'ordine delle fazioni, che raggrupperebbe quelli della stessa: si
+    # ordinano per posizione e si numerano dopo.
+    anon.sort(key=lambda r: r["location"] or "")
+    for n, r in enumerate(anon, 1):
+        r["id"] = "unknown-%d" % n
+    rows += anon
+    return {"gates": COUNCILOR_GATES, "missionPhase": mission_phase,
+            "councilors": rows}
+
+
+def _faction_ref(g, nm, f):
+    return {"name": nm.faction(f) or "?", "template": f.get("templateName"),
+            "colors": gamedata.faction_colors(f.get("templateName"))}
+
+
+def _mission(g, nm, c, missions, lang):
+    m = missions.get((c.get("activeMission") or {}).get("value"))
+    if not m:
+        return None
+    name = m.get("missionTemplate") or m.get("templateName")
+    if isinstance(name, dict):
+        name = name.get("value")
+    return {"id": name, "name": gamedata.mission_name(lang, name) if name else None,
+            "icon": gamedata.mission_icon(name) if name else None,
+            "target": _target_name(g, nm, (m.get("target") or {}).get("value"))}

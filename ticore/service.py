@@ -218,6 +218,12 @@ class Service:
         self.require()
         return factions.compare(self.game, lang or self.lang)
 
+    def faction_councilors(self, lang=None):
+        """Consiglieri delle altre fazioni, coi soli campi che il nostro intel
+        sblocca: vedi ticore/factions.py."""
+        self.require()
+        return factions.councilors(self.game, lang or self.lang)
+
     def space(self, lang=None):
         """Habitat visibili, orbite terrestri, moduli costruibili: vedi
         ticore/space.py per la soglia di visibilita'."""
@@ -423,6 +429,7 @@ _ROUTES = [
     ("GET", r"/api/nations/([^/]+)/detail",
      lambda s, q, b, name: s.nation_detail(name, q.get("lang"))),
     ("GET", r"/api/factions", lambda s, q, b: s.faction_compare(q.get("lang"))),
+    ("GET", r"/api/factions/councilors", lambda s, q, b: s.faction_councilors(q.get("lang"))),
     ("GET", r"/api/space", lambda s, q, b: s.space(q.get("lang"))),
     ("GET", r"/api/diff", lambda s, q, b: s.diff()),
     ("GET", r"/api/presets", lambda s, q, b: s.presets_status(q.get("lang"))),

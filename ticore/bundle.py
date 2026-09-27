@@ -183,6 +183,7 @@ def check(save_path=None):
                 "snapshot": snap,
                 "missions": missions.catalogue(snap, lang),
                 "factions": factions.compare(g, lang),
+                "councilors": factions.councilors(g, lang),
                 "space": space.overview(g, lang),
                 "details": {n["id"]: model.nation_detail(g, n["id"], lang)
                             for n in model.nations(g, lang)},

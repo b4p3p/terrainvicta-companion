@@ -6,6 +6,7 @@ import { usePersistentState } from "@/lib/persist";
 import { useSettings } from "@/lib/settings";
 import { Empty, Panel, ResourceIcon, Tag, nf } from "@/components/ui";
 import { Guide } from "@/components/Guide";
+import { FactionCouncilors } from "@/components/FactionCouncilors";
 
 type Field = "resources" | "unassignedOrgs" | "objectives" | "projects";
 interface Gate { need: number; measure: "intel" | "highest" }
@@ -167,6 +168,7 @@ export default function FactionsPage() {
   }
 
   return (
+    <>
     <Panel title={t.factions.title}
       right={
         <Guide title={t.factions.title} sections={[
@@ -312,5 +314,7 @@ export default function FactionsPage() {
         </table>
       </div>
     </Panel>
+    <FactionCouncilors />
+    </>
   );
 }
