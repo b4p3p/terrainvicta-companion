@@ -16,6 +16,7 @@ import { useEngineStatus } from "@/lib/api";
 import { BOOT_STEPS, engine, engineMode, type EngineStatus } from "@/lib/engine";
 import { useSettings } from "@/lib/settings";
 import { Button } from "@/components/ui";
+import { LanguagePicker } from "@/components/LanguagePicker";
 
 const MIN_MS = 1100;     // sotto questa durata l'avvio sembra uno sfarfallio
 const FADE_MS = 450;
@@ -81,9 +82,14 @@ function Panel({ st }: { st: EngineStatus }) {
   return (
     <section className="relative w-full max-w-[440px] bg-panel border border-edge-lit">
       <Corners />
-      <header className="px-5 pt-4 pb-3 bg-bar-deep border-b border-edge">
-        <div className="display text-[10.5px] uppercase tracking-[.32em] text-faint">Terra Invicta</div>
-        <div className="display text-[20px] uppercase tracking-[.14em] text-accent leading-tight">Companion</div>
+      <header className="px-5 pt-4 pb-3 bg-bar-deep border-b border-edge flex items-end gap-3">
+        <div>
+          <div className="display text-[10.5px] uppercase tracking-[.32em] text-faint">Terra Invicta</div>
+          <div className="display text-[20px] uppercase tracking-[.14em] text-accent leading-tight">Companion</div>
+        </div>
+        {/* l'intestazione del sito e' coperta: senza questo, chi non legge
+            l'italiano o l'inglese resta bloccato davanti alla prima schermata */}
+        <span className="ml-auto"><LanguagePicker /></span>
       </header>
 
       <ol className="px-5 py-4 space-y-2.5">

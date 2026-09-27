@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { api, askNotificationPermission, useEngineStatus, useSnapshot } from "@/lib/api";
+import { useEffect, useSyncExternalStore } from "react";
+import { askNotificationPermission, useEngineStatus, useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { engineMode, LOCKED_ENGINE, type EngineMode } from "@/lib/engine";
 import { EngineGate } from "@/components/EngineGate";
 import { EngineSplash } from "@/components/EngineSplash";
+import { LanguagePicker } from "@/components/LanguagePicker";
 import { ResourceIcon, nf } from "@/components/ui";
 
 const TABS = [
@@ -34,21 +35,15 @@ const RESOURCES = [
 const noSubscribe = () => () => {};
 
 export default function Shell({ children }: { children: React.ReactNode }) {
-  const { t, game, setGame, live } = useSettings();
+  const { t, game, live } = useSettings();
   const { data: snap } = useSnapshot(live.version, game);
   // null con l'API locale: deciso dopo il montaggio, niente differenze col render del server
   const engineStatus = useEngineStatus();
   const path = usePathname();
-  const [langs, setLangs] = useState<{ id: string; name: string }[]>([]);
   // null nel render del server: dipende da URL e sessionStorage
   const mode = useSyncExternalStore<EngineMode | null>(noSubscribe, engineMode, () => null);
 
   useEffect(() => { askNotificationPermission(); }, []);
-  useEffect(() => {
-    api<{ available: { id: string; name: string }[] }>("/api/languages")
-      .then((d) => setLangs(d.available))
-      .catch(() => setLangs([]));
-  }, []);
 
   const critical = live.alerts.filter((a) => a.severity === "critical").length;
   const warning = live.alerts.filter((a) => a.severity === "warning").length;
@@ -99,10 +94,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                       className="text-dim hover:text-ink underline">{t.engine[m]}</a>)}
               </span>
             )}
-            <select value={game} aria-label={t.common.language}
-              onChange={(e) => setGame(e.target.value)}>
-              {langs.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
+            <LanguagePicker />
           </span>
         </div>
 

@@ -17,6 +17,27 @@ export const GAME_LOCALES: Record<string, string> = {
   chs: "zh-CN", cht: "zh-TW", jpn: "ja-JP", kor: "ko-KR",
 };
 
+/** Le lingue del gioco, col nome scritto in quella lingua: chi cerca la
+ *  propria la riconosce anche con l'interfaccia in un'altra. Statiche, non da
+ *  /api/languages: il selettore serve gia' nella schermata d'avvio, prima che
+ *  il motore risponda. `flag` e' il paese ISO della bandiera; por e' pt-BR. */
+export const GAME_LANGS: { id: string; name: string; flag: string }[] = [
+  { id: "en", name: "English", flag: "GB" },
+  { id: "ita", name: "Italiano", flag: "IT" },
+  { id: "fr", name: "Français", flag: "FR" },
+  { id: "deu", name: "Deutsch", flag: "DE" },
+  { id: "esp", name: "Español", flag: "ES" },
+  { id: "por", name: "Português", flag: "BR" },
+  { id: "pol", name: "Polski", flag: "PL" },
+  { id: "rus", name: "Русский", flag: "RU" },
+  { id: "ukr", name: "Українська", flag: "UA" },
+  { id: "cze", name: "Čeština", flag: "CZ" },
+  { id: "chs", name: "简体中文", flag: "CN" },
+  { id: "cht", name: "繁體中文", flag: "TW" },
+  { id: "jpn", name: "日本語", flag: "JP" },
+  { id: "kor", name: "한국어", flag: "KR" },
+];
+
 /** Prima visita: la lingua di gioco che corrisponde al browser, se c'e'. */
 export function gameLangFromBrowser(): string {
   const nav = typeof navigator === "undefined" ? [] : navigator.languages ?? [navigator.language];
