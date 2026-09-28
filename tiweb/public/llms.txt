@@ -1,0 +1,33 @@
+# Terra Invicta Companion
+
+> Free, unofficial second-screen companion for the strategy game Terra Invicta (Pavonis Interactive). It runs entirely in the browser (Chrome or Edge on desktop), reads the player's save files from a folder they choose, and puts nations, councilors, missions, factions, space assets and technologies side by side. It only shows what the game already shows the player: it is a reading tool, not a cheat.
+
+Site: https://terrainvicta-companion.b4p3p.it/
+
+## What it shows
+
+- Alerts: rules checked on every save, what changed since the previous one.
+- Council: attribute coverage, missions nobody on the council can run, which recruit candidates would cover them.
+- Missions: the real attacking and defending factors of each mission from the game templates; targets ranked with raw values next to the score.
+- Nations: trends over time and a detail view per nation.
+- Factions: rival factions and councilors compared only on what the player's intel unlocks.
+- Space: visible habitats, Earth orbits with free slots, buildable modules and when they are affordable.
+- Technologies: what each available technology unlocks for the player's faction.
+- Presets: custom priority presets as files to copy into the game, without mods, so achievements stay enabled.
+- History: every save archived, turn-to-turn differences, goals and notes, exportable.
+- Game terms in all 14 languages of the game, from its official localization.
+
+## How it works
+
+1. Open the site in Chrome or Edge on the PC where Terra Invicta is installed.
+2. Choose My Games or TerraInvicta inside Documents; the companion finds the Saves folder.
+3. It reloads automatically on every save. The first visit downloads about 13 MB (Python compiled to WebAssembly).
+
+## Facts
+
+- Not a cheat: real councilor loyalty, intel the player hasn't gathered and rival missions during the mission phase stay hidden. Computed scores are labelled as such, with raw values shown.
+- Saves are never uploaded; no account, no tracking scripts.
+- Never writes to save files.
+- Firefox and Safari are not supported (no File System Access API).
+- Free, no ads, optional donations. Fan project, not affiliated with Pavonis Interactive or Hooded Horse.
+- Interface in English and Italian.

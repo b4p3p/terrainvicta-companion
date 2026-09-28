@@ -24,7 +24,9 @@ const Ctx = createContext<Settings | null>(null);
 const uiFor = (game: string): UiLang => (game === "ita" ? "it" : "en");
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [game, setGameRaw] = useState<string>("ita");
+  // "en" nel render del server: e' la lingua dell'HTML statico, quella che
+  // leggono i crawler. Il browser passa subito alla sua (effetto qui sotto).
+  const [game, setGameRaw] = useState<string>("en");
   const live = useLive();
 
   // preferenze per-browser: non sono stato di partita, stanno bene qui.

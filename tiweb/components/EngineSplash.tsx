@@ -9,7 +9,11 @@
    dentro, nello stesso pannello: niente riquadri che compaiono e spariscono.
 
    Stile del gioco: niente angoli arrotondati, intestazione in Saira maiuscolo,
-   indicatori quadrati, barra sottile nel colore della fazione. */
+   indicatori quadrati, barra sottile nel colore della fazione.
+
+   Sotto il pannello, a scorrimento, la presentazione del companion
+   (Landing): e' l'unico testo che vede chi arriva la prima volta, e l'unico
+   che trovano i crawler. */
 
 import { useEffect, useRef, useState } from "react";
 import { useEngineStatus } from "@/lib/api";
@@ -17,6 +21,7 @@ import { BOOT_STEPS, engine, engineMode, type EngineStatus } from "@/lib/engine"
 import { useSettings } from "@/lib/settings";
 import { Button } from "@/components/ui";
 import { LanguagePicker } from "@/components/LanguagePicker";
+import { Landing } from "@/components/Landing";
 
 const MIN_MS = 1100;     // sotto questa durata l'avvio sembra uno sfarfallio
 const FADE_MS = 450;
@@ -49,7 +54,7 @@ export function EngineSplash() {
   const status = st ?? engine.status;
   return (
     <div
-      className="ti-splash fixed inset-0 z-50 grid place-items-center bg-void px-4"
+      className="ti-splash fixed inset-0 z-50 overflow-y-auto bg-void"
       style={{
         opacity: phase === "leaving" ? 0 : 1,
         transition: `opacity ${FADE_MS}ms ease`,
@@ -61,7 +66,10 @@ export function EngineSplash() {
       }}
       aria-live="polite"
     >
-      <Panel st={status} />
+      <div className="min-h-full flex flex-col items-center gap-12 pt-[14vh]">
+        <div className="w-full max-w-[440px] px-4"><Panel st={status} /></div>
+        <Landing />
+      </div>
     </div>
   );
 }
