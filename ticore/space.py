@@ -126,7 +126,55 @@ def _res_key(k):
     return k[:1].upper() + k[1:]
 
 
-def _module_offer(s, finished, lang):
+# Costo di un modulo portato dalla Terra in orbita bassa (TIHabModuleTemplate.
+# CostFromEarth): i materiali sono `weightedBuildMaterials` x massa x
+# `spaceResourceToTons` (0,1: un'unita' di risorsa spaziale = 10 t); il denaro
+# e' ogni unita' al prezzo di mercato (`resourceMarketValues` del salvataggio);
+# la capacita' di lancio verso l'orbita bassa e' massa x 0,1
+# (TISpaceObjectState.GenericTransferBoostFromEarthSurface). Antimateria ed
+# esotici non si comprano: servono in magazzino (irreplaceableSpaceResources).
+SPACE_RESOURCE_TO_TONS = 0.1
+_BUYABLE = ("water", "volatiles", "metals", "nobleMetals", "fissiles")
+_IRREPLACEABLE = ("antimatter", "exotics")
+# regole che cambiano la massa fuori dall'orbita bassa: li' il costo e' una stima
+_MASS_RULES = {"Cost_Scales_With_Gravity", "SolarMirror"}
+
+
+def _earth_cost(t, market, lang="ita"):
+    mass = t.get("baseMass_tons") or 0
+    w = t.get("weightedBuildMaterials") or {}
+    units = {k: (w.get(k) or 0) * mass * SPACE_RESOURCE_TO_TONS for k in _BUYABLE + _IRREPLACEABLE}
+    money = sum(units[k] * market.get(_res_key(k), 0) for k in _BUYABLE)
+    boost = sum(units.values())
+    exact = (t.get("habType") != "Base" and not t.get("mine")
+             and not _MASS_RULES & set(t.get("specialRules") or []))
+    return {
+        "boost": round(boost, 2),
+        "money": round(money, 1),
+        "materials": [dict(gamedata.resource_view(lang, _res_key(k)), units=round(v, 3))
+                      for k, v in units.items() if v],
+        "needsStock": [_res_key(k) for k in _IRREPLACEABLE if units[k]],
+        "exact": exact,
+    }
+
+
+def _afford(cost, stock, monthly):
+    """Si puo' pagare adesso? Altrimenti fra quanti giorni, al ritmo attuale:
+    (costo - scorta) / entrata mensile x 30, la risorsa piu' lenta. L'entrata
+    e' il flusso ricorrente del mese chiuso: spese e entrate una tantum no."""
+    short = {k: round(cost[k] - stock[k], 2) for k in ("boost", "money") if cost[k] > stock[k] + 1e-9}
+    rate = {k: round(monthly.get(k, 0), 2) for k in short}
+    if not short:
+        return {"now": True, "days": 0, "short": {}, "monthly": {}}
+    days = 0
+    for k, gap in short.items():
+        if monthly.get(k, 0) <= 0:
+            return {"now": False, "days": None, "short": short, "monthly": rate}
+        days = max(days, gap / monthly[k] * 30)
+    return {"now": False, "days": int(-(-days // 1)), "short": short, "monthly": rate}
+
+
+def _module_offer(s, finished, lang, stock=None, monthly=None, market=None):
     """Moduli che i nostri progetti sbloccano, coi numeri dei template."""
     out = []
     for name, t in s.module_tpl.items():
@@ -137,7 +185,13 @@ def _module_offer(s, finished, lang):
         mass = t.get("baseMass_tons") or 0
         income = {k[len("income"):-len("_month")]: v for k, v in t.items()
                   if k.startswith("income") and k.endswith("_month") and v}
+        cost = _earth_cost(t, market or {}, lang)
+        afford = _afford(cost, stock or {"boost": 0, "money": 0}, monthly or {})
+        if cost["needsStock"]:
+            afford = {"now": False, "days": None, "short": {}, "needsStock": cost["needsStock"]}
         out.append({
+            "cost": cost,
+            "afford": afford,
             "id": name,
             "name": s.loc("TIHabModuleTemplate", name),
             "core": bool(t.get("coreModule")),
@@ -228,5 +282,9 @@ def overview(g, lang="ita"):
         },
         "habs": habs,
         "earthOrbits": orbits,
-        "modules": _module_offer(s, finished, lang),
+        "modules": _module_offer(
+            s, finished, lang,
+            stock={"boost": res.get("Boost", 0), "money": res.get("Money", 0)},
+            monthly={"boost": income.get("Boost", 0), "money": income.get("Money", 0)},
+            market=next(iter(g.state("TIGlobalValuesState").values()), {}).get("resourceMarketValues") or {}),
     }

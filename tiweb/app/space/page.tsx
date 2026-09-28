@@ -4,6 +4,7 @@ import { useApi } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { Empty, Panel, ResourceIcon, Stat, Tag, nf } from "@/components/ui";
 import { Guide } from "@/components/Guide";
+import { Tip, TipRow } from "@/components/Tip";
 
 interface Res { id: string; name: string; icon: string | null }
 interface Amount extends Res { amount: number }
@@ -28,6 +29,11 @@ interface Offer {
   id: string; name: string; core: boolean; habType: "Station" | "Base" | "Any"; tier: number;
   mass: number; boost: number; days: number; power: number; missionControl: number;
   crew: number; upkeep: Amount[]; income: Amount[];
+  cost: { boost: number; money: number; materials: (Res & { units: number })[];
+          needsStock: string[]; exact: boolean };
+  afford: { now: boolean; days: number | null; short: { boost?: number; money?: number };
+            monthly?: { boost?: number; money?: number };
+            needsStock?: string[] };
 }
 interface Space {
   intelToSee: number;
@@ -40,6 +46,53 @@ interface Space {
   habs: Hab[];
   earthOrbits: Orbit[];
   modules: Offer[];
+}
+
+/** Costo di un modulo scomposto: materiali, prezzo, capacità di lancio. */
+function CostTip({ m, stock, money, children }: {
+  m: Offer; stock: number; money: number; children: React.ReactNode;
+}) {
+  const { t } = useSettings();
+  const s = t.space;
+  return (
+    <Tip title={`${m.name} · ${s.costTitle}`} width={330} content={
+      <>
+        {m.cost.materials.map((r) => (
+          <TipRow key={r.id} label={r.name} value={`${nf(r.units, 2)} (${nf(r.units * 10, 1)} t)`} />
+        ))}
+        <TipRow strong label={s.costBoost} value={`${nf(m.cost.boost, 2)} / ${nf(stock, 2)}`} />
+        <TipRow label={s.costMoney} value={`${nf(m.cost.money, 1)} / ${nf(money, 1)}`} />
+        <p className="m-0 mt-1.5 text-faint">{m.cost.exact ? s.costExact : s.costApprox}</p>
+      </>
+    }>{children}</Tip>
+  );
+}
+
+/** Adesso, fra quanti giorni, o mai col ritmo attuale. */
+function When({ m }: { m: Offer }) {
+  const { t } = useSettings();
+  const s = t.space;
+  const a = m.afford;
+  if (a.needsStock?.length) return <Tip title={s.whenNever} content={s.needsStockHint}><span className="text-bad">{s.needsStock}</span></Tip>;
+  if (a.now) return <span className="text-good">{s.whenNow}</span>;
+  const gaps = (
+    <>
+      {a.short.boost != null && <>
+        <TipRow label={`${s.costBoost}: ${s.missing}`} value={`${nf(a.short.boost, 2)}`} />
+        <TipRow label={`${s.costBoost}: ${s.perMonthIn}`} value={`+${nf(a.monthly?.boost ?? 0, 2)}`} />
+      </>}
+      {a.short.money != null && <>
+        <TipRow label={`${s.costMoney}: ${s.missing}`} value={`${nf(a.short.money, 1)}`} />
+        <TipRow label={`${s.costMoney}: ${s.perMonthIn}`} value={`+${nf(a.monthly?.money ?? 0, 1)}`} />
+      </>}
+      <p className="m-0 mt-1.5 text-faint">{s.whenHint}</p>
+    </>
+  );
+  return a.days == null
+    ? <Tip title={s.whenNever} content={gaps}><span className="text-bad">{s.whenNever}</span></Tip>
+    : <Tip title={s.whenIn.replace("{n}", String(a.days))} content={gaps}>
+        <span className="text-warn">{s.whenIn.replace("{n}", String(a.days))}</span>
+      </Tip>;
 }
 
 /** Filetto col colore della fazione, come nella scheda Fazioni. */
@@ -190,7 +243,9 @@ export default function SpacePage() {
                 <tr className="text-left text-faint">
                   <th className="font-normal pb-1.5 pr-3">{s.module}</th>
                   <th className="font-normal pb-1.5 pr-3 text-right">{s.mass}</th>
-                  <th className="font-normal pb-1.5 pr-3 text-right" title={s.boostEstHint}>{s.boostEst}</th>
+                  <th className="font-normal pb-1.5 pr-3 text-right">{s.costBoost}</th>
+                  <th className="font-normal pb-1.5 pr-3 text-right">{s.costMoney}</th>
+                  <th className="font-normal pb-1.5 pr-3">{s.when}</th>
                   <th className="font-normal pb-1.5 pr-3 text-right">{s.days}</th>
                   <th className="font-normal pb-1.5 pr-3 text-right" title={s.powerHint}>{s.power}</th>
                   <th className="font-normal pb-1.5 pr-3 text-right">{s.mc}</th>
@@ -208,9 +263,21 @@ export default function SpacePage() {
                       {m.habType === "Base" && <> <Tag>{s.baseOnly}</Tag></>}
                     </td>
                     <td className="py-1.5 pr-3 text-right whitespace-nowrap">{nf(m.mass, 0)} t</td>
-                    <td className="py-1.5 pr-3 text-right whitespace-nowrap" title={s.boostEstHint}>
-                      <span className={m.boost > boost.stock ? "text-bad" : ""}>{nf(m.boost, 1)}</span>
+                    <td className="py-1.5 pr-3 text-right whitespace-nowrap">
+                      <CostTip m={m} stock={boost.stock} money={money.stock}>
+                        <span className={m.afford.short.boost ? "text-bad" : ""}>
+                          {m.cost.exact ? "" : "≈ "}{nf(m.cost.boost, 2)}
+                        </span>
+                      </CostTip>
                     </td>
+                    <td className="py-1.5 pr-3 text-right whitespace-nowrap">
+                      <CostTip m={m} stock={boost.stock} money={money.stock}>
+                        <span className={m.afford.short.money ? "text-bad" : ""}>
+                          {m.cost.exact ? "" : "≈ "}{nf(m.cost.money, 1)}
+                        </span>
+                      </CostTip>
+                    </td>
+                    <td className="py-1.5 pr-3 whitespace-nowrap"><When m={m} /></td>
                     <td className="py-1.5 pr-3 text-right">{m.days}</td>
                     <td className={`py-1.5 pr-3 text-right ${m.power > 0 ? "text-good" : m.power < 0 ? "text-dim" : "text-faint"}`}>
                       {m.power > 0 ? "+" : ""}{nf(m.power, 0)}
