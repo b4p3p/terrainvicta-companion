@@ -25,7 +25,7 @@ NATION_FACTORS = {
     "TargetNationGDP":             ("gdp",        -1, "factor.gdp"),
     "NationPopulation":            ("pop",        -1, "factor.population"),
     "AttackerPopulationIdeology":  ("support",    +1, "factor.support"),
-    "DefenderPopulationIdeology":  ("support",    +1, "factor.support"),
+    "DefenderPopulationIdeology":  ("support",    +1, "factor.defenderSupport"),
     "NationalIndustries":          ("gdp",        +1, "factor.industries"),
     "SecurityApparatus":           ("miltech",    -1, "factor.security"),
 }
@@ -238,6 +238,136 @@ def targets_nation(snap, name, councilor=None):
     }
 
 
+# ------------------------------------------------ bersaglio: punto di controllo
+# Repressione, Epurazione e simili colpiscono un punto di controllo di un'altra
+# fazione (`TIMissionTarget_OwnedControlPoint`), non una nazione. Condizioni
+# (IL): il proprietario non e' alieno (`HumanControlPoint`); l'Esecutivo di una
+# nazione con piu' punti si attacca solo se ci hai gia' un punto
+# (`TIControlPoint.CanBeAttacked`). Modificatori leggibili (GetModifier):
+#   AttackerPopulationIdeology  (10 + democrazia) x sostegno a noi
+#   DefenderPopulationIdeology  (10 + democrazia) x sostegno al proprietario
+#   SecurityApparatus           +3 se il Sistema di sicurezza della nazione e' nostro
+#   DefendedAsset               +10 in difesa se il punto e' difeso
+#   TargetNationGDP             difficolta' economica della nazione
+# Restano fuori, e rendono la probabilita' una stima: l'Amministrazione del
+# consiglio avversario (`OwnedControlPoint`, attributi che il gioco non ti
+# mostra) e il bonus se il difensore sfora il tetto dei punti
+# (`InsufficientCPMaintenance_Defender`). Sui numeri della partita del
+# 01/11/2026 la stima sta entro 1-2 punti dal gioco sulla maggior parte dei
+# bersagli.
+
+CP_TARGET = "TIMissionTarget_OwnedControlPoint"
+DEFENDED_ASSET = 10.0          # TIGlobalConfig.TIMissionModifier_DefendedAsset
+SECURITY_APPARATUS = 3.0       # TIMissionModifier_SecurityApparatus
+
+
+def _ideology(f):
+    return (f.get("templateName") or "").replace("Council", "")
+
+
+def _cp_mod(s, ctx):
+    """(valore, noto?) di un modificatore contro un punto di controllo."""
+    n, cp = ctx["nation"], ctx["cp"]
+    if s == "CouncilorAttackStat":
+        return (ctx["councilor"] or 0), ctx["councilor"] is not None
+    if s == "AttackerPopulationIdeology":
+        return (10 + n["democracy"]) * ctx["mySupport"], True
+    if s == "DefenderPopulationIdeology":
+        return (10 + n["democracy"]) * ctx["ownerSupport"], True
+    if s == "SecurityApparatus":
+        return (SECURITY_APPARATUS if ctx["mySecurity"] else 0.0), True
+    if s == "DefendedAsset":
+        return (DEFENDED_ASSET if cp.get("defended") else 0.0), True
+    if s == "TargetNationGDP":
+        return n["difficulty"] * 1.0, True
+    if s in ("ResourceSpent", "PherocyteResistance"):
+        return 0.0, True
+    return 0.0, False
+
+
+def targets_control_points(g, snap, name, councilor=None):
+    """Punti di controllo delle altre fazioni attaccabili da questa missione,
+    con la probabilita' stimata (vedi sopra cosa resta fuori)."""
+    from .factions import _goal_pairs, relation
+    from .names import Namer, nation_id
+    lang = gamedata_lang(snap)
+    t_ = gamedata.templates()["missions"].get(name) or {}
+    att, dfn = _modifiers(name)
+    attr = gamedata.mission_attribute(name)
+    my_attr = (councilor or {}).get("attributes", {}).get(attr) if attr else None
+    nm = Namer(g, lang)
+    my_id = g.me["ID"]["value"]
+    my_key = _ideology(g.me)
+    rows_by_id = {r["id"]: r for r in snap["nations"]}
+    goals = _goal_pairs(g)
+    rel_cache = {}
+
+    out = []
+    for cp in g.cps.values():
+        fid = (cp.get("faction") or {}).get("value")
+        owner = g.factions.get(fid)
+        if not owner or fid == my_id or (gamedata.templates()["factions"].get(
+                owner.get("templateName")) or {}).get("isAlien"):
+            continue
+        nat = g.nations.get((cp.get("nation") or {}).get("value"))
+        row = rows_by_id.get(nation_id(nat)) if nat else None
+        if not row:
+            continue
+        here = [g.cps.get(c["value"]) for c in nat.get("controlPoints") or []]
+        mine_here = [c for c in here if c and (c.get("faction") or {}).get("value") == my_id]
+        if (cp.get("controlPointType") == "Executive" and len(here) > 1
+                and not mine_here):
+            continue                                  # CanBeAttacked
+        op = nat.get("publicOpinion") or {}
+        ctx = {"nation": row, "cp": cp, "councilor": my_attr,
+               "mySupport": op.get(my_key, 0) or 0,
+               "ownerSupport": op.get(_ideology(owner), 0) or 0,
+               "mySecurity": any(c.get("controlPointType") == "SecurityApparatus"
+                                 and not c.get("benefitsDisabled") for c in mine_here)}
+        parts, a_sum, d_sum, exact = [], 0.0, 0.0, True
+        for mods, side in ((att, "attacco"), (dfn, "difesa")):
+            for m in mods:
+                v, known = _cp_mod(_short(m), ctx)
+                exact &= known
+                if side == "attacco":
+                    a_sum += v
+                else:
+                    d_sum += v
+                if abs(v) > 0.005 or not known:
+                    parts.append({"side": side, "key": _short(m), "label": _label(_short(m), lang),
+                                  "value": round(v, 2), "known": known})
+        d = a_sum - d_sum
+        p = 0.5 * 0.775 ** abs(d)
+        if fid not in rel_cache:
+            rel_cache[fid] = relation(g, owner, lang, goals)
+        out.append({
+            "id": cp["ID"]["value"],
+            "nationId": row["id"], "nation": row["name"], "eu": row["eu"],
+            "cpType": cp.get("controlPointType"),
+            "cpName": nm.control_point(cp),
+            "owner": {"id": fid, "name": nm.faction(owner) or "?",
+                      "colors": gamedata.faction_colors(owner.get("templateName")),
+                      "relation": rel_cache[fid]},
+            "defended": bool(cp.get("defended")),
+            "disabled": bool(cp.get("benefitsDisabled")),
+            "myCP": len(mine_here), "cp": row["cp"],
+            "gdp": row["gdp"], "democracy": row["democracy"], "difficulty": row["difficulty"],
+            "mySupport": ctx["mySupport"], "ownerSupport": ctx["ownerSupport"],
+            "mySecurity": ctx["mySecurity"],
+            "game": {"attack": round(a_sum, 2), "defense": round(d_sum, 2), "d": round(d, 2),
+                     "chance": 1 - p if d >= 0 else p, "exact": exact, "approx": not exact,
+                     "parts": parts},
+        })
+    out.sort(key=lambda x: (-x["game"]["chance"], -x["gdp"]))
+    return {
+        "mission": name, "targetKind": "controlPoint",
+        "missionName": gamedata.mission_name(lang, name),
+        "attribute": attr, "attributeShort": council.attr_short(attr, lang),
+        "councilorValue": my_attr, "factors": factors(name, lang),
+        "targets": out,
+    }
+
+
 def gamedata_lang(snap):
     return snap.get("lang") or "ita"
 
@@ -256,7 +386,7 @@ def catalogue(snap, lang="ita"):
             "attributeShort": m["attributeShort"],
             "cost": m["cost"],
             "target": target,
-            "supportsTargeting": (t.get("target") or {}).get("$type") == NATION_TARGET,
+            "supportsTargeting": (t.get("target") or {}).get("$type") in (NATION_TARGET, CP_TARGET),
             "holders": m["holders"],
             "best": m["best"],
             "xp": t.get("XPonSuccess") or 0,
@@ -265,7 +395,7 @@ def catalogue(snap, lang="ita"):
     return out
 
 
-def plan(snap, name, councilor_name=None):
+def plan(snap, name, councilor_name=None, g=None):
     """Scheda completa per pianificare una missione: fattori + bersagli ordinati."""
     team = snap["council"]["team"]
     c = None
@@ -278,7 +408,11 @@ def plan(snap, name, councilor_name=None):
             c = max(holders, key=lambda x: x["attributes"].get(attr, 0))
         elif holders:
             c = holders[0]
-    res = targets_nation(snap, name, c)
+    t_ = gamedata.templates()["missions"].get(name) or {}
+    if g is not None and (t_.get("target") or {}).get("$type") == CP_TARGET:
+        res = targets_control_points(g, snap, name, c)
+    else:
+        res = targets_nation(snap, name, c)
     if res is None:
         lang = gamedata_lang(snap)
         return {"mission": name,

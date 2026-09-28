@@ -115,6 +115,83 @@ def _view(g, f, lang, level, highest, mine):
     return out
 
 
+# -- relazioni fra fazioni ----------------------------------------------------
+#
+# Come la griglia delle relazioni della schermata Intelligence
+# (`IntelFactionRelationsGridItemController.SetListItem`), dal punto di vista
+# di chi giudica:
+#   Supporto      alleati permanenti (solo alieni e loro alleato: non noi);
+#   Guerra        chi giudica ha un obiettivo `WarOnFaction` contro l'altra;
+#   In conflitto  odio (`factionHate`) > 0;
+#   Tolleranza    odio = 0.
+# Accanto, i trattati: tregua e patto di non aggressione sono obiettivi di una
+# delle due fazioni verso l'altra con importanza > 0 (`HasTruce`/`HasNAP`), la
+# condivisione dell'intelligence e' `intelSharingFactions`.
+
+ATTITUDE_KEYS = {"war": "UI.Intel.FactionWar", "conflict": "UI.Intel.FactionHate10",
+                 "tolerance": "UI.Intel.FactionHate0"}
+TREATY_KEYS = {"truce": "UI.Notifications.Diplomacy.Truce",
+               "nap": "UI.Notifications.Diplomacy.NAP",
+               "intelSharing": "UI.Notifications.Diplomacy.IntelSharing"}
+_GOALS = {"war": "FactionGoal_WarOnFaction", "truce": "FactionGoal_TruceWithFaction",
+          "nap": "FactionGoal_NonAggressionPact"}
+
+
+def _goal_pairs(g):
+    out = {}
+    for kind, state in _GOALS.items():
+        pairs = set()
+        for v in g.state(state).values():
+            if kind != "war" and not (v.get("importance") or 0) > 0:
+                continue
+            a = (v.get("faction") or {}).get("value")
+            b = (v.get("targetFaction") or {}).get("value")
+            if a and b:
+                pairs.add((a, b))
+        out[kind] = pairs
+    return out
+
+
+def _hate(f, other_id):
+    for e in f.get("factionHate") or []:
+        if (e.get("Key") or {}).get("value") == other_id:
+            return e.get("Value") or 0
+    return 0
+
+
+def _attitude(g, a, b, goals, lang):
+    aid, bid = a["ID"]["value"], b["ID"]["value"]
+    if (aid, bid) in goals["war"]:
+        kind = "war"
+    elif _hate(a, bid) > 0:
+        kind = "conflict"
+    else:
+        kind = "tolerance"
+    return {"id": kind, "label": _ui(lang, ATTITUDE_KEYS[kind], kind)}
+
+
+def _ui(lang, key, fallback):
+    return gamedata.strings(lang).get(key) or gamedata.strings("en").get(key) or fallback
+
+
+def relation(g, other, lang="ita", goals=None):
+    """Come ci vede `other`, come lo vediamo noi, e i trattati fra noi."""
+    goals = goals if goals is not None else _goal_pairs(g)
+    me, mid, oid = g.me, g.me["ID"]["value"], other["ID"]["value"]
+    treaties = []
+    for kind in ("truce", "nap"):
+        if (mid, oid) in goals[kind] or (oid, mid) in goals[kind]:
+            treaties.append(kind)
+    if any((x.get("value") if isinstance(x, dict) else x) == oid
+           for x in me.get("intelSharingFactions") or []):
+        treaties.append("intelSharing")
+    return {
+        "theirs": _attitude(g, other, me, goals, lang),
+        "mine": _attitude(g, me, other, goals, lang),
+        "treaties": [{"id": k, "label": _ui(lang, TREATY_KEYS[k], k)} for k in treaties],
+    }
+
+
 def compare(g, lang="ita"):
     """La nostra fazione e quelle che conosciamo, nell'ordine del gioco.
 
@@ -124,6 +201,7 @@ def compare(g, lang="ita"):
     now = _intel_map(g.me, "intel")
     top = _intel_map(g.me, "highestIntel")
     out = [_view(g, g.me, lang, 1.0, 1.0, True)]
+    goals = _goal_pairs(g)
     unknown = 0
     for fid, f in g.factions.items():
         if f is g.me or f.get("defeated"):
@@ -132,7 +210,9 @@ def compare(g, lang="ita"):
         if highest <= 0:
             unknown += 1
             continue
-        out.append(_view(g, f, lang, now.get(fid, 0), highest, False))
+        v = _view(g, f, lang, now.get(fid, 0), highest, False)
+        v["relation"] = relation(g, f, lang, goals)
+        out.append(v)
     # Le mai contattate diventano segnaposto anonimi: si sa che esistono (il
     # consiglio e' di otto, lo dice la schermata iniziale del gioco) ma non
     # chi sono. Niente nome, colore o id: nemmeno l'API li espone.

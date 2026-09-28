@@ -188,7 +188,7 @@ class Service:
 
     def mission_plan(self, name, councilor=None, lang=None):
         self._switch(lang)
-        return missions.plan(self.require(), name, councilor)
+        return missions.plan(self.require(), name, councilor, self.game)
 
     def history(self):
         self.require()

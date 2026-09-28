@@ -95,6 +95,8 @@ TEXTS = {
     "factor.population": {"it": "popolazione", "en": "population"},
     "factor.support": {"it": "sostegno alla tua fazione",
                        "en": "support for your faction"},
+    "factor.defenderSupport": {"it": "sostegno alla fazione che difende",
+                               "en": "support for the defending faction"},
     "factor.industries": {"it": "industria nazionale", "en": "national industries"},
     "factor.security": {"it": "apparato di sicurezza", "en": "security apparatus"},
     "factor.UnhappyElites": {"it": "élite scontenta", "en": "unhappy elites"},

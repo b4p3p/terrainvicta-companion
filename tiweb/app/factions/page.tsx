@@ -7,6 +7,8 @@ import { useSettings } from "@/lib/settings";
 import { Empty, Panel, ResourceIcon, Tag, nf } from "@/components/ui";
 import { Guide } from "@/components/Guide";
 import { FactionCouncilors } from "@/components/FactionCouncilors";
+import { Attitude } from "@/components/CpTargets";
+import type { FactionRelation } from "@/lib/types";
 
 type Field = "resources" | "unassignedOrgs" | "objectives" | "projects";
 interface Gate { need: number; measure: "intel" | "highest" }
@@ -20,6 +22,8 @@ interface Faction {
   intel: number;
   highest: number;
   locked: Partial<Record<Field, Gate>>;
+  /** come ci vede, come la vediamo, trattati: la griglia della schermata Intelligence */
+  relation?: FactionRelation;
   resources?: { id: string; name: string; icon: string | null; stock: number; monthly: number }[];
   unassignedOrgs?: number;
   objectives?: { id: string; status: "Unlocked" | "Completed"; name: string }[];
@@ -232,6 +236,9 @@ export default function FactionsPage() {
                       </span>
                     )}
                   </div>
+                  {f.relation && (
+                    <div className="pl-2.5 mt-1 text-[11px]"><Attitude r={f.relation} /></div>
+                  )}
                   {!f.mine && sortRes && (() => {
                     const v = metric(f, sortKey);
                     return (

@@ -1,10 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { api, useApi, useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { Empty, Panel, Tag, bn, nf, pct } from "@/components/ui";
-import type { GameChance, CatalogueEntry, MissionPlan } from "@/lib/types";
+import type { CatalogueEntry, CpTarget, MissionPlan, MissionTarget } from "@/lib/types";
+import { usePersistentState } from "@/lib/persist";
+import { ChanceTip, CpTargets } from "@/components/CpTargets";
+
+// colonne ordinabili della tabella per nazione
+type NSort = "chance" | "d" | "score" | "unrest" | "cohesion" | "democracy" | "support" | "gdp" | "myCP" | "name";
+const NSORTS: NSort[] = ["chance", "d", "score", "unrest", "cohesion", "democracy", "support", "gdp", "myCP", "name"];
+const isNSort = (v: unknown): v is { key: NSort; desc: boolean } =>
+  !!v && typeof v === "object" && NSORTS.includes((v as { key: NSort }).key);
+const nval = (x: MissionTarget, k: NSort): number | string =>
+  k === "chance" ? x.game?.chance ?? x.score : k === "d" ? x.game?.d ?? x.score : x[k];
 
 export default function MissionsPage() {
   const { t, game, live } = useSettings();
@@ -15,6 +25,7 @@ export default function MissionsPage() {
   const [councilor, setCouncilor] = useState<string>("");
   const [plan, setPlan] = useState<MissionPlan | null>(null);
   const [scope, setScope] = useState<"eu" | "all">("all");
+  const [nsort, setNsort] = usePersistentState("missions.nation.sort", { key: "chance" as NSort, desc: true }, isNSort);
 
   // alla prima apertura punta su una missione con bersaglio nazione
   useEffect(() => {
@@ -34,15 +45,27 @@ export default function MissionsPage() {
   if (!cat || !snap) return <Empty>{t.common.loading}</Empty>;
 
   const entry = cat.find((c) => c.id === picked);
-  const targets = (plan?.targets ?? []).filter((x) => scope === "all" || x.eu);
+  const cpMode = plan?.targetKind === "controlPoint";
+  const nationTargets = cpMode ? [] : ((plan?.targets ?? []) as MissionTarget[]);
+  const targets = nationTargets.filter((x) => scope === "all" || x.eu).sort((a, b) => {
+    const va = nval(a, nsort.key), vb = nval(b, nsort.key);
+    const c = typeof va === "string" ? va.localeCompare(vb as string) : (va as number) - (vb as number);
+    return nsort.desc ? -c : c;
+  });
 
-  const hasGame = !!plan?.targets?.length && plan.targets.every((x) => x.game);
-  // il dettaglio della formula, voce per voce: la stessa lista che il gioco somma
-  const chanceTitle = (g: GameChance) => [
-    ...g.parts.map((p) => `${p.side === "attacco" ? "+" : "−"} ${p.label}: ${p.known ? nf(p.value, 1) : "?"}`),
-    `= ${nf(g.attack, 1)} − ${nf(g.defense, 1)} = ${nf(g.d, 1)}`,
-    ...(g.exact ? [] : [t.missions.chanceUnknown]),
-  ].join("\n");
+  const hasGame = !!nationTargets.length && nationTargets.every((x) => x.game);
+  const sortTh = (k: NSort, label: ReactNode, title?: string, left = false) => {
+    const on = nsort.key === k;
+    return (
+      <th title={title} style={left ? { textAlign: "left" } : undefined}>
+        <button type="button" aria-pressed={on} title={t.missions.sortHint}
+          onClick={() => setNsort({ key: k, desc: on ? !nsort.desc : k !== "name" })}
+          className={`cursor-pointer ${on ? "text-accent" : "hover:text-ink"}`}>
+          {label}{on && <span className="text-[10px]"> {nsort.desc ? "▼" : "▲"}</span>}
+        </button>
+      </th>
+    );
+  };
 
   return (
     <div className="grid gap-5 lg:grid-cols-[300px_1fr] items-start">
@@ -127,25 +150,26 @@ export default function MissionsPage() {
           </Panel>
         )}
 
-        <Panel title={t.missions.targets} sub={t.missions.factorsHint}>
+        <Panel title={t.missions.targets} sub={cpMode ? t.missions.cpFactorsHint : t.missions.factorsHint}>
           {!plan ? <Empty>{t.common.loading}</Empty>
             : plan.targets === null ? <Empty>{t.missions.noTargeting}</Empty>
+              : cpMode ? <CpTargets targets={plan.targets as CpTarget[]} scope={scope} />
               : (
                 <div className="overflow-auto max-h-[62vh]">
                   <table className="data">
                     <thead>
                       <tr>
-                        <th>{t.common.nation}</th>
+                        {sortTh("name", t.common.nation)}
                         {hasGame ? <>
-                          <th title={t.missions.chanceHint}>{t.missions.chance}</th>
-                          <th title={t.missions.attDefHint}>{t.missions.attDef}</th>
-                        </> : <th>{t.missions.score}</th>}
-                        <th>{t.missions.unrest}</th>
-                        <th>{t.missions.cohesion}</th>
-                        <th>{t.missions.democracy}</th>
-                        <th>{t.missions.support}</th>
-                        <th>{t.common.gdpBn}</th>
-                        <th>{t.missions.mine}</th>
+                          {sortTh("chance", t.missions.chance, t.missions.chanceHint)}
+                          {sortTh("d", t.missions.attDef, t.missions.attDefHint)}
+                        </> : sortTh("score", t.missions.score)}
+                        {sortTh("unrest", t.missions.unrest)}
+                        {sortTh("cohesion", t.missions.cohesion)}
+                        {sortTh("democracy", t.missions.democracy)}
+                        {sortTh("support", t.missions.support)}
+                        {sortTh("gdp", t.common.gdpBn)}
+                        {sortTh("myCP", t.missions.mine)}
                         <th style={{ textAlign: "left" }}>{t.common.owners}</th>
                       </tr>
                     </thead>
@@ -159,12 +183,15 @@ export default function MissionsPage() {
                           </td>
                           {x.game ? <>
                             <td className={x.game.chance >= 0.6 ? "text-good font-semibold"
-                              : x.game.chance < 0.2 ? "text-dim" : ""}
-                              title={chanceTitle(x.game)}>
-                              {!x.game.exact && "≤ "}{nf(x.game.chance * 100, 0)}%
+                              : x.game.chance < 0.2 ? "text-dim" : ""}>
+                              <ChanceTip g={x.game} note={x.game.exact ? undefined : t.missions.chanceUnknown}>
+                                {!x.game.exact && "≤ "}{nf(x.game.chance * 100, 0)}%
+                              </ChanceTip>
                             </td>
-                            <td className="text-dim" title={chanceTitle(x.game)}>
-                              {nf(x.game.attack, 1)} / {nf(x.game.defense, 1)}{!x.game.exact && " +?"}
+                            <td className="text-dim">
+                              <ChanceTip g={x.game} note={x.game.exact ? undefined : t.missions.chanceUnknown}>
+                                {nf(x.game.attack, 1)} / {nf(x.game.defense, 1)}{!x.game.exact && " +?"}
+                              </ChanceTip>
                             </td>
                           </> : <td className={x.score > 0.5 ? "text-good font-semibold"
                             : x.score < 0 ? "text-dim" : ""}>{nf(x.score, 2)}</td>}

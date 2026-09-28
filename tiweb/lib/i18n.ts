@@ -484,6 +484,28 @@ const it = {
     democracy: "Democrazia",
     support: "Sostegno",
     mine: "miei",
+    sortHint: "Clic per ordinare, di nuovo per invertire",
+    cpTarget: "Punto di controllo",
+    cpOwner: "Proprietario",
+    cpOwnerSupport: "Sost. proprietario",
+    cpDifficulty: "Difficoltà PIL",
+    cpDefended: "difeso",
+    cpDisabled: "benefici spenti",
+    cpDisabledHint: "I benefici di questo punto sono spenti: per una Repressione già riuscita o perché la fazione proprietaria sfora il suo tetto dei punti di controllo.",
+    cpSecurity: "sicurezza tua",
+    cpOwnerFilter: "Fazione",
+    cpAllOwners: "Tutte",
+    cpChanceApprox:
+      "≈: mancano due fattori che il gioco non ti mostra, l'Amministrazione del consiglio avversario (in difesa) e il bonus se il proprietario sfora il tetto dei punti (in attacco). Sui numeri di questa partita la stima sta di solito entro 1-2 punti da quella del gioco: la percentuale vera la vedi quando scegli il bersaglio.",
+    cpFactorsHint:
+      "Un punto di controllo di un'altra fazione, non una nazione. Probabilità con la formula del gioco sui fattori leggibili; clic sulle intestazioni per ordinare.",
+  },
+  relations: {
+    title: "Rapporti",
+    theirs: "Come ti vede",
+    mine: "Come la vedi",
+    treaty: "Trattato",
+    hint: "Come nella schermata Intelligence del gioco: Guerra se ha dichiarato guerra, In conflitto se c'è ostilità, Tolleranza altrimenti.",
   },
   nations: {
     metric: {
@@ -1198,6 +1220,28 @@ const en: typeof it = {
     democracy: "Democracy",
     support: "Support",
     mine: "mine",
+    sortHint: "Click to sort, again to reverse",
+    cpTarget: "Control point",
+    cpOwner: "Owner",
+    cpOwnerSupport: "Owner support",
+    cpDifficulty: "GDP difficulty",
+    cpDefended: "defended",
+    cpDisabled: "benefits off",
+    cpDisabledHint: "This point's benefits are off: because of a successful Crackdown or because the owning faction exceeds its control point cap.",
+    cpSecurity: "your security",
+    cpOwnerFilter: "Faction",
+    cpAllOwners: "All",
+    cpChanceApprox:
+      "≈: two factors the game doesn't show you are missing, the rival council's Administration (defense) and the bonus when the owner exceeds its control point cap (attack). On this campaign's numbers the estimate is usually within 1-2 points of the game's: you see the real percentage when you pick the target.",
+    cpFactorsHint:
+      "Another faction's control point, not a nation. Chance with the game's formula on the readable factors; click the headers to sort.",
+  },
+  relations: {
+    title: "Relations",
+    theirs: "How they see you",
+    mine: "How you see them",
+    treaty: "Treaty",
+    hint: "As in the game's Intelligence screen: War if they declared war, In conflict if there is hostility, Tolerance otherwise.",
   },
   nations: {
     metric: {

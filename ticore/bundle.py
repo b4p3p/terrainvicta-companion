@@ -55,6 +55,9 @@ KEEP_PREFIXES = (
     "TIEffectTemplate.description.",
     "UI.Science.Category.",
     "UI.Global.",
+    # relazioni fra fazioni, come la schermata Intelligence
+    "UI.Intel.Faction",
+    "UI.Notifications.Diplomacy.",
     "UI.Nation.",
 )
 # cause delle variazioni nazionali (`tracker_*ChangeReason_*`): chiavi nude,

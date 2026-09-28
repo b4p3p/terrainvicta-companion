@@ -261,6 +261,26 @@ export interface GameChance {
   parts: { side: string; key: string; label: string; value: number; known: boolean }[];
 }
 
+/** Come la schermata Intelligence: come ci vede, come la vediamo, trattati. */
+export interface FactionRelation {
+  theirs: { id: "war" | "conflict" | "tolerance"; label: string };
+  mine: { id: "war" | "conflict" | "tolerance"; label: string };
+  treaties: { id: "truce" | "nap" | "intelSharing"; label: string }[];
+}
+
+/** Bersaglio punto di controllo (Repressione e simili). */
+export interface CpTarget {
+  id: number;
+  nationId: string; nation: string; eu: boolean;
+  cpType: string; cpName: string;
+  owner: { id: number; name: string; colors: { accent?: string | null } | null; relation: FactionRelation };
+  defended: boolean; disabled: boolean;
+  myCP: number; cp: number;
+  gdp: number; democracy: number; difficulty: number;
+  mySupport: number; ownerSupport: number; mySecurity: boolean;
+  game: GameChance;
+}
+
 export interface MissionTarget {
   id?: string;
   game?: GameChance | null;
@@ -284,7 +304,9 @@ export interface MissionPlan {
   councilor: string | null;
   candidates?: string[];
   factors: { readable: MissionFactor[]; opaque: { side: string; label: string }[] };
-  targets: MissionTarget[] | null;
+  /** "controlPoint": `targets` sono CpTarget, non nazioni */
+  targetKind?: "controlPoint";
+  targets: MissionTarget[] | CpTarget[] | null;
   note?: string;
 }
 
