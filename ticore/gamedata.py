@@ -239,6 +239,13 @@ def faction_colors(data_name):
     return {"accent": accent, "background": t.get("backgroundColor")}
 
 
+def faction_cursor(data_name):
+    """Nome del cursore della fazione nel bundle `cursors`
+    (`cursorPath` = «cursors/Cursor_ResistCouncil»). None se non ne ha."""
+    p = (templates()["factions"].get(data_name) or {}).get("cursorPath") or ""
+    return p.rsplit("/", 1)[-1] or None
+
+
 # risorsa -> icona nel bundle icons_2d, come la disegna il gioco
 RESOURCE_ICONS = {
     "Money": "ICO_currency",

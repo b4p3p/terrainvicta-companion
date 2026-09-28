@@ -56,6 +56,19 @@ export default function Shell({ children }: { children: React.ReactNode }) {
      fazione (TIFactionTemplate.color), non una tinta scelta a tavolino. */
   const accent = snap?.factionColors?.accent;
 
+  /* Anche il cursore e' quello della fazione (TIFactionTemplate.cursorPath).
+     Su <html> e non sul div: deve valere anche per finestre e menu a tendina,
+     che stanno fuori da questo albero. */
+  const cursor = snap?.factionCursor;
+  useEffect(() => {
+    const s = document.documentElement.style;
+    const vars = [["--ti-cursor", "", "auto"], ["--ti-cursor-valid", "_Valid", "pointer"],
+                  ["--ti-cursor-invalid", "_Invalid", "not-allowed"]];
+    for (const [v, suffix, fallback] of vars)
+      if (cursor) s.setProperty(v, `url(/icons/cursors/${cursor}${suffix}.png) 16 16, ${fallback}`);
+      else s.removeProperty(v);
+  }, [cursor]);
+
   return (
     <div className="min-h-screen flex flex-col"
       style={accent ? ({ "--accent": accent } as React.CSSProperties) : undefined}>

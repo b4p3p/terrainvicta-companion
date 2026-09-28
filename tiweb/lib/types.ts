@@ -190,6 +190,8 @@ export interface Project {
 export interface Snapshot {
   /* colori che il gioco assegna alla fazione (TIFactionTemplate) */
   factionColors: { accent: string | null; background: string | null };
+  /** cursore della fazione nel bundle `cursors` (public/icons/cursors/) */
+  factionCursor?: string | null;
   faction: string;
   date: string;
   dateKey: string;

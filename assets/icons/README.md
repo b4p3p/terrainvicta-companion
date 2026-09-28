@@ -29,6 +29,14 @@ the `*_priority` files), and the other seven technology category icons
 (`tech_energy_icon`, `tech_info_icon`, `tech_life_icon`, `tech_material_icon`,
 `tech_social_icon`, `tech_space_icon`, `tech_xeno_icon`).
 
+`cursors/` holds the 24 mouse cursors (32×32 RGBA PNG) from the bundle of the same
+name: `Cursor_Neutral` and one per faction, as named by `cursorPath` in
+`TIFactionTemplate.json` (`cursors/Cursor_ResistCouncil` → `Cursor_ResistCouncil.png`),
+each with a `_Valid` and an `_Invalid` variant. The arrow tip sits at the centre of the
+texture (16, 16), which is the hotspot the companion uses.
+`Cursor_ResistCouncil_invalid` is spelled with a lowercase `i` in the bundle and was
+renamed to `_Invalid` like the others.
+
 ## Why they are here
 
 They are included so the interface shows the same icons the player sees in game, without

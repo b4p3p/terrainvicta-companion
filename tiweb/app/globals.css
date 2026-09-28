@@ -59,6 +59,25 @@
   --font-sans: var(--font-plex), "IBM Plex Sans", system-ui, sans-serif;
 }
 
+/* Il cursore del gioco (bundle `cursors`, assets/icons/cursors/): neutro
+   finche' non c'e' una partita, poi quello della fazione, che la Shell mette
+   in queste variabili. La punta della freccia e' al centro della texture
+   32x32, non nell'angolo. `_Valid` su cio' che si clicca, `_Invalid` sui
+   pulsanti disattivati, come sulla mappa del gioco. */
+:root {
+  --ti-cursor: url(/icons/cursors/Cursor_Neutral.png) 16 16, auto;
+  --ti-cursor-valid: url(/icons/cursors/Cursor_Neutral_Valid.png) 16 16, pointer;
+  --ti-cursor-invalid: url(/icons/cursors/Cursor_Neutral_Invalid.png) 16 16, not-allowed;
+}
+html { cursor: var(--ti-cursor); }
+/* fuori dai layer: vince sulle utility di Tailwind (cursor-pointer…) */
+a[href], button, select, summary, label:has(input), .cursor-pointer, table.data th {
+  cursor: var(--ti-cursor-valid);
+}
+button:disabled { cursor: var(--ti-cursor-invalid); }
+.cursor-help { cursor: var(--ti-cursor); }
+input[type="text"], input[type="search"], input[type="number"], textarea { cursor: text; }
+
 html, body {
   background: var(--void);
   color: var(--ink);
@@ -109,7 +128,6 @@ table.data th {
   font-size: 11px;
   letter-spacing: .04em;
   text-transform: uppercase;
-  cursor: pointer;
   user-select: none;
 }
 table.data th:first-child { z-index: 3; background: var(--bar); }
