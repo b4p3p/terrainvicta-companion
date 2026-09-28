@@ -45,14 +45,22 @@ def _text(lang, key):
 
 def save_language(g):
     """Lingua in cui e' scritto il salvataggio: quella che riconosce piu' nomi
-    di fazione. `ita` se non se ne riconosce nessuno."""
+    di fazione. `ita` se non se ne riconosce nessuno.
+
+    Prima le lingue gia' in memoria, e ci si ferma alla prima che le riconosce
+    tutte: nel browser ogni altra lingua e' un file da scaricare
+    (gamedata.set_loader), e provarle tutte vorrebbe dire scaricarne 14."""
+    named = [f for f in g.factions.values() if f.get("displayName")]
+    loaded = gamedata.loaded_languages()
+    order = [l for l in gamedata.available_languages() if l in loaded] +             [l for l in gamedata.available_languages() if l not in loaded]
     best, score = "ita", 0
-    for lang in gamedata.available_languages():
-        s = sum(1 for f in g.factions.values()
-                if f.get("displayName") and _text(
-                    lang, "TIFactionTemplate.displayName.%s" % f.get("templateName")) == f["displayName"])
+    for lang in order:
+        s = sum(1 for f in named if _text(
+            lang, "TIFactionTemplate.displayName.%s" % f.get("templateName")) == f["displayName"])
         if s > score:
             best, score = lang, s
+        if named and score == len(named):
+            break
     return best
 
 

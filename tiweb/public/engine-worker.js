@@ -136,6 +136,10 @@ from ticore.service import Service, ServiceError
 gamedata.use_bundle(json.loads(TPL), {l: json.loads(v) for l, v in LOC.items()}, list(LANGS))
 from ticore import presets
 presets.use_bundled_template(json.loads(PRESETS))
+# la lingua del salvataggio, se non e' fra quelle gia' scaricate (names.py):
+# XHR sincrono, permesso nei worker
+from pyodide.http import open_url
+gamedata.set_loader(lambda l: json.loads(open_url("/gamedata/loc/%s.json" % l).read()))
 del TPL, LOC, LANGS, PRESETS
 `);
   service = py.runPython(`s = Service(); s.lang = ${JSON.stringify(lang)}

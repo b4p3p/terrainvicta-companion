@@ -69,6 +69,18 @@ def add_strings(lang, table):
     trait_description.cache_clear()
 
 
+def set_loader(fn):
+    """Con l'estratto: `fn(lang)` scarica una lingua non ancora caricata la
+    prima volta che serve. Il browser parte con due lingue, ma per ritradurre
+    i nomi serve anche quella in cui e' scritto il salvataggio (names.py)."""
+    _bundle["loader"] = fn
+
+
+def loaded_languages():
+    """Le lingue gia' in memoria: con i file del gioco, tutte."""
+    return list(_bundle["strings"]) if _bundle else available_languages()
+
+
 @lru_cache(maxsize=1)
 def templates():
     if _bundle:
@@ -94,6 +106,12 @@ def templates():
 def strings(lang):
     """{'TIMissionTemplate.displayName.GainInfluence': 'Controlla nazione', ...}"""
     if _bundle:
+        if lang not in _bundle["strings"] and _bundle.get("loader")                 and lang in _bundle["languages"]:
+            try:
+                _bundle["strings"][lang] = _bundle["loader"](lang)
+            except Exception:
+                _bundle["strings"][lang] = {}     # lingua irraggiungibile: nomi com'e'
+            trait_description.cache_clear()
         return _bundle["strings"].get(lang, {})
     d = paths.localization_dir()
     out = {}
