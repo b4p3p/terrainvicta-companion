@@ -45,7 +45,14 @@ export function Landing() {
             {l.how.map((s, i) => (
               <li key={i} className="flex gap-3">
                 <span className="display text-accent text-[13px] w-4 shrink-0">{i + 1}</span>
-                <span>{s}</span>
+                <span>
+                  {s}
+                  {i === l.how.length - 1 && (
+                    <a href="/?demo=1" className="ml-2 text-accent hover:underline whitespace-nowrap">
+                      {t.engine.demoTry} →
+                    </a>
+                  )}
+                </span>
               </li>
             ))}
           </ol>

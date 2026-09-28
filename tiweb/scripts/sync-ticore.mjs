@@ -41,6 +41,12 @@ rmSync(iconsDst, { recursive: true, force: true });
 cpSync(iconsSrc, iconsDst, { recursive: true, filter: (p) => !p.endsWith(".md") });
 console.log("icone: assets/icons -> public/icons");
 
+// la partita demo (assets/demo/README.md)
+const demoDst = join(here, "..", "public", "demo");
+rmSync(demoDst, { recursive: true, force: true });
+cpSync(join(here, "..", "..", "assets", "demo"), demoDst, { recursive: true, filter: (p) => !p.endsWith(".md") });
+console.log("demo: assets/demo -> public/demo");
+
 // l'estratto richiede il gioco installato: se manca, la build va avanti e la
 // pagina ricade sulla cartella scelta dall'utente
 const out = join(here, "..", "public", "gamedata");

@@ -17,6 +17,7 @@ export interface Landing {
   featuresTitle: string;
   features: { title: string; text: string }[];
   howTitle: string;
+  /** l'ultimo passo e' l'invito alla demo: Landing ci aggiunge il pulsante */
   how: string[];
   faqTitle: string;
   faq: { q: string; a: string }[];
@@ -48,6 +49,7 @@ const en: Landing = {
     "Choose My Games or TerraInvicta inside Documents: the companion finds the Saves folder by itself.",
     "Keep it on a second monitor. It reloads by itself every time the game saves.",
     "The first visit downloads about 13 MB (Python compiled to WebAssembly); after that it starts from the browser cache.",
+    "Just curious? The demo opens a real campaign of the author's, in any browser.",
   ],
   faqTitle: "Questions",
   faq: [
@@ -65,7 +67,7 @@ const en: Landing = {
     },
     {
       q: "Which browsers work?",
-      a: "Chrome and Edge on desktop: reading a folder of your PC needs the File System Access API, which Firefox and Safari don't offer.",
+      a: "Chrome and Edge on desktop: reading a folder of your PC needs the File System Access API, which Firefox and Safari don't offer. The demo works in any browser.",
     },
     {
       q: "Is it free? Is it official?",
@@ -100,6 +102,7 @@ const it: Landing = {
     "In Documenti scegli My Games o TerraInvicta: alla cartella Saves ci arriva da solo.",
     "Tienilo sul secondo monitor. Si ricarica da solo ogni volta che il gioco salva.",
     "La prima visita scarica circa 13 MB (Python compilato in WebAssembly); poi parte dalla cache del browser.",
+    "Solo curioso? La demo apre una partita vera dell'autore, in qualunque browser.",
   ],
   faqTitle: "Domande",
   faq: [
@@ -117,7 +120,7 @@ const it: Landing = {
     },
     {
       q: "Con quali browser funziona?",
-      a: "Chrome ed Edge su desktop: leggere una cartella del PC richiede la File System Access API, che Firefox e Safari non offrono.",
+      a: "Chrome ed Edge su desktop: leggere una cartella del PC richiede la File System Access API, che Firefox e Safari non offrono. La demo funziona in qualunque browser.",
     },
     {
       q: "È gratis? È ufficiale?",

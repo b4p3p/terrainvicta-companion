@@ -783,6 +783,13 @@ const it = {
     unsupported:
       "Questo browser non permette di leggere una cartella del PC: serve Chrome o Edge.",
     error: "Il motore del companion si è fermato:",
+    demoTry: "Prova la demo",
+    demoHint: "Niente Terra Invicta a portata di mano, o un browser diverso da Chrome? Guarda una partita vera dell'autore: la Resistenza, da marzo a novembre 2026.",
+    demoOr: "oppure",
+    demoBadge: "Demo",
+    demoTitle: "Partita demo",
+    demoTip: "Stai guardando una partita dell'autore, non la tua: la Resistenza a Normale, da marzo a novembre 2026, in cinque salvataggi. Note, obiettivi e preset che aggiungi qui non vengono salvati.",
+    demoExit: "Esci dalla demo",
   },
 };
 
@@ -1519,6 +1526,13 @@ const en: typeof it = {
     unsupported:
       "This browser can't read a folder on your PC: use Chrome or Edge.",
     error: "The companion engine stopped:",
+    demoTry: "Try the demo",
+    demoHint: "No Terra Invicta at hand, or a browser other than Chrome? Look at a real campaign of the author's: the Resistance, from March to November 2026.",
+    demoOr: "or",
+    demoBadge: "Demo",
+    demoTitle: "Demo campaign",
+    demoTip: "You are looking at the author's campaign, not yours: the Resistance on Normal, from March to November 2026, in five saves. Notes, goals and presets you add here are not saved.",
+    demoExit: "Leave the demo",
   },
 };
 

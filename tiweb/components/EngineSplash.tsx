@@ -17,7 +17,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useEngineStatus } from "@/lib/api";
-import { BOOT_STEPS, engine, engineMode, type EngineStatus } from "@/lib/engine";
+import { BOOT_STEPS, engine, engineMode, enterDemo, type EngineStatus } from "@/lib/engine";
 import { useSettings } from "@/lib/settings";
 import { Button } from "@/components/ui";
 import { LanguagePicker } from "@/components/LanguagePicker";
@@ -134,6 +134,7 @@ function Panel({ st }: { st: EngineStatus }) {
         {st.state === "nofolder" && <>
           <p>{e.noFolder}</p>
           <Button tone="primary" onClick={pick}>{e.pick}</Button>
+          <Demo />
         </>}
         {st.state === "permission" && <>
           <p>{e.permission}</p>
@@ -145,8 +146,13 @@ function Panel({ st }: { st: EngineStatus }) {
         {st.state === "nosaves" && <>
           <p className="text-warn">{e.noSaves}</p>
           <Button onClick={pick}>{e.change}</Button>
+          <Demo />
         </>}
-        {st.state === "unsupported" && <p className="text-bad">{e.unsupported}</p>}
+        {/* Firefox, Safari, telefoni: la demo e' l'unica cosa che possono vedere */}
+        {st.state === "unsupported" && <>
+          <p className="text-bad">{e.unsupported}</p>
+          <Demo primary />
+        </>}
         {st.state === "error" && <>
           <p className="text-bad">{e.error}</p>
           <p className="font-mono text-[11.5px] break-all text-dim">{st.detail}</p>
@@ -156,6 +162,19 @@ function Panel({ st }: { st: EngineStatus }) {
         {err && <p className="text-bad">{err}</p>}
       </div>
     </section>
+  );
+}
+
+/** «Prova la demo»: la partita dell'autore, senza cartella (lib/engine.ts). */
+function Demo({ primary }: { primary?: boolean }) {
+  const { t } = useSettings();
+  const e = t.engine;
+  return (
+    <div className="pt-3 mt-1 border-t border-edge space-y-2">
+      {!primary && <p className="display text-[10.5px] uppercase tracking-[.14em] text-faint m-0">{e.demoOr}</p>}
+      <p className="m-0">{e.demoHint}</p>
+      <Button tone={primary ? "primary" : undefined} onClick={enterDemo}>{e.demoTry}</Button>
+    </div>
   );
 }
 

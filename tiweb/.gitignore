@@ -46,3 +46,4 @@ next-env.d.ts
 /public/pyodide/
 /public/icons/
 /public/gamedata/
+/public/demo/

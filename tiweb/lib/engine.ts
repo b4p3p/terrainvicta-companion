@@ -38,6 +38,27 @@ export function engineMode(): EngineMode {
   return ["localhost", "127.0.0.1"].includes(window.location.hostname) ? "server" : "browser";
 }
 
+/** Partita demo: i salvataggi dell'autore serviti dal sito (/demo/), per chi
+ *  vuole vedere il companion senza il gioco o con un browser che non legge
+ *  le cartelle. `?demo=1` la accende, `?demo=0` la spegne; vale per la scheda
+ *  (sessionStorage), cosi' la navigazione fra le schede non la perde. */
+export function demoMode(): boolean {
+  if (typeof window === "undefined") return false;
+  const q = new URLSearchParams(window.location.search).get("demo");
+  try {
+    if (q === "0") sessionStorage.removeItem("ti.demo");
+    else if (q !== null) sessionStorage.setItem("ti.demo", "1");
+    return sessionStorage.getItem("ti.demo") === "1";
+  } catch {
+    return q !== null && q !== "0";          // storage bloccato: solo l'URL
+  }
+}
+
+/** Entrare o uscire dalla demo ricarica la pagina: il motore si avvia una
+ *  volta sola, con o senza la cartella dell'utente. */
+export const enterDemo = () => window.location.assign("/?demo=1");
+export const exitDemo = () => window.location.assign("/?demo=0");
+
 export type EngineState =
   | "loading"      // Pyodide, ticore o il primo salvataggio in caricamento
   | "nofolder"     // nessuna cartella scelta
@@ -154,15 +175,17 @@ class Engine {
    *  o la prima richiesta, che nel montaggio di React possono venire prima. */
   start(lang = savedGameLang()) {
     if (this.worker || this.status.state === "unsupported") return;
-    if (!("showDirectoryPicker" in window)) {
+    // la demo non legge cartelle: funziona anche in Firefox e Safari
+    const demo = demoMode();
+    if (!demo && !("showDirectoryPicker" in window)) {
       this.setStatus("unsupported");
       return;
     }
     this.worker = new Worker("/engine-worker.js", { type: "module" });
     this.worker.onerror = (e) => this.setStatus("error", e.message || currentDict().engine.workerError);
     this.worker.onmessage = ({ data }) => this.onMessage(data);
-    this.worker.postMessage({ t: "init", lang });
-    void this.restoreFolder();
+    this.worker.postMessage({ t: "init", lang, demo });
+    if (!demo) void this.restoreFolder();
   }
 
   private async restoreFolder() {

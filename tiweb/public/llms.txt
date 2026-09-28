@@ -23,11 +23,13 @@ Site: https://terrainvicta-companion.b4p3p.it/
 2. Choose My Games or TerraInvicta inside Documents; the companion finds the Saves folder.
 3. It reloads automatically on every save. The first visit downloads about 13 MB (Python compiled to WebAssembly).
 
+Demo without the game, in any browser (a real campaign of the author's, the Resistance, March–November 2026): https://terrainvicta-companion.b4p3p.it/?demo=1
+
 ## Facts
 
 - Not a cheat: real councilor loyalty, intel the player hasn't gathered and rival missions during the mission phase stay hidden. Computed scores are labelled as such, with raw values shown.
 - Saves are never uploaded; no account, no tracking scripts.
 - Never writes to save files.
-- Firefox and Safari are not supported (no File System Access API).
+- Reading your own saves needs Chrome or Edge (File System Access API); the demo works in any browser.
 - Free, no ads, optional donations. Fan project, not affiliated with Pavonis Interactive or Hooded Horse.
 - Interface in English and Italian.

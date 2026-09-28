@@ -6,7 +6,8 @@
    /api/* attraverso ticore.service.Service.dispatch.
 
    Messaggi dalla pagina:
-     {t:"init", lang}                       avvio; risponde {t:"ready", languages}
+     {t:"init", lang, demo}                 avvio; risponde {t:"ready", languages}.
+                                            Con demo: carica /demo/ e niente IndexedDB
      {t:"folder", handle}                   cartella Saves concessa: parte il controllo
      {t:"req", id, method, path, query, body}  risponde {t:"res", id, ok, status, data|error}
    Verso la pagina, oltre alle risposte:
@@ -27,6 +28,7 @@ let service = null;
 let dir = null;
 let lastKey = "";
 let busy = false;
+let demo = false;       // partita demo: storico solo in memoria, mai in IndexedDB
 const loadedLangs = new Set();
 
 // Le richieste che vogliono uno snapshot aspettano il primo salvataggio letto:
@@ -67,6 +69,7 @@ async function restoreFiles() {
 }
 
 async function persistFiles() {
+  if (demo) return;
   for (const f of PERSIST) {
     const p = `${HOME}/${f}`;
     if (!py.FS.analyzePath(p).exists) continue;
@@ -120,7 +123,8 @@ async function init(lang) {
     py.FS.writeFile(`/lib/assets/presets/${f}`, await fetchText(`/py/assets/presets/${f}`));
   py.globals.set("PRESETS", await fetchText("/gamedata/presets-template.json"));
 
-  await restoreFiles();
+  if (demo) py.FS.mkdirTree(HOME);
+  else await restoreFiles();
   py.runPython(`
 import sys, json
 sys.path.insert(0, "/lib")
@@ -142,7 +146,35 @@ s`);
   post({ t: "ready", gameVersion: manifest.gameVersion });
   // senza cartella non e' "nosaves": la pagina puo' averne una in attesa del
   // permesso, e sa lei cosa mostrare (Engine.setStatus)
-  status(dir ? "loading" : "nofolder", "save");
+  status(dir || demo ? "loading" : "nofolder", "save");
+}
+
+// ------------------------------------------------------------ demo
+
+/* I salvataggi della demo, uno dopo l'altro nell'ordine del manifest: ogni
+   reload archivia lo snapshot nel database in memoria, cosi' Storico, allerte
+   e confronti hanno un precedente. */
+async function loadDemo() {
+  try {
+    const list = JSON.parse(await fetchText("/demo/manifest.json"));
+    py.FS.mkdirTree("/saves");
+    for (const { file, mtime } of list) {
+      const r = await fetch(`/demo/${file}`);
+      if (!r.ok) throw new Error(`/demo/${file}: ${r.status}`);
+      for (const n of py.FS.readdir("/saves")) if (n !== "." && n !== "..") py.FS.unlink(`/saves/${n}`);
+      const dest = `/saves/${file}`;
+      py.FS.writeFile(dest, new Uint8Array(await r.arrayBuffer()));
+      py.FS.utime(dest, mtime, mtime);
+      service.pinned = dest;
+      if (!service.reload(true)) throw new Error(`${file}: ${service.error}`);
+    }
+    snapshotLoaded();
+    const ev = py.runPython(`json.dumps(s.event("hello"), default=str)`);
+    post({ t: "event", ev: JSON.parse(ev) });
+    status("ready");
+  } catch (e) {
+    status("error", String(e));
+  }
 }
 
 // ------------------------------------------------------------ salvataggi
@@ -231,8 +263,10 @@ let ready = null;
 
 onmessage = async ({ data }) => {
   if (data.t === "init") {
+    demo = !!data.demo;
     ready = init(data.lang).catch((e) => status("error", String(e)));
     await ready;
+    if (demo) return service && loadDemo();   // niente cartella da sorvegliare
     setInterval(poll, POLL_MS);
     poll();
   } else if (data.t === "folder") {

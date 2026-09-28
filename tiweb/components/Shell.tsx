@@ -5,11 +5,12 @@ import { usePathname } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
 import { askNotificationPermission, useEngineStatus, useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
-import { engineMode, LOCKED_ENGINE, type EngineMode } from "@/lib/engine";
+import { demoMode, engineMode, exitDemo, LOCKED_ENGINE, type EngineMode } from "@/lib/engine";
 import { EngineGate } from "@/components/EngineGate";
 import { EngineSplash } from "@/components/EngineSplash";
 import { LanguagePicker } from "@/components/LanguagePicker";
 import { ResourceIcon, nf } from "@/components/ui";
+import { Tip } from "@/components/Tip";
 
 const TABS = [
   { href: "/", key: "overview" },
@@ -44,6 +45,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   // null nel render del server: dipende da URL e sessionStorage
   const mode = useSyncExternalStore<EngineMode | null>(noSubscribe, engineMode, () => null);
+  const demo = useSyncExternalStore(noSubscribe, demoMode, () => false);
 
   useEffect(() => { askNotificationPermission(); }, []);
 
@@ -65,6 +67,18 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           <span className="display text-[14px] uppercase tracking-[.08em] leading-none">
             {live.save?.faction ?? "Terra Invicta"}
           </span>
+
+          {/* la demo si deve vedere sempre: non e' la partita di chi guarda */}
+          {demo && (
+            <span className="flex items-center gap-2">
+              <Tip title={t.engine.demoTitle} content={t.engine.demoTip} width={320}>
+                <span className="display text-[11px] uppercase tracking-[.14em] px-1.5 py-px
+                                 border border-warn text-warn">{t.engine.demoBadge}</span>
+              </Tip>
+              <button onClick={exitDemo}
+                className="text-[11.5px] text-dim hover:text-ink underline">{t.engine.demoExit}</button>
+            </span>
+          )}
 
           {live.save && (
             <span className="text-dim text-[12px]">
