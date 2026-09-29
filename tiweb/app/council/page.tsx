@@ -29,17 +29,19 @@ export default function CouncilPage() {
     <>
       <Panel title={t.council.coverage} sub={t.council.coverageHint}>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {coverage.map((c) => (
+          {coverage.map((c) => {
+            const used = c.used || c.attribute === "Science";
+            return (
             <div key={c.attribute}
               className={`px-3 py-2 border ${c.weak ? "border-bad/40" : "border-edge"} bg-panel ${
-                c.used ? "" : "opacity-55"}`}>
+                used ? "" : "opacity-55"}`}>
               <div className="flex justify-between items-baseline">
                 <span className="font-semibold flex items-center gap-1.5">
                   <AttrIcon attr={c.attribute} size={16} title={c.short} />
                   {c.short}
                 </span>
                 <span className={`text-[18px] font-semibold ${
-                  c.weak ? "text-bad" : c.used ? "text-accent" : "text-dim"}`}>
+                  c.weak ? "text-bad" : used ? "text-accent" : "text-dim"}`}>
                   {c.max}
                 </span>
               </div>
@@ -47,7 +49,7 @@ export default function CouncilPage() {
                 <div className="h-full rounded-full"
                   style={{
                     width: `${(c.max / maxTotal) * 100}%`,
-                    background: c.weak ? "var(--bad)" : c.used ? "var(--accent)" : "var(--ink-faint)",
+                    background: c.weak ? "var(--bad)" : used ? "var(--accent)" : "var(--ink-faint)",
                   }} />
               </div>
               <div className="text-[11.5px] text-dim">
@@ -63,12 +65,15 @@ export default function CouncilPage() {
                           .replace("{total}", String(science))
                           .replace("{bonus}", (science / 5).toFixed(1))}</p>
                       </>}>
-                        <span className="underline decoration-dotted">{t.council.unused}</span>
+                        <span className="underline decoration-dotted">
+                          {t.council.scienceUse.replace("{bonus}", (science / 5).toFixed(1))}
+                        </span>
                       </Tip>
                     : t.council.unused}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </Panel>
 
