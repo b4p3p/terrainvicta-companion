@@ -83,7 +83,7 @@ export function Tag({
 export function GameIcon({
   bundle, icon, size = 18, height, title,
 }: {
-  bundle: "councilor_missions" | "icons_2d";
+  bundle: "councilor_missions" | "icons_2d" | "faction_logos";
   icon: string | null | undefined; size?: number; title?: string;
   /** per le icone non quadrate; di default uguale a `size` */
   height?: number;
@@ -107,6 +107,12 @@ export function GameIcon({
 
 export function MissionIcon(p: { icon: string | null | undefined; size?: number; title?: string }) {
   return <GameIcon bundle="councilor_missions" {...p} />;
+}
+
+/** Logo della fazione (TIFactionTemplate.councilIcon64): «FAC_<template>_64». */
+export function FactionLogo({ template, size = 28, title }: { template: string | null | undefined; size?: number; title?: string }) {
+  return <GameIcon bundle="faction_logos" icon={template ? `FAC_${template}_${size > 64 ? 128 : 64}` : null}
+    size={size} title={title} />;
 }
 
 export function ResourceIcon(p: { icon: string | null | undefined; size?: number; title?: string }) {
@@ -283,4 +289,16 @@ export function Button({
       {children}
     </button>
   );
+}
+
+
+/** «35 giorni fa», «3 mesi fa»: distanza fra due date di gioco (AAAA-MM-GG),
+ *  nella lingua scelta. Il riferimento e' la data della partita, non oggi. */
+export function gameAgo(from: string, to: string, locale: string) {
+  const days = Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);
+  if (!Number.isFinite(days)) return "";
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  if (Math.abs(days) < 45) return rtf.format(-days, "day");
+  if (Math.abs(days) < 730) return rtf.format(-Math.round(days / 30.44), "month");
+  return rtf.format(-Math.round(days / 365.25), "year");
 }

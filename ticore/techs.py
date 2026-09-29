@@ -315,8 +315,81 @@ def overview(g, lang="ita"):
     out.sort(key=lambda x: (x["category"] or "", x["cost"]))
     return {
         "techs": out,
+        "projects": available_projects(g, lang),
         "inProgress": [{"id": x, "name": gamedata.tech_name(lang, x)} for x in ctx.in_progress if x],
         "rules": {"science": ctx.science, "scienceBonus": round(ctx.science / 5, 1),
                   "humanFactions": ctx.humans, "traitBonus": ctx.trait_bonus,
                   "effectBonus": ctx.effect_bonus, "speed": ctx.speed},
     }
+
+
+_XN = re.compile(r"\s*x\d+$")
+
+
+def _unlocks(lang, name):
+    """Componenti sbloccati, per famiglia, coi nomi del gioco. Le varianti
+    «x1…x6» dello stesso motore diventano una voce sola."""
+    by = {}
+    for fam, dn in gamedata.templates()["projectUnlocks"].get(name) or []:
+        n = gamedata.loc(lang, "TI%sTemplate" % fam, "displayName", dn, dn)
+        n = _XN.sub("", n.split("\t")[0].strip())
+        if n not in by.setdefault(fam, []):
+            by[fam].append(n)
+    return [{"family": f, "names": v} for f, v in by.items()]
+
+
+def available_projects(g, lang="ita"):
+    """Scegli progetto: quelli che la fazione puo' avviare adesso
+    (`availableProjectNames`), con effetti, componenti sbloccati, cio' che
+    aprono e il tempo alla quota di ricerca di uno slot progetto.
+
+    Il tempo e' una stima NOSTRA: costo che manca / (ricerca del mese x quota
+    dello slot). Per un progetto fermo la quota e' la sua; per uno da avviare,
+    la piu' alta fra gli slot progetto col peso, cioe' dove lo metteresti."""
+    from . import model
+    P = gamedata.templates()["projects"]
+    T = gamedata.templates()["techs"]
+    proj = model.projects(g, lang)
+    rate = proj["rate"]
+    slot_shares = [s["share"] for s in model.research(g, lang)["slots"]
+                   if s["kind"] == "project" and s.get("share")]
+    best = max(slot_shares) if slot_shares else None
+    # «segna come obsoleto» nella schermata dei progetti del gioco
+    hidden = set(g.me.get("hiddenProjects") or [])
+    out = []
+    for it in proj["items"]:
+        name = it["id"]
+        p = P.get(name) or {}
+        effects = [e for e in p.get("effects") or [] if e]
+        grants = [{"resource": r.get("resource"), "value": r.get("value"),
+                   "name": gamedata.resource_name(lang, r.get("resource"))}
+                  for r in p.get("resourcesGranted") or [] if r.get("resource")]
+        summary = gamedata.loc(lang, "TIProjectTemplate", "summary", name, "")
+        unlocks = _unlocks(lang, name)
+        opens = [{"id": m, "name": gamedata.tech_name(lang, m) if m in T else gamedata.project_name(lang, m),
+                  "kind": "tech" if m in T else "project"}
+                 for fam in (T, P) for m, u in fam.items()
+                 if name in [x for x in (u.get("prereqs") or []) if x]
+                 or name in (u.get("altPrereq0"), u.get("altPrereq1"))]
+        share = it["share"] if it["active"] else best
+        left = max(0, it["cost"] - it["accumulated"])
+        out.append({
+            "id": name,
+            "name": it["name"],
+            "summary": "" if summary.startswith("<") else _TAG.sub("", summary).strip(),
+            "cost": it["cost"],
+            "effects": [t for t in (effect_text(lang, e) for e in effects) if t],
+            "grants": grants,
+            "unlocks": unlocks,
+            "opens": opens,
+            "themes": sorted(set(_themes(effects, grants)) | ({"space"} if unlocks else set())),
+            "repeatable": it["repeatable"],
+            "obsolete": name in hidden,
+            "active": it["active"],
+            "slot": it["slot"],
+            "accumulated": it["accumulated"],
+            "share": share,
+            "months": round(left / (rate * share), 1) if rate and share else None,
+        })
+    out.sort(key=lambda x: (x["obsolete"], not x["active"], x["cost"]))
+    return {"items": out, "rate": rate, "share": best}

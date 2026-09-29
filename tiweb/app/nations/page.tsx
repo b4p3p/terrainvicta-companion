@@ -6,9 +6,10 @@ import { Legend, ShareBar, WeightChips, pc, type Slice } from "@/components/prio
 import { useSettings } from "@/lib/settings";
 import { usePersistentState } from "@/lib/persist";
 import {
-  Column, DataTable, Empty, GameIcon, Panel, Spark, Tag, TrendArrow, bn, nf, pct,
+  Column, DataTable, Empty, GameIcon, MissionIcon, Panel, Spark, Tag, TrendArrow, bn, nf, pct,
 } from "@/components/ui";
 import { Guide } from "@/components/Guide";
+import { Tip } from "@/components/Tip";
 import type { Nation, NationTrends, TrendKey } from "@/lib/types";
 
 const SCOPES = ["all", "eu", "mine", "full", "partial", "free", "affordable", "contested"] as const;
@@ -326,6 +327,19 @@ export default function NationsPage() {
             : r.freeCP === r.cp ? <Tag tone="free">{t.nations.free}</Tag>
               : r.freeCP > 0 ? <Tag tone="free">{r.freeCP}</Tag>
                 : <Tag tone="bad">{t.nations.taken}</Tag>}
+          {r.myCPDisabled > 0 && <>
+            {" "}
+            {/* l'icona di Reprimi: il gioco segna cosi' i punti coi benefici sospesi */}
+            <Tip title={t.nations.cpOffTitle} content={<>
+              {r.myCPDisabledSince && <div>{t.nations.cpOffSince.replace("{date}", r.myCPDisabledSince)}</div>}
+              {r.myCPDisabledUntil && <div className={r.autoAbandon ? "" : "text-warn"}>
+                {(r.autoAbandon ? t.nations.cpOffRenew : t.nations.cpOffUntil).replace("{date}", r.myCPDisabledUntil)}
+              </div>}
+              <div className="text-dim mt-1">{t.nations.cpOffNote}</div>
+            </>}>
+              <span className="inline-block align-[-3px]"><MissionIcon icon="ICO_crackdown" size={16} /></span>
+            </Tip>
+          </>}
         </>
       ),
     },

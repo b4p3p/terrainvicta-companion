@@ -223,7 +223,7 @@ function Section({ title, children }: { title: ReactNode; children: ReactNode })
   );
 }
 
-export function CouncilorCard({ c, variant, action, sortAttr, highlighted }: {
+export function CouncilorCard({ c, variant, action, sortAttr, highlighted, onMission, activeMission }: {
   c: Councilor;
   /** «council»: già nel consiglio; «recruit»: candidato, con le differenze */
   variant: "council" | "recruit";
@@ -231,6 +231,9 @@ export function CouncilorCard({ c, variant, action, sortAttr, highlighted }: {
   action?: ReactNode;
   sortAttr?: Attr | null;
   highlighted?: boolean;
+  /** clic su una missione: la pagina filtra per quella (Reclutamento) */
+  onMission?: (id: string) => void;
+  activeMission?: string | null;
 }) {
   const { t } = useSettings();
   const recruit = variant === "recruit";
@@ -321,16 +324,24 @@ export function CouncilorCard({ c, variant, action, sortAttr, highlighted }: {
           ? <div className="text-dim">—</div>
           : (
             <div className="flex gap-1 flex-wrap">
-              {missions.map((m) => (
-                <Tag key={m.id} tone={m.new ? "mine" : "dim"}>
-                  <span className="inline-flex items-center gap-1"
-                    title={m.new ? t.recruit.missionsNewHint : undefined}>
-                    <MissionIcon icon={m.icon} size={16} title={m.name} />
-                    {m.name}
-                    {m.attribute && <AttrIcon attr={m.attribute} size={12} title={short(m.attribute)} />}
-                  </span>
-                </Tag>
-              ))}
+              {missions.map((m) => {
+                const tag = (
+                  <Tag tone={m.new ? "mine" : "dim"}>
+                    <span className={`inline-flex items-center gap-1 ${m.id === activeMission ? "text-accent" : ""}`}
+                      title={m.new ? t.recruit.missionsNewHint : undefined}>
+                      <MissionIcon icon={m.icon} size={16} title={m.name} />
+                      {m.name}
+                      {m.attribute && <AttrIcon attr={m.attribute} size={12} title={short(m.attribute)} />}
+                    </span>
+                  </Tag>
+                );
+                return onMission
+                  ? <button key={m.id} type="button" onClick={() => onMission(m.id)}
+                      className={m.id === activeMission ? "outline outline-1 outline-accent" : "hover:brightness-125"}>
+                      {tag}
+                    </button>
+                  : <span key={m.id}>{tag}</span>;
+              })}
             </div>
           )}
       </div>

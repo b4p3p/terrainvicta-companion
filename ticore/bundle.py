@@ -46,6 +46,14 @@ KEEP_PREFIXES = (
     # scheda Spazio: habitat coi nomi dei template, orbite, corpi, siti, moduli
     "TIHabTemplate.displayName.",
     "TIHabModuleTemplate.displayName.",
+    # componenti sbloccati dai progetti (gamedata.PART_FAMILIES)
+    "TIShipHullTemplate.displayName.", "TIDriveTemplate.displayName.",
+    "TIPowerPlantTemplate.displayName.", "TIRadiatorTemplate.displayName.",
+    "TIHeatSinkTemplate.displayName.", "TIBatteryTemplate.displayName.",
+    "TIShipArmorTemplate.displayName.", "TIGunTemplate.displayName.",
+    "TIMagneticGunTemplate.displayName.", "TILaserWeaponTemplate.displayName.",
+    "TIParticleWeaponTemplate.displayName.", "TIPlasmaWeaponTemplate.displayName.",
+    "TIMissileTemplate.displayName.", "TIUtilityModuleTemplate.displayName.",
     "TIOrbitTemplate.displayName.",
     "TISpaceBodyTemplate.displayName.",
     "TIHabSiteTemplate.displayName.",

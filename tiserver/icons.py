@@ -18,7 +18,7 @@ import threading
 from ticore import paths
 
 # bundle Unity da cui arrivano le icone, per famiglia
-BUNDLES = ("councilor_missions", "icons_2d")
+BUNDLES = ("councilor_missions", "icons_2d", "faction_logos")
 _BUNDLE = BUNDLES[0]          # compatibilita': la famiglia storica
 
 _lock = threading.Lock()

@@ -41,6 +41,12 @@ def _chrono(v):
     return list(reversed(v)) if isinstance(v, list) else []
 
 
+# Durata dell'abbandono di una nazione: TIGlobalConfig.selfDisableControlPointDuration_months,
+# 6 nel costruttore e in nessun template (IL di TINationState.SelfDisableControlPoints).
+# Scade con crackdownExpiration; il rinnovo automatico la sposta di altri 6 mesi.
+ABANDON_MONTHS = 6
+
+
 def nations(g, lang="ita"):
     me_key = (g.me.get("templateName") or "").replace("Council", "")
     nm = Namer(g, lang)
@@ -71,6 +77,19 @@ def nations(g, lang="ita"):
                    / c["totalWeightsForControlPoint"]
                    for c in cp_objs if c.get("totalWeightsForControlPoint")]
         hist = [round(x, 1) for x in _chrono(n.get("historyResearch"))][-32:]
+        # i tuoi punti coi benefici sospesi (nazione abbandonata o Reprimi),
+        # la prima scadenza e l'inizio stimato, GG/MM/AAAA come il gioco
+        off = [c for c in cp_objs if c.get("benefitsDisabled")
+               and g.factions.get((c.get("faction") or {}).get("value")) is g.me]
+        until = sorted((e["year"], e["month"], e["day"]) for e in
+                       (c.get("crackdownExpiration") for c in off) if e and e.get("year"))
+        since = None
+        if until:
+            y, m, _ = until[0]
+            m -= ABANDON_MONTHS
+            y, m = (y - 1, m + 12) if m < 1 else (y, m)
+            since = "%02d/%04d" % (m, y)
+
         op = _now(n.get("historyPublicOpinion")) or n.get("publicOpinion") or {}
         out.append({
             "id": nation_id(n),              # chiave stabile: il nome cambia con la lingua
@@ -97,6 +116,12 @@ def nations(g, lang="ita"):
             "miltech": n.get("militaryTechLevel") or 0,
             "cp": n.get("numControlPoints") or len(cps),
             "myCP": mine, "freeCP": free, "takenCP": taken,
+            "myCPDisabled": len(off),
+            "myCPDisabledUntil": "%02d/%02d/%04d" % until[0][::-1] if until else None,
+            "myCPDisabledSince": since,
+            # «Rinnovo automatico abbandono» (TIFactionState.permaAbandonedNations)
+            "autoAbandon": any((x or {}).get("value") == (n.get("ID") or {}).get("value")
+                               for x in g.me.get("permaAbandonedNations") or []),
             # quanto occupa un punto di questa nazione nel tetto dei punti di controllo
             "cpCost": round(cp_cost(g, n), 2),
             "owners": sorted(set(owners.values())),
@@ -615,9 +640,11 @@ def alien_sites(g, lang="ita"):
         out.append({
             "regionId": rid,
             "region": nm.region_label(rid),
-            "since": "%04d-%02d-%02d" % (d.get("year", 0), d.get("month", 0), d.get("day", 0)),
+            "since": "%02d/%02d/%04d" % (d.get("day", 0), d.get("month", 0), d.get("year", 0)),
+            "sinceKey": "%04d-%02d-%02d" % (d.get("year", 0), d.get("month", 0), d.get("day", 0)),
         })
-    return out
+    # il piu' recente in cima: e' quello a cui non hai ancora reagito
+    return sorted(out, key=lambda s: s["sinceKey"], reverse=True)
 
 
 def snapshot(g, lang="ita"):

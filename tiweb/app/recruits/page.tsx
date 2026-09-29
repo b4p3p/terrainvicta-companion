@@ -103,13 +103,18 @@ export default function RecruitsPage() {
   const { data: snap, error } = useSnapshot(live.version, game);
   const [sort, setSort] = useState<Sort>("covers");
   const [pickedIds, setPickedIds] = useState<number[]>([]);
+  const [mission, setMission] = useState<string | null>(null);
 
   if (error) return <Empty>{t.common.error}: {error}</Empty>;
   if (!snap) return <Empty>{t.common.loading}</Empty>;
   if (snap.recruits.length === 0) return <Empty>{t.recruit.empty}</Empty>;
 
   const sortAttr = (ATTRS as readonly string[]).includes(sort) ? (sort as Attr) : null;
-  const list = [...snap.recruits].sort((a, b) => {
+  // tutte le missioni dei candidati, per il filtro: una volta sola, per nome
+  const allMissions = [...new Map(snap.recruits.flatMap((c) => c.missionList)
+    .map((m) => [m.id, m] as const)).values()].sort((a, b) => a.name.localeCompare(b.name));
+  const withMission = (c: Councilor) => !mission || c.missionList.some((m) => m.id === mission);
+  const list = snap.recruits.filter(withMission).sort((a, b) => {
     if (sortAttr) return (b.attributes[sortAttr] ?? 0) - (a.attributes[sortAttr] ?? 0);
     if (sort === "covers") return (b.covers?.length ?? 0) - (a.covers?.length ?? 0);
     if (sort === "income") return incomeWeight(b.income) - incomeWeight(a.income);
@@ -166,6 +171,27 @@ export default function RecruitsPage() {
         ))}
       </div>
 
+      {/* filtro per missione: dal menu o cliccando una missione su una scheda */}
+      <div className="flex items-center gap-2 mb-3 text-[12px] flex-wrap">
+        <span className="text-dim">{t.recruit.missionFilter}</span>
+        <select value={mission ?? ""} onChange={(e) => setMission(e.target.value || null)}>
+          <option value="">{t.recruit.missionAll}</option>
+          {allMissions.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name} ({snap.recruits.filter((c) => c.missionList.some((x) => x.id === m.id)).length})
+            </option>
+          ))}
+        </select>
+        {mission ? <>
+          <span className="text-faint">
+            {t.recruit.missionCount.replace("{n}", String(list.length)).replace("{total}", String(snap.recruits.length))}
+          </span>
+          <button onClick={() => setMission(null)} className="text-dim hover:text-ink underline">
+            {t.recruit.missionClear}
+          </button>
+        </> : <span className="text-faint">{t.recruit.missionFilterHint}</span>}
+      </div>
+
       {picked.length > 0 && (
         <Compare picked={picked} coverage={snap.council.coverage}
           onClear={() => setPickedIds([])} />
@@ -175,6 +201,8 @@ export default function RecruitsPage() {
         {list.map((c) => (
           <CouncilorCard key={c.id} c={c} variant="recruit" sortAttr={sortAttr}
             highlighted={pickedIds.includes(c.id)}
+            activeMission={mission}
+            onMission={(id) => setMission((cur) => (cur === id ? null : id))}
             action={(() => {
               const on = pickedIds.includes(c.id);
               return (

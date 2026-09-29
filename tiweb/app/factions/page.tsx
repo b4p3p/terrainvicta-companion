@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useApi } from "@/lib/api";
 import { usePersistentState } from "@/lib/persist";
 import { useSettings } from "@/lib/settings";
-import { Empty, Panel, ResourceIcon, Tag, nf } from "@/components/ui";
+import { Empty, FactionLogo, Panel, ResourceIcon, Tag, nf } from "@/components/ui";
 import { Guide } from "@/components/Guide";
 import { FactionCouncilors } from "@/components/FactionCouncilors";
 import { Attitude } from "@/components/CpTargets";
@@ -224,8 +224,10 @@ export default function FactionsPage() {
                 </th>
               ) : (
                 <th key={f.id} className={`text-left align-top px-3 pb-2 pt-1 font-normal ${f.mine ? "bg-sel/40" : ""}`}>
-                  <div className="display text-[13px] uppercase tracking-[.04em] border-l-2 pl-2"
+                  <div className="display text-[13px] uppercase tracking-[.04em] border-l-2 pl-2
+                                  flex items-center gap-2"
                     style={{ borderColor: f.colors?.accent ?? "var(--edge-lit)" }}>
+                    <FactionLogo template={f.template} size={28} />
                     {f.name}
                   </div>
                   <div className="text-faint text-[11px] pl-2.5 mt-0.5">

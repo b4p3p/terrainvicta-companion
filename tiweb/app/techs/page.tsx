@@ -24,8 +24,19 @@ interface Tech {
   cost: number; effects: string[]; now: Project[]; later: Project[];
   opens: (Ref & { missing: Ref[] })[]; themes: string[];
 }
+/** Progetto avviabile adesso (techs.available_projects). */
+interface Avail {
+  id: string; name: string; summary: string; cost: number;
+  effects: string[]; grants: { resource: string; value: number; name: string }[];
+  unlocks: { family: string; names: string[] }[];
+  opens: (Ref & { kind: "tech" | "project" })[];
+  themes: string[]; repeatable: boolean; obsolete: boolean;
+  active: boolean; slot: number | null; accumulated: number;
+  share: number | null; months: number | null;
+}
 interface Techs {
   techs: Tech[];
+  projects: { items: Avail[]; rate: number; share: number | null };
   inProgress: Ref[];
   rules: { science: number; scienceBonus: number; humanFactions: number;
            traitBonus: number; effectBonus: number; speed: number };
@@ -59,6 +70,12 @@ const CATEGORY_ICON: Record<string, string> = {
 };
 const SORTS = ["category", "cost", "now"] as const;
 type Sort = (typeof SORTS)[number];
+const TABS = ["techs", "projects"] as const;
+type Tab = (typeof TABS)[number];
+const PSORTS = ["cost", "months"] as const;
+type PSort = (typeof PSORTS)[number];
+const isTab = (v: unknown): v is Tab => (TABS as readonly unknown[]).includes(v);
+const isPSort = (v: unknown): v is PSort => (PSORTS as readonly unknown[]).includes(v);
 
 const isTheme = (v: unknown): v is Theme =>
   v === "all" || (THEMES as readonly unknown[]).includes(v);
@@ -157,6 +174,70 @@ function ProjectRow({ p }: { p: Project }) {
         <p className="m-0 mt-0.5 text-[12px] text-faint italic">{p.summary}</p>
       )}
     </div>
+  );
+}
+
+/** Un progetto da scegliere: cosa dà, cosa sblocca, quanto ci metti. */
+function AvailCard({ p, rate }: { p: Avail; rate: number }) {
+  const { t } = useSettings();
+  const k = t.techs;
+  const stalled = p.active && !p.share;
+  return (
+    <article className={`bg-panel border border-edge p-3 flex flex-col gap-1.5 ${p.obsolete ? "opacity-45" : ""}`}>
+      <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <h3 className="display text-[15px] m-0 text-ink">{p.name}</h3>
+        {p.active && <Tag tone={stalled ? "bad" : "mine"}>
+          {stalled ? k.projStalled : fill(k.projActive, { slot: p.slot ?? "?" })}</Tag>}
+        {p.repeatable && <TagTip label={k.projRepeatable} hint={k.projRepeatableHint} />}
+        {p.obsolete && <TagTip label={k.projObsolete} hint={k.projObsoleteHint} />}
+        <span className="ml-auto whitespace-nowrap text-[12px] inline-flex items-baseline gap-1.5">
+          <span className="display text-[14px]">{nf(p.cost, 0)}</span>
+          <span className="text-faint text-[11px]">{k.pts}</span>
+          {p.months != null && <>
+            <span className="text-faint">·</span>
+            <Tip title={k.projMonthsTitle} width={300} content={<>
+              <TipRow label={k.projLeft} value={nf(p.cost - p.accumulated, 0)} />
+              <TipRow label={k.projRate} value={nf(rate, 1)} />
+              <TipRow label={k.projShare} value={`${Math.round((p.share ?? 0) * 100)}%`} />
+              <TipRow strong label={k.projMonthsTitle} value={fill(k.projMonths, { n: nf(p.months, 1) })} />
+              <p className="m-0 mt-1.5 text-faint">{k.projMonthsHint}</p>
+            </>}>
+              <span>{fill(k.projMonths, { n: nf(p.months, 1) })}</span>
+            </Tip>
+          </>}
+        </span>
+      </header>
+      {p.active && p.accumulated > 0 && (
+        <div className="h-[3px] bg-edge"><div className="h-full bg-accent"
+          style={{ width: `${Math.min(100, (p.accumulated / p.cost) * 100)}%` }} /></div>
+      )}
+      {(p.grants.length > 0 || p.effects.length > 0) && (
+        <ul className="m-0 pl-4 text-[12px] text-dim list-disc marker:text-faint">
+          {p.grants.map((g) => <li key={g.resource}>{fill(k.grant, { value: nf(g.value, 0), resource: g.name })}</li>)}
+          {p.effects.map((e, i) => <li key={i}>{e}</li>)}
+        </ul>
+      )}
+      {p.unlocks.length > 0 && (
+        <div className="text-[12px]">
+          <span className="text-faint text-[10.5px] uppercase tracking-[.06em] mr-2">{k.unlocks}</span>
+          {p.unlocks.map((u) => (
+            <span key={u.family} className="mr-3">
+              <span className="text-faint">{k.family[u.family] ?? u.family}:</span>{" "}
+              <span className="text-ink">{u.names.join(", ")}</span>
+            </span>
+          ))}
+        </div>
+      )}
+      {p.opens.length > 0 && (
+        <div className="text-[12px]">
+          <span className="text-faint text-[10.5px] uppercase tracking-[.06em] mr-2">{k.opens}</span>
+          <span className="text-dim">{p.opens.map((o) => o.name).join(", ")}</span>
+        </div>
+      )}
+      {p.grants.length === 0 && p.effects.length === 0 && p.unlocks.length === 0 && p.summary && (
+        <p className="m-0 text-[12px] text-faint italic">{p.summary}</p>
+      )}
+    </article>
   );
 }
 
@@ -260,6 +341,8 @@ export default function TechsPage() {
   const [sort, setSort] = usePersistentState<Sort>("techs.sort", "now", isSort);
   const [onlyNow, setOnlyNow] = usePersistentState("techs.onlyNow", false, isBool);
   const [openLater, setOpenLater] = usePersistentState("techs.later", false, isBool);
+  const [tab, setTab] = usePersistentState<Tab>("techs.tab", "techs", isTab);
+  const [psort, setPsort] = usePersistentState<PSort>("techs.psort", "cost", isPSort);
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -275,15 +358,27 @@ export default function TechsPage() {
     return [...xs].sort(by[sort]);
   }, [data, theme, sort, onlyNow]);
 
+  // in corso per primi, gli obsoleti sempre in fondo
+  const prows = useMemo(() => {
+    if (!data) return [];
+    const key = (p: Avail) => psort === "months" ? (p.months ?? Infinity) : p.cost;
+    return data.projects.items
+      .filter((p) => theme === "all" || p.themes.includes(theme))
+      .sort((a, b) => Number(a.obsolete) - Number(b.obsolete)
+        || Number(b.active) - Number(a.active) || key(a) - key(b));
+  }, [data, theme, psort]);
+
   if (error) return <Empty>{t.common.error}: {error}</Empty>;
   if (!data) return <Empty>{t.common.loading}</Empty>;
 
+  const list: { themes: string[] }[] = tab === "techs" ? data.techs : data.projects.items;
   const count = (th: Theme) =>
-    th === "all" ? data.techs.length : data.techs.filter((x) => x.themes.includes(th)).length;
+    th === "all" ? list.length : list.filter((x) => x.themes.includes(th)).length;
   const r = data.rules;
 
   return (
-    <Panel title={k.title} sub={`${rows.length} / ${data.techs.length}`}
+    <Panel title={k.title}
+      sub={tab === "techs" ? `${rows.length} / ${data.techs.length}` : `${prows.length} / ${data.projects.items.length}`}
       right={
         <Guide title={k.title} sections={[
           { body: [k.guideIntro] },
@@ -297,9 +392,21 @@ export default function TechsPage() {
         ]} />
       }>
       <div className="px-3 pt-3">
+        {/* tecnologia e progetto sono due scelte diverse: globale e condivisa
+            la prima, solo tua la seconda */}
+        <div className="flex mb-3">
+          {TABS.map((x) => (
+            <button key={x} type="button" onClick={() => setTab(x)} aria-pressed={tab === x}
+              className={`display text-[12px] uppercase tracking-[.07em] px-4 h-8 -ml-px border ${tab === x
+                ? "border-sel-edge bg-sel text-ink relative z-[1]" : "border-edge-lit bg-control text-dim hover:text-ink"}`}>
+              {x === "techs" ? k.tabTechs : k.tabProjects}
+              <span className="text-faint ml-1.5">{x === "techs" ? data.techs.length : data.projects.items.length}</span>
+            </button>
+          ))}
+        </div>
         <p className="text-faint text-[11.5px] mt-0 mb-3">
-          {k.sub}
-          {data.inProgress.length > 0 && <> {k.inProgress}: {data.inProgress.map((x) => x.name).join(", ")}.</>}
+          {tab === "projects" ? fill(k.projSub, { rate: nf(data.projects.rate, 1) }) : k.sub}
+          {tab === "techs" && data.inProgress.length > 0 && <> {k.inProgress}: {data.inProgress.map((x) => x.name).join(", ")}.</>}
         </p>
 
         <div className="flex flex-wrap items-center gap-1.5 mb-2">
@@ -312,6 +419,16 @@ export default function TechsPage() {
             </button>
           ))}
         </div>
+        {tab === "projects" ? (
+          <div className="flex flex-wrap items-center gap-4 mb-3 text-[12px]">
+            <label className="flex items-center gap-1.5">
+              <span className="text-faint">{k.sortBy}</span>
+              <select value={psort} onChange={(e) => setPsort(e.target.value as PSort)}>
+                {PSORTS.map((s) => <option key={s} value={s}>{k.projSort[s]}</option>)}
+              </select>
+            </label>
+          </div>
+        ) : (
         <div className="flex flex-wrap items-center gap-4 mb-3 text-[12px]">
           <label className="flex items-center gap-1.5">
             <span className="text-faint">{k.sortBy}</span>
@@ -328,9 +445,14 @@ export default function TechsPage() {
             {k.showLater}
           </label>
         </div>
+        )}
       </div>
 
-      {rows.length === 0 ? <Empty>{k.none}</Empty> : (
+      {tab === "projects" ? (prows.length === 0 ? <Empty>{k.projNone}</Empty> : (
+        <div className="grid gap-3 px-3 pb-3 lg:grid-cols-2 2xl:grid-cols-3">
+          {prows.map((p) => <AvailCard key={p.id} p={p} rate={data.projects.rate} />)}
+        </div>
+      )) : rows.length === 0 ? <Empty>{k.none}</Empty> : (
         <div className="grid gap-3 px-3 pb-3 lg:grid-cols-2 2xl:grid-cols-3">
           {rows.map((x) => (
             <TechCard key={x.id} tech={x} open={openLater} onToggle={() => setOpenLater(!openLater)}

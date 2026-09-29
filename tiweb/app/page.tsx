@@ -3,7 +3,8 @@
 import { useSnapshot } from "@/lib/api";
 import { ResearchPanel } from "@/components/ResearchPanel";
 import { useSettings } from "@/lib/settings";
-import { Bars, Empty, MissionIcon, Panel, ResourceIcon, Tag, nf } from "@/components/ui";
+import { GAME_LOCALES } from "@/lib/i18n";
+import { Bars, Empty, MissionIcon, Panel, ResourceIcon, Tag, nf, gameAgo } from "@/components/ui";
 import type { Alert, Snapshot } from "@/lib/types";
 
 const TONE = {
@@ -108,10 +109,6 @@ export default function Overview() {
               </div>
             </div>
           </Panel>
-        </div>
-
-        <div>
-          <ResearchPanel />
 
           <Panel title={t.overview.controlPoints}>
             <Bars rows={cps} value={(r) => r[1]}
@@ -151,14 +148,26 @@ export default function Overview() {
             <Panel title={t.overview.alienSites}>
               <div className="flex flex-col gap-1.5 text-[12.5px]">
                 {snap.alienSites.map((s) => (
-                  <div key={s.region} className="flex justify-between">
+                  <div key={s.region} className="flex justify-between items-baseline gap-3">
                     <span>{s.region}</span>
-                    <Tag tone="warn">{s.since}</Tag>
+                    <span className="flex items-baseline gap-2">
+                      <span className="text-faint text-[11.5px]">
+                        {gameAgo(s.sinceKey, snap.dateKey, GAME_LOCALES[game] ?? "en")}
+                      </span>
+                      <Tag tone="warn">{s.since}</Tag>
+                    </span>
                   </div>
                 ))}
               </div>
             </Panel>
           )}
+        </div>
+
+        {/* la corsa alla ricerca e' la card piu' alta: da sola a destra, cosi'
+            le due colonne finiscono piu' o meno insieme */}
+        <div>
+          <ResearchPanel />
+
         </div>
       </div>
     </>

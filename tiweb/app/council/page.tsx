@@ -6,6 +6,7 @@ import { useSettings } from "@/lib/settings";
 import { AttrIcon, Empty, MissionIcon, Panel, ResourceIcon, Tag } from "@/components/ui";
 import { CouncilorCard, short } from "@/components/CouncilorCard";
 import { MissionFinder } from "@/components/MissionFinder";
+import { Tip } from "@/components/Tip";
 import type { Councilor } from "@/lib/types";
 
 export default function CouncilPage() {
@@ -17,6 +18,9 @@ export default function CouncilPage() {
 
   const { team, coverage, missions } = snap.council;
   const maxTotal = Math.max(...coverage.map((c) => c.max), 1);
+  // la Scienza non serve alle missioni ma alla probabilita' dei progetti
+  // (techs.py: Scienza totale del consiglio / 5)
+  const science = team.reduce((acc, c) => acc + (c.attributes.Science ?? 0), 0);
   // il candidato che copre piu' missioni scoperte, come anteprima sulla card
   const bestCover = snap.recruits.reduce<Councilor | null>(
     (best, c) => ((c.covers?.length ?? 0) > (best?.covers?.length ?? 0) ? c : best), null);
@@ -52,7 +56,16 @@ export default function CouncilPage() {
               <div className="text-[11px] text-faint mt-0.5" title={t.council.useHint}>
                 {c.used
                   ? t.council.use.replace("{a}", String(c.attack)).replace("{d}", String(c.defense))
-                  : t.council.unused}
+                  : c.attribute === "Science"
+                    ? <Tip title={t.council.scienceTitle} width={320} content={<>
+                        <p className="m-0 mb-1.5">{t.council.scienceTip}</p>
+                        <p className="m-0 text-ink">{t.council.scienceNow
+                          .replace("{total}", String(science))
+                          .replace("{bonus}", (science / 5).toFixed(1))}</p>
+                      </>}>
+                        <span className="underline decoration-dotted">{t.council.unused}</span>
+                      </Tip>
+                    : t.council.unused}
               </div>
             </div>
           ))}

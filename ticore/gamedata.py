@@ -84,7 +84,7 @@ def loaded_languages():
 @lru_cache(maxsize=1)
 def templates():
     if _bundle:
-        return {k: _bundle["templates"].get(k, {}) for k in _TEMPLATE_FILES}
+        return {k: _bundle["templates"].get(k, {}) for k in (*_TEMPLATE_FILES, "projectUnlocks")}
     d = paths.template_dir()
     out = {k: {} for k in _TEMPLATE_FILES}
     if not d:
@@ -99,6 +99,32 @@ def templates():
             continue
         out[key] = {o["dataName"]: o for o in data
                     if isinstance(o, dict) and o.get("dataName")}
+    out["projectUnlocks"] = _project_unlocks(d)
+    return out
+
+
+# componenti che un progetto sblocca: moduli di habitat e parti di nave, che
+# puntano al progetto con `requiredProjectName`. Il progetto non li elenca: e'
+# il componente a dire da quale progetto dipende.
+PART_FAMILIES = ("HabModule", "ShipHull", "Drive", "PowerPlant", "Radiator", "HeatSink",
+                 "Battery", "ShipArmor", "Gun", "MagneticGun", "LaserWeapon",
+                 "ParticleWeapon", "PlasmaWeapon", "Missile", "UtilityModule")
+
+
+def _project_unlocks(d):
+    """{progetto: [[famiglia, dataName], ...]}, nell'ordine di PART_FAMILIES.
+    Solo il collegamento, non i template interi: e' tutto cio' che serve, e
+    l'estratto del sito resta piccolo."""
+    out = {}
+    for fam in PART_FAMILIES:
+        p = os.path.join(d, "TI%sTemplate.json" % fam)
+        try:
+            data = json.load(open(p, encoding="utf-8-sig"))
+        except Exception:
+            continue
+        for o in data:
+            if isinstance(o, dict) and o.get("requiredProjectName") and o.get("dataName"):
+                out.setdefault(o["requiredProjectName"], []).append([fam, o["dataName"]])
     return out
 
 

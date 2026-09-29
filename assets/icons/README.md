@@ -37,6 +37,11 @@ texture (16, 16), which is the hotspot the companion uses.
 `Cursor_ResistCouncil_invalid` is spelled with a lowercase `i` in the bundle and was
 renamed to `_Invalid` like the others.
 
+`faction_logos/` holds the faction emblems (64×64 and 128×128 RGBA PNG) from the bundle
+of the same name, as named by `councilIcon64` / `councilIcon128` in
+`TIFactionTemplate.json` (`faction_logos/FAC_ResistCouncil_64` → `FAC_ResistCouncil_64.png`).
+The `_ui` variants the template also lists are pixel-identical and were left out.
+
 ## Why they are here
 
 They are included so the interface shows the same icons the player sees in game, without

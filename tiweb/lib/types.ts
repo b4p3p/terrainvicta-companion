@@ -166,6 +166,14 @@ export interface Nation {
   miltech: number;
   cp: number;
   myCP: number;
+  /** tuoi punti coi benefici sospesi (nazione abbandonata o Reprimi) */
+  myCPDisabled: number;
+  /** prima scadenza della sospensione, GG/MM/AAAA */
+  myCPDisabledUntil: string | null;
+  /** inizio stimato: scadenza meno i 6 mesi dell'abbandono, MM/AAAA */
+  myCPDisabledSince: string | null;
+  /** «Rinnovo automatico abbandono» attivo */
+  autoAbandon: boolean;
   freeCP: number;
   takenCP: number;
   /** quanto occupa un punto di questa nazione nel tetto dei punti di controllo */
@@ -230,7 +238,8 @@ export interface Snapshot {
   recruits: Councilor[];
   orgMarket: Org[];
   projects: { rate: number; items: Project[] };
-  alienSites: { region: string; since: string }[];
+  /** since: GG/MM/AAAA come il gioco; sinceKey: AAAA-MM-GG, per i conti */
+  alienSites: { region: string; since: string; sinceKey: string }[];
   cpCapOverage: boolean;
 }
 
