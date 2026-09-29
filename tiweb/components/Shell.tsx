@@ -101,7 +101,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             </span>
           )}
 
-          <span className="ml-auto flex items-center gap-4 text-[11.5px]">
+          <span className="ml-auto flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-[11.5px] whitespace-nowrap">
             {(critical > 0 || warning > 0) && (
               <Link href="/" className={critical ? "text-bad" : "text-warn"}>
                 {critical > 0 && `${critical} ${t.severity.critical}`}

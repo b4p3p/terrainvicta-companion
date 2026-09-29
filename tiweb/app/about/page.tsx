@@ -66,8 +66,22 @@ export default function AboutPage() {
 
   return (
     <Panel title={a.title}>
+      {/* il lungomare di Bari, in testa e sfumato nel pannello: il testo resta
+          sul fondo normale. Il file non e' nel repo: se manca, la fascia resta
+          del colore del pannello. */}
+      {/* sempre intera (stesse proporzioni del file), mai piu' larga dei suoi
+          1916 px ne' piu' alta di meta' schermo: sugli schermi grandi resta
+          al centro e i lati sfumano nel pannello */}
+      <div aria-hidden className="-mx-3 -mt-3 mb-4">
+        <div className="mx-auto w-full max-w-[min(1916px,calc(52vh*1916/821))] aspect-[1916/821]
+            bg-no-repeat bg-cover bg-center
+            lg:[mask-image:linear-gradient(90deg,transparent,#000_7%,#000_93%,transparent)]"
+          style={{ backgroundImage:
+            "linear-gradient(180deg, transparent 82%, var(--raised) 100%), url(/about-bg.webp)" }} />
+      </div>
       {/* tutta la larghezza, come le altre schede: su schermi larghi due
           colonne invece di righe lunghissime */}
+      <div>
       <div className="grid gap-x-10 gap-y-6 py-1 lg:grid-cols-2">
         <Section title={a.whoTitle}>
           <p>{a.who.replace("{author}", SITE.author)}</p>
@@ -112,6 +126,7 @@ export default function AboutPage() {
         <Versions />
 
         <p className="lg:col-span-2 text-faint text-[11.5px] border-t border-edge pt-3">{a.disclaimer}</p>
+      </div>
       </div>
     </Panel>
   );
