@@ -1,41 +1,72 @@
 # Terra Invicta Companion
 
-A second-screen companion for [Terra Invicta](https://store.steampowered.com/app/1176470/Terra_Invicta/).
-It reads your save file directly and shows, live while you play: your council and its
-coverage, which missions you can actually run and where they are most likely to land,
-a ranked view of nations, and alerts on what changed since the previous save.
+**🌐 <https://terrainvicta-companion.b4p3p.it/>** · [demo](https://terrainvicta-companion.b4p3p.it/?demo=1) · [support the project](#support)
 
-It is a **reading aid, not a cheat**. The interface deliberately shows only information
-the game already gives you — apparent loyalty, not real loyalty; no un-acquired intel.
-Where a number is a heuristic of this tool rather than the game's own formula, it says so
-and shows the raw factors next to it.
+A second-screen companion for [Terra Invicta](https://store.steampowered.com/app/1176470/Terra_Invicta/).
+It reads your save files and puts side by side what the game spreads across a dozen
+screens: your council and what it can do, which missions you can run and where, nations,
+rival factions, space, technologies, and what changed since the previous save.
+
+**Use it online:** <https://terrainvicta-companion.b4p3p.it/> — runs entirely in your
+browser, nothing to install. **Try the demo** without the game:
+<https://terrainvicta-companion.b4p3p.it/?demo=1>
+
+![Overview: alerts, monthly flows and the research race](docs/screenshots/overview.png)
+
+| Council | History |
+|---|---|
+| ![Council: attribute coverage and the team](docs/screenshots/council.png) | ![History: every save archived, charted over time](docs/screenshots/history.png) |
+
+![Mining: base sites ranked by yield, and the orgs with space bonuses](docs/screenshots/mining.png)
+
+It is a **reading aid, not a cheat**. The interface only shows information the game
+already gives you: apparent loyalty, not real loyalty; no intel you haven't gathered; a
+site's real mining yield only once you've probed its body. Where a number is this tool's
+own heuristic rather than the game's formula, it says so and shows the raw values next
+to it.
 
 > Unofficial fan project. Not affiliated with, endorsed by, or connected to Pavonis
-> Interactive or Hooded Horse. It ships no game data: templates and localization are read
-> from your own local installation.
+> Interactive or Hooded Horse.
 
-## Features
+## What it shows
 
-- **Council** — councilors, attributes, organizations, attribute coverage, and which
-  missions your council currently has no access to.
-- **Missions** — the real attacking/defending modifiers of each mission, taken from the
-  game templates, with targets ranked by readable factors.
-- **Nations** — control points, GDP, cohesion, unrest, with not-yet-born separatist
-  states filtered out so they stop skewing every ranking.
-- **Alerts and history** — every save is archived to SQLite; a rule engine compares
-  consecutive snapshots and pushes what changed over SSE. No polling in the frontend.
-- **Notes and goals** — per-campaign, stored locally.
-- **14 game languages** — mission, organization and project names come from the game's
-  own official localization files, never hand-translated. UI is available in English and
-  Italian.
+- **Overview** — alerts checked on every save, monthly flows, the research race against
+  the other factions.
+- **Council** — attribute coverage, missions nobody on the council can run, which recruit
+  candidates would fill the gaps, org requirements.
+- **Missions** — the real attacking and defending modifiers of each mission, taken from
+  the game templates, with targets ranked on readable factors.
+- **Nations** — control points, GDP, cohesion, unrest, trends over time; not-yet-born
+  separatist states filtered out so they stop skewing every ranking.
+- **Factions** — rival factions and their councilors, compared only on what your intel
+  unlocks, with the game's own thresholds.
+- **Space** — visible habitats, Earth orbits and their free slots, buildable modules and
+  when you can afford them.
+- **Mining** — every base site ranked by yield (real numbers on prospected bodies, the
+  game's range elsewhere), and the orgs with space bonuses: yours, on your market, and
+  rival ones as Hostile Takeover targets.
+- **Technologies** — what each available tech unlocks for your faction, with the game's
+  own project-unlock chance.
+- **Presets** — custom national priority presets written as game files, without mods, so
+  achievements stay enabled.
+- **History, notes and goals** — every save archived per campaign, turn-to-turn diffs,
+  exportable.
+- **14 game languages** — mission, org and project names come from the game's official
+  localization, never hand-translated. Interface in English and Italian.
 
-## Requirements
+## Two ways to run it
 
-- Terra Invicta installed (the tool reads its `StreamingAssets` templates and localization)
-- Python 3.10+
-- Node.js 20+ (for the web interface)
+### In the browser (recommended)
 
-## Install
+Open the site in **Chrome or Edge** on the PC where Terra Invicta is installed and pick
+the `My Games` or `TerraInvicta` folder inside Documents: it finds the saves and reloads
+on every save. The whole Python core runs in the page through
+[Pyodide](https://pyodide.org/) (the first visit downloads about 13 MB). Saves are never
+uploaded, and the tool never writes to them. The demo works in any browser.
+
+### Locally, with the Python API
+
+Requirements: Terra Invicta installed, Python 3.10+, Node.js 20+.
 
 ```bash
 git clone https://github.com/b4p3p/terrainvicta-companion.git
@@ -44,17 +75,12 @@ pip install -e .
 cd tiweb && npm install && cd ..
 ```
 
-Mission icons ship with the repository, so nothing extra is needed. The optional
-`icons` extra (`pip install -e ".[icons]"`) pulls in UnityPy and is only used to
-re-extract them from your own installation — see `assets/icons/README.md`.
-
-## Run
-
 On Windows, both services plus the browser:
 
 ```powershell
 .\start.ps1                  # API on :8732, interface on :3000
 .\start.ps1 -NoBrowser
+.\start.ps1 -NoReload        # no API auto-reload on source changes
 ```
 
 Or separately:
@@ -64,7 +90,8 @@ python -m uvicorn tiserver.main:app --port 8732
 cd tiweb && npm run dev
 ```
 
-Then open <http://localhost:3000>.
+Then open <http://localhost:3000>. The local API watches the save folder and pushes
+changes over SSE; history is kept in SQLite in `~/.terrainvicta-companion/`.
 
 ## CLI
 
@@ -88,47 +115,78 @@ Useful flags: `--save <name or fragment>`, `--lang ita|en|fr|deu|…`, `--limit 
 
 ```
 ticore/     parser and domain logic. Python, zero dependencies, no UI.
-tiserver/   FastAPI: /api/*, SSE on /api/stream, save-file watcher.
+tiserver/   FastAPI wrapper: /api/*, SSE on /api/stream, save-file watcher.
 tiweb/      Next.js 16 + React 19 + Tailwind 4 + TypeScript.
 ti.py       CLI on top of ticore.
 ```
 
-`ticore` is deliberately dependency-free and UI-free: it outlives any frontend.
+`ticore` is deliberately dependency-free and UI-free: the same code serves the local API
+and, compiled to WebAssembly, the browser version. Its routes live in `service.py`
+without any web framework; `tiserver` and the browser worker
+(`tiweb/public/engine-worker.js`) both call `Service.dispatch()`.
 
 | module | contents |
 |---|---|
 | `paths.py` | locates saves, templates, localization, data folder |
-| `save.py` | loads the gzipped save and indexes gamestates; survives the file being locked while the game writes it (retry, then fallback to the previous save) |
+| `save.py` | loads the gzipped save and indexes gamestates; survives the file being locked while the game writes it |
 | `gamedata.py` | JSON templates plus official localization in 14 languages |
-| `council.py` | councilors, orgs, attribute coverage, missing missions |
+| `names.py` | translates names the save stores in the game's language back through their template keys |
+| `council.py` | councilors (attributes with trait effects), orgs, coverage, missing missions |
 | `missions.py` | real mission factors and ranked targets |
-| `model.py` | `snapshot()`: the full payload |
+| `model.py` | `snapshot()`: the full payload, control-point capacity |
 | `alerts.py` | rule engine over consecutive snapshots |
-| `store.py` | SQLite in `~/.terrainvicta-companion/`: history, notes, goals |
+| `factions.py` | rival factions and councilors, gated by intel like the game's own views |
+| `space.py` | habitats, Earth orbits, buildable modules and their cost |
+| `mining.py` | mining sites (real yield or the game's estimate) and orgs with space bonuses |
+| `techs.py` | available techs and what they unlock for your faction |
+| `presets.py` | priority presets, written into the game's template files without mods |
+| `service.py` | the `/api/*` routes, shared by the server and the browser |
+| `store.py` | SQLite: history, notes, goals, per campaign |
+| `portable.py` | export and merge-import of the companion's data |
+| `bundle.py` | the game-data extract used by the browser version |
 
 ### API
 
-`/api/health` · `/api/snapshot?lang=` · `/api/alerts` · `/api/languages` · `/api/saves`
-· `/api/missions` · `/api/missions/{name}/plan` · `/api/history` · `/api/campaigns`
-· `/api/diff` · `/api/notes` · `/api/goals` · `/api/stream` (SSE)
+`/api/health` · `/api/snapshot?lang=` · `/api/alerts` · `/api/missions` ·
+`/api/missions/{name}/plan` · `/api/nations/trends` · `/api/nations/{name}/detail` ·
+`/api/factions` (+ `councilors`) · `/api/space` · `/api/mining` · `/api/techs` ·
+`/api/research` · `/api/presets` (+ `export`, `install`, `restore`, `custom`) ·
+`/api/history` · `/api/campaigns` · `/api/diff` · `/api/notes` · `/api/goals` ·
+`/api/data` (+ `export`, `import`) · `/api/saves` · `/api/languages` · `/api/stream` (SSE)
 
-The watcher checks the save's mtime every 3 seconds, reloads, archives the snapshot,
-re-evaluates alerts and pushes them over SSE.
-
-## Where the game data is read from
-
-Auto-detected, no configuration needed:
+## Where the game data comes from
 
 - **Saves** — `%USERPROFILE%\Documents\My Games\TerraInvicta\Saves\*.gz` (OneDrive-redirected
-  Documents folders included). If neither exists, the path is read from `savedGamesPath`
-  in the game's `Player.log`.
-- **Templates and localization** — `<Steam>\steamapps\common\Terra Invicta\TerraInvicta_Data\StreamingAssets\`.
-- **Mission icons** — shipped in `assets/icons/`. In the game they are not files on
-  disk at all: they live inside the Unity asset bundle
-  `StreamingAssets/AssetBundles/councilor_missions`. If one is missing from
-  `assets/icons/`, the server re-extracts it from your own copy of the game.
+  Documents included). If neither exists, the path is read from `savedGamesPath` in the
+  game's `Player.log`.
+- **Templates and localization** — the local version reads them from your installation,
+  `<Steam>\steamapps\common\Terra Invicta\TerraInvicta_Data\StreamingAssets\`. The
+  browser can't reach that folder, so the site serves a minimal extract generated by
+  `python -m ticore.bundle`. The extract is not stored in this repository.
+- **Icons** — `assets/icons/` holds the mission, resource, faction and cursor icons. In
+  the game they live inside Unity asset bundles, not as files; if a mission, resource or
+  faction icon is missing, the local server re-extracts it from your own copy of the game
+  (`pip install -e ".[icons]"` pulls in UnityPy for that).
 
-Everything this tool writes lives in `~/.terrainvicta-companion/`.
+## Feedback
+
+Any request, bug report or suggestion is welcome: something the game shows that you'd
+like side by side, a number that doesn't match what you see in game, a screen that's
+confusing. [Open an issue](https://github.com/b4p3p/terrainvicta-companion/issues) and
+I'll take a look.
+
+## Support
+
+The companion is free and will stay free: no ads, no accounts, no tracking. But a
+space station and a base on the Moon don't come cheap these days, and neither does the
+coffee that keeps this thing running. If it saved you a few trips between screens:
+
+[☕ A coffee (3 €)](https://paypal.me/b4p3p/3EUR) ·
+[🍕 A pizza (10 €)](https://paypal.me/b4p3p/10EUR) ·
+[🚀 Fund a project (any amount)](https://paypal.me/b4p3p)
+
+PayPal opens with the amount already filled in; you can change it. No alien project will
+be funded by mistake.
 
 ## License
 
