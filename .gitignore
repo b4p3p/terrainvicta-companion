@@ -28,3 +28,8 @@ PARTITA.local.md
 # OS
 Thumbs.db
 .DS_Store
+
+# Note personali e infrastruttura degli altri siti: restano solo in locale
+ROADMAP.md
+deploy/stats/
+deploy/stats-setup.sh
