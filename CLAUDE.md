@@ -145,6 +145,10 @@ con `isAI == false`.
   «In fase di declino» (−1 IND, −1 CMD) e poi uccidere, con probabilità crescente.
   Il 65 non compare nei testi del gioco: è una regola letta dal codice, non stato
   nascosto della partita.
+- **Attributi dei consiglieri**: il salvataggio ha solo il valore **base**. Il gioco
+  (`TICouncilorState.GetAttribute`) somma i `statMods` dei tratti, poi i bonus delle
+  org, e non scende sotto zero: Lupo solitario porta −1 AMM −1 CMD +2 SPI.
+  `council.councilor_view` fa lo stesso, tranne le modifiche con una condizione.
 - **Costo di reclutamento**: 60 influenza; 30 se il tipo ha affinità con la fazione
   (`affinities` in `TICouncilorTypeTemplate`: l'Agente sul campo con la Resistenza),
   120 se ha anti-affinità.

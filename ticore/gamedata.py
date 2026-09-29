@@ -397,8 +397,8 @@ def trait_effects(lang, data_name):
     priorita'): meglio un effetto in meno che uno descritto male.
 
     Gli effetti sugli attributi sono quelli dichiarati dal tratto. Il
-    salvataggio non distingue il valore base da quello modificato, quindi non
-    vanno sommati a quanto mostrato: sono il perche' di un numero, non un'aggiunta.
+    salvataggio ha solo il valore base: council.councilor_view li somma, come
+    fa il gioco in TICouncilorState.GetAttribute (tranne i condizionali).
     """
     t = templates()["traits"].get(data_name) or {}
     out = []

@@ -168,13 +168,32 @@ def councilor_view(g, c, lang="ita", known=True):
         if o:
             orgs.append(org_view(g, o, lang))
 
+    ctype = c.get("typeTemplateName")
+    traits = c.get("traitTemplateNames") or []
+
+    # Come TICouncilorState.GetAttribute: base (il salvataggio ha solo quella),
+    # poi i tratti (TITraitTemplate.ApplyTraitStatValue), poi le org, mai sotto
+    # zero. Le modifiche con una condizione restano fuori: dipendono da dove si
+    # trova o cosa fa il consigliere, e non le sappiamo valutare.
     effective = {a: attrs.get(a, 0) for a in ATTRS}
+    for tn in traits:
+        for m in (gamedata.templates()["traits"].get(tn) or {}).get("statMods") or []:
+            a, op = m.get("stat"), m.get("operation")
+            if a not in effective or m.get("condition"):
+                continue
+            try:
+                v = float(m.get("strValue"))
+            except (TypeError, ValueError):
+                continue
+            v = int(v) if v.is_integer() else v
+            if op == "Additive":
+                effective[a] += v
+            elif op == "SetToFixedValue":
+                effective[a] = v
     for o in orgs:
         for a, v in o["attributes"].items():
             effective[a] += v
-
-    ctype = c.get("typeTemplateName")
-    traits = c.get("traitTemplateNames") or []
+    effective = {a: max(0, v) for a, v in effective.items()}
     sources = mission_sources(ctype, traits, orgs, c.get("learnedMissionsTemplateNames"))
     missions = set(sources)
     home = g.region_nation((c.get("homeRegion") or {}).get("value"))
