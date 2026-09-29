@@ -7,7 +7,8 @@ import { useSettings } from "@/lib/settings";
 /** Sotto-schede di Spazio: stesso spigolo vivo della navigazione principale, più piccole. */
 export function SpaceTabs() {
   const { t } = useSettings();
-  const path = usePathname();
+  // l'export statico serve /space/mining/: la barra finale non conta
+  const path = usePathname().replace(/(.)\/$/, "$1");
   const tabs = [
     { href: "/space", label: t.space.tabHabs },
     { href: "/space/mining", label: t.tabs.mining },
