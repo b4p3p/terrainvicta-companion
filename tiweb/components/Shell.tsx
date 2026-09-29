@@ -75,7 +75,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
       <header className="sticky top-0 z-20 bg-void border-b border-edge-lit">
         {/* riga 1 — identità e stato della partita */}
-        <div className="flex items-center gap-x-5 gap-y-1 flex-wrap px-4 h-9
+        <div className="flex items-center gap-x-5 gap-y-1 flex-wrap px-4 min-h-9 py-1
                         border-b border-edge">
           <span className="display text-[14px] uppercase tracking-[.08em] leading-none">
             {live.save?.faction ?? "Terra Invicta"}
@@ -129,7 +129,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
         {/* riga 2 — risorse, come la barra superiore del gioco */}
         {snap?.resources && (
-          <div className="flex items-center gap-6 flex-wrap px-4 h-8
+          <div className="flex items-center gap-x-6 gap-y-1 flex-wrap px-4 min-h-8 py-1
                           bg-bar-deep border-b border-edge text-[12px]">
             {RESOURCES.map((r) => {
               const v = snap.resources[r.key as keyof typeof snap.resources];
