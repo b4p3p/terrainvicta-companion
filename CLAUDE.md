@@ -64,12 +64,13 @@ ti.py       CLI sottile sopra ticore (utile senza browser).
 | `bundle.py` | estratto dei dati del gioco per la versione web (template + chiavi di localizzazione usate), in `tiweb/public/gamedata/`, gitignorato: sono dati di Pavonis. Chi aggiunge un `loc()` su una famiglia nuova la mette in `KEEP_PREFIXES`; `python -m ticore.bundle --check` confronta l'output dell'API coi file del gioco e con l'estratto |
 | `factions.py` | confronto fra fazioni, coi soli campi che l'intel sblocca: soglie e misure di `TIGlobalConfig`/`FactionView`. `councilors()`: i consiglieri altrui con le regole di `CouncilorView` (0,10 posizione senza nome, 0,25 identità, 0,50 attributi veri, 0,75 missione, nascosta in fase missioni); sotto 0,50 gli attributi sono la stima del gioco dal tipo |
 | `space.py` | scheda Spazio: habitat visibili (intel >= `intelToSeeSpaceAssetLocationandComposition`, 0,1: stessa regola della finestra Habitat), orbite terrestri coi posti, moduli sbloccati. Controllo missioni = ultima voce giornaliera delle `Transactions` |
+| `mining.py` | scheda Estrazione: tutti i siti con la resa **vera solo sui corpi prospettati** (intel sul corpo >= 1,0), altrove la stima del gioco (`GetHabSiteExpectedProductivity_month`) con forchetta; raggiungibilità da `effectToExplore`. «Valore» = resa × prezzo di mercato, euristica nostra. Org spaziali: nostre, del mercato, altrui entro l'intel (bersagli di Acquisizione ostile) |
 | `techs.py` | scheda Tecnologie: le tecnologie avviabili e cosa sblocca ognuna per la tua fazione (UniqueProjectUnlocks/ShouldHide del gioco). Percentuale = `GetProjectUnlockChance` come nella schermata Ricerca; i mesi di comparsa sono una stima nostra dalle regole dei trigger |
 | `store.py` | SQLite in `~/.terrainvicta-companion/`: storico, note, obiettivi. La campagna è identificata da **fazione + difficoltà + `realWorldCampaignStart`** |
 
 ### API
 `/api/snapshot?lang=` · `/api/alerts` · `/api/missions` · `/api/missions/{id}/plan`
-· `/api/nations/trends` · `/api/nations/{name}/detail` · `/api/factions` (+ `councilors`) · `/api/space` · `/api/techs`
+· `/api/nations/trends` · `/api/nations/{name}/detail` · `/api/factions` (+ `councilors`) · `/api/space` · `/api/mining` · `/api/techs`
 · `/api/presets` (+ `install`, `restore`, `custom`)
 · `/api/nations` (dentro snapshot) · `/api/history` · `/api/campaigns` · `/api/diff`
 · `/api/goals` · `/api/notes` · `/api/saves` · `/api/languages` · `/api/stream` (SSE)
@@ -176,6 +177,15 @@ con `isAI == false`.
   coppia. Il gioco **non azzera gli slot di autosave** quando ricominci: `Autosave3.gz`
   può appartenere alla campagna precedente. Per capire di che partita è un `.gz`,
   leggere quel campo, non il nome del file né la data di gioco.
+- **Rese dei siti**: il salvataggio ha la resa vera di ogni sito, ma il gioco la mostra
+  solo dopo la sonda (`Prospected`: intel sul corpo ≥ 1,0; 0,1 = sonda in viaggio).
+  Prima la lista dei siti (pannello del corpo, anche se non esplorabile) mostra
+  solo la forchetta min–max attorno a media del profilo × fattore massa/densità
+  (0,75–1,25). Verificato: resa vera / attesa, mediana 1,00 su 561 siti.
+- **Bonus spaziali delle org** (`TIOrgState.description`): `spaceDevBonus` →
+  Finanziamenti; `spaceflightBonus` → Programma spaziale, Capacità di lancio,
+  exovelivoli; `MCBonus` → Controllo missioni. Acquisizione ostile può colpire
+  anche il pool non assegnato della fazione bersaglio.
 
 ## Cosa c'e' in cantiere
 

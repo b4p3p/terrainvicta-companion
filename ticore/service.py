@@ -15,7 +15,7 @@ import re
 from urllib.parse import unquote
 
 from . import (Game, SaveLocked, alerts, factions, gamedata, load, missions,
-               model, paths, portable, presets, snapshot, space, store, techs, texts)
+               mining, model, paths, portable, presets, snapshot, space, store, techs, texts)
 from .texts import t
 
 
@@ -230,6 +230,11 @@ class Service:
         self.require()
         return space.overview(self.game, lang or self.lang)
 
+    def mining(self, lang=None):
+        """Siti di estrazione e org spaziali visibili: vedi ticore/mining.py."""
+        self.require()
+        return mining.overview(self.game, lang or self.lang)
+
     def techs(self, lang=None):
         """Tecnologie avviabili e cosa sblocca ognuna: vedi ticore/techs.py."""
         self.require()
@@ -436,6 +441,7 @@ _ROUTES = [
     ("GET", r"/api/factions", lambda s, q, b: s.faction_compare(q.get("lang"))),
     ("GET", r"/api/factions/councilors", lambda s, q, b: s.faction_councilors(q.get("lang"))),
     ("GET", r"/api/space", lambda s, q, b: s.space(q.get("lang"))),
+    ("GET", r"/api/mining", lambda s, q, b: s.mining(q.get("lang"))),
     ("GET", r"/api/techs", lambda s, q, b: s.techs(q.get("lang"))),
     ("GET", r"/api/diff", lambda s, q, b: s.diff()),
     ("GET", r"/api/presets", lambda s, q, b: s.presets_status(q.get("lang"))),

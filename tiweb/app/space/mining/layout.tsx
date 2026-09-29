@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
-import { SpaceTabs } from "@/components/SpaceTabs";
 
 // la pagina e' "use client": il titolo della scheda sta qui
-export const metadata: Metadata = { title: "Space" };
+export const metadata: Metadata = { title: "Mining" };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  return <><SpaceTabs />{children}</>;
+  return children;
 }

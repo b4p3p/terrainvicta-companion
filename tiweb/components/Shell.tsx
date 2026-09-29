@@ -190,7 +190,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         {/* riga 3 — navigazione, schede a spigolo vivo */}
         <nav className="flex flex-wrap">
           {TABS.map((tab) => {
-            const active = path === tab.href;
+            // le sotto-schede (/space/mining) tengono accesa la scheda madre
+            const active = path === tab.href || (tab.href !== "/" && path.startsWith(tab.href + "/"));
             return (
               <Link key={tab.href} href={tab.href}
                 aria-current={active ? "page" : undefined}

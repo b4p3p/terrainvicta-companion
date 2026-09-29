@@ -67,6 +67,9 @@ KEEP_PREFIXES = (
     "UI.Intel.Faction",
     "UI.Notifications.Diplomacy.",
     "UI.Nation.",
+    # scheda Estrazione: profili minerari, bonus di estrazione delle org
+    "TIMiningProfileTemplate.displayName.",
+    "UI.OrgTargeting.SpaceMiningBonus",
 )
 # cause delle variazioni nazionali (`tracker_*ChangeReason_*`): chiavi nude,
 # es. `CohesionReason_Annexation`
@@ -118,6 +121,21 @@ def _dump(path, obj):
     return os.path.getsize(path)
 
 
+# famiglie grandi di cui ci servono pochi campi (ticore/mining.py): il resto
+# (orbite, note degli astronomi) peserebbe mezzo megabyte nel browser
+SLIM_FIELDS = {
+    "habSites": ("dataName", "miningProfileName"),
+    "spaceBodies": ("dataName", "barycenterName", "objectType", "mass_kg", "density_gcm3",
+                    "semiMajorAxis_AU", "effectToExplore", "alternativeEffectToExplore"),
+}
+
+
+def _slim(tpl):
+    return {k: ({n: {f: t[f] for f in SLIM_FIELDS[k] if f in t} for n, t in v.items()}
+                if k in SLIM_FIELDS else v)
+            for k, v in tpl.items()}
+
+
 def build(out):
     if not paths.template_dir() or not paths.localization_dir():
         raise SystemExit("Installazione di Terra Invicta non trovata.")
@@ -126,7 +144,7 @@ def build(out):
     os.makedirs(os.path.join(out, "loc"), exist_ok=True)
 
     sizes = {"templates.json": _dump(os.path.join(out, "templates.json"),
-                                     gamedata.templates())}
+                                     _slim(gamedata.templates()))}
     langs = gamedata.available_languages()
     for lang in langs:
         s = {k: v for k, v in gamedata.strings(lang).items() if keep(k)}
@@ -188,7 +206,7 @@ def check(save_path=None):
     dall'estratto: va aggiunta a KEEP_PREFIXES/KEEP_PATTERNS.
     """
     import tempfile
-    from . import factions, missions, model, save, space, techs
+    from . import factions, mining, missions, model, save, space, techs
     g = save.Game(save_path or paths.latest_save()[0])
 
     def run():
@@ -201,6 +219,7 @@ def check(save_path=None):
                 "factions": factions.compare(g, lang),
                 "councilors": factions.councilors(g, lang),
                 "space": space.overview(g, lang),
+                "mining": mining.overview(g, lang),
                 "techs": techs.overview(g, lang),
                 "details": {n["id"]: model.nation_detail(g, n["id"], lang)
                             for n in model.nations(g, lang)},

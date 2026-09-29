@@ -31,6 +31,9 @@ _TEMPLATE_FILES = {
     "techs": "TITechTemplate.json",
     "orbits": "TIOrbitTemplate.json",
     "habModules": "TIHabModuleTemplate.json",
+    "habSites": "TIHabSiteTemplate.json",
+    "spaceBodies": "TISpaceBodyTemplate.json",
+    "miningProfiles": "TIMiningProfileTemplate.json",
 }
 
 
