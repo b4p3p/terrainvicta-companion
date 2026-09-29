@@ -9,6 +9,7 @@ import { demoMode, engineMode, exitDemo, LOCKED_ENGINE, type EngineMode } from "
 import { EngineGate } from "@/components/EngineGate";
 import { EngineSplash } from "@/components/EngineSplash";
 import { LanguagePicker } from "@/components/LanguagePicker";
+import { GithubLink } from "@/components/GithubLink";
 import { ResourceIcon, nf } from "@/components/ui";
 import { Tip } from "@/components/Tip";
 
@@ -123,6 +124,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                       className="text-dim hover:text-ink underline">{t.engine[m]}</a>)}
               </span>
             )}
+            <GithubLink />
             <LanguagePicker />
           </span>
         </div>

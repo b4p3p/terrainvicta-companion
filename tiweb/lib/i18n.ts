@@ -225,6 +225,8 @@ const it = {
     footnote: "Regola del gioco per il vincitore atteso (contributo attuale + giorni mancanti × ritmo), ma col ritmo osservato fra due salvataggi: i pesi di ricerca delle altre fazioni non si vedono. Un tick in più su uno slot sposta lì una parte più grande della tua ricerca.",
   },
   common: {
+    source: "Codice sorgente su GitHub",
+    sourceHint: "Il codice del companion è pubblico: segnalazioni, richieste e consigli sono benvenuti.",
     code: "codice {code}",
     copy: "Copia",
     copied: "Copiato",
@@ -1064,6 +1066,8 @@ const en: typeof it = {
     footnote: "The game's rule for the expected winner (current contribution + days left × pace), but with the pace observed between two saves: other factions' research weights are not visible. One more tick on a slot moves a bigger part of your research there.",
   },
   common: {
+    source: "Source code on GitHub",
+    sourceHint: "The companion's code is public: bug reports, requests and suggestions are welcome.",
     code: "code {code}",
     copy: "Copy",
     copied: "Copied",

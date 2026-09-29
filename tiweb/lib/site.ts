@@ -2,6 +2,8 @@
 
 export const SITE = {
   author: "b4p3p",
+  /** repository pubblico del codice */
+  repo: "https://github.com/b4p3p/terrainvicta-companion",
   /* L'email e' spezzata apposta: nell'HTML e nel JavaScript non compare mai
      intera, cosi' i bot che raccolgono indirizzi non la trovano. La pagina la
      ricompone solo quando qualcuno clicca «Mostra email». Alias con +: se
