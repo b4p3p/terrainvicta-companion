@@ -1,6 +1,6 @@
 # Terra Invicta Companion
 
-> Free, unofficial second-screen companion for the strategy game Terra Invicta (Pavonis Interactive). It runs entirely in the browser (Chrome or Edge on desktop), reads the player's save files from a folder they choose, and puts nations, councilors, missions, factions, space assets and technologies side by side. It only shows what the game already shows the player: it is a reading tool, not a cheat.
+> Free, unofficial second-screen companion for the strategy game Terra Invicta (Pavonis Interactive). It runs entirely in the browser (Chrome or Edge on desktop), reads the player's save files from a folder they choose, and puts nations, councilors, missions, factions, space assets, mining sites and technologies side by side. It only shows what the game already shows the player: it is a reading tool, not a cheat.
 
 Site: https://terrainvicta-companion.b4p3p.it/
 
@@ -12,6 +12,7 @@ Site: https://terrainvicta-companion.b4p3p.it/
 - Nations: trends over time and a detail view per nation.
 - Factions: rival factions and councilors compared only on what the player's intel unlocks.
 - Space: visible habitats, Earth orbits with free slots, buildable modules and when they are affordable.
+- Mining: every base site ranked by yield (real values only on bodies the player has probed, the game's min-max range elsewhere) and the orgs with space bonuses, including rival ones as Hostile Takeover targets.
 - Technologies: what each available technology unlocks for the player's faction.
 - Presets: custom priority presets as files to copy into the game, without mods, so achievements stay enabled.
 - History: every save archived, turn-to-turn differences, goals and notes, exportable.
