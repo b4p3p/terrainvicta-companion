@@ -7,7 +7,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // `npm run build` e non `next build`: prebuild copia ticore, Pyodide e l'estratto
-const r = spawnSync("npm", ["run", "build"], {
+// comando in una stringa sola: con shell e un array di argomenti Node emette
+// DEP0190 su stderr, e PowerShell con ErrorActionPreference=Stop lo prende
+// per un errore (deploy.ps1 si fermava li')
+const r = spawnSync("npm run build", {
   stdio: "inherit",
   shell: true,
   env: { ...process.env, NEXT_PUBLIC_ENGINE: "browser" },
