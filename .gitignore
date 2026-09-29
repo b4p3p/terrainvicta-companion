@@ -29,7 +29,7 @@ PARTITA.local.md
 Thumbs.db
 .DS_Store
 
-# Note personali e infrastruttura degli altri siti: restano solo in locale
+# Note personali e pubblicazione sul server: restano solo in locale
+# (deploy/ ha una copia anche sul server, in ~/terrainvicta-deploy-backup)
 ROADMAP.md
-deploy/stats/
-deploy/stats-setup.sh
+deploy/
