@@ -76,14 +76,16 @@ EFFECTS = {
     "uniCohMin": 0.025,          # unityMinCohesionChange
     "uniEdu": -0.001,            # unityPriorityEducationChange
 }
-# costo in IP di un completamento: TIGlobalConfig.priority_*, default della DLL
+# costo in IP di un completamento: TIGlobalConfig.priority_*. Valori del
+# template del gioco (Armi nucleari 40; la DLL ha 25), cosi' la versione nel
+# browser, che non ha i file del gioco, da' gli stessi numeri dell'API locale
 PRIORITY_COST_DEFAULT = {
     "Economy": ("ECO", 1), "Welfare": ("WEL", 1), "Environment": ("ENV", 1), "Knowledge": ("KNO", 1),
     "Government": ("DEM", 1), "Unity": ("UNI", 2), "Military": ("MIL", 1), "Oppression": ("OPP", 1),
     "Spoils": ("SPO", 1), "Funding": ("DEV", 1), "LaunchFacilities": ("BOO", 2), "MissionControl": ("MC", 25),
     "Civilian_InitiateSpaceflightProgram": ("FLI", 50), "Military_FoundMilitary": ("FMI", 40),
     "Military_BuildArmy": ("ARM", 60), "Military_BuildNavy": ("NAV", 100),
-    "Military_InitiateNuclearProgram": ("NUC", 80), "Military_BuildNuclearWeapons": ("NUK", 25),
+    "Military_InitiateNuclearProgram": ("NUC", 80), "Military_BuildNuclearWeapons": ("NUK", 40),
     "Military_BuildSpaceDefenses": ("DEF", 50), "Military_BuildSTOSquadron": ("STO", 10),
 }
 
@@ -94,11 +96,13 @@ def priority_costs(ip_mult=1.0):
     import os, re
     from . import paths
     text = ""
-    try:
-        with open(os.path.join(paths.template_dir(), "TIGlobalConfig.json"), encoding="utf-8-sig") as f:
-            text = f.read()
-    except OSError:
-        pass
+    tdir = paths.template_dir()
+    if tdir:                        # nel browser i file del gioco non ci sono
+        try:
+            with open(os.path.join(tdir, "TIGlobalConfig.json"), encoding="utf-8-sig") as f:
+                text = f.read()
+        except OSError:
+            pass
     found = {m.group(1): float(m.group(2)) for m in re.finditer(r'"priority_([A-Z]+)"\s*:\s*([0-9.]+)', text)}
     return {k: found.get(code, default) / ip_mult for k, (code, default) in PRIORITY_COST_DEFAULT.items()}
 
