@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useApi } from "@/lib/api";
+import { usePersistentState } from "@/lib/persist";
 import { useSettings } from "@/lib/settings";
 import { Empty, Panel, ResourceIcon, Stat, Tag, nf, pct } from "@/components/ui";
 import { Guide } from "@/components/Guide";
@@ -45,6 +46,21 @@ const LIMIT = 40;
 
 const digits = (v: number) => (v < 1 ? 2 : v < 10 ? 1 : 0);
 
+/** Come si pesa il Valore: prezzi di mercato del salvataggio, oppure pesi
+    scelti dall'utente (tutti a 1 = somma semplice delle rese). */
+type Weights = Record<ResKey, number>;
+interface ValueMode { mode: "market" | "custom"; weights: Weights }
+const RES_KEYS: ResKey[] = ["water", "volatiles", "metals", "nobles", "fissiles"];
+const DEFAULT_MODE: ValueMode = { mode: "market", weights: { water: 1, volatiles: 1, metals: 1, nobles: 1, fissiles: 1 } };
+const isValueMode = (v: unknown): v is ValueMode => {
+  const x = v as ValueMode;
+  return !!x && (x.mode === "market" || x.mode === "custom") && !!x.weights
+    && RES_KEYS.every((k) => typeof x.weights[k] === "number" && x.weights[k] >= 0);
+};
+const factor = (vm: ValueMode, r: Res) => (vm.mode === "market" ? r.price : vm.weights[r.id]);
+const siteValue = (s: Site, res: Res[], vm: ValueMode) =>
+  res.reduce((sum, r) => sum + s.yields[r.id].value * factor(vm, r), 0);
+
 /** Resa di una risorsa: vera se il corpo e' prospettato, altrimenti la
     forchetta minima–massima, che e' quello che mostra il gioco. */
 function YieldCell({ y, site, res }: { y: Yield; site: Site; res: Res }) {
@@ -68,21 +84,21 @@ function YieldCell({ y, site, res }: { y: Yield; site: Site; res: Res }) {
   );
 }
 
-function ValueCell({ site, res }: { site: Site; res: Res[] }) {
+function ValueCell({ site, res, vm, value }: { site: Site; res: Res[]; vm: ValueMode; value: number }) {
   const { t } = useSettings();
   const m = t.mining;
   return (
     <Tip title={`${site.name} · ${m.value}`} width={320} content={
       <>
         {res.map((r) => {
-          const v = site.yields[r.id].value;
-          return v ? <TipRow key={r.id} label={`${r.name} ${nf(v, 2)} × ${nf(r.price, 1)}`} value={nf(v * r.price, 1)} /> : null;
+          const v = site.yields[r.id].value, f = factor(vm, r);
+          return v ? <TipRow key={r.id} label={`${r.name} ${nf(v, 2)} × ${nf(f, vm.mode === "market" ? 1 : 2)}`} value={nf(v * f, 1)} /> : null;
         })}
-        <TipRow strong label={m.value} value={nf(site.value, 1)} />
-        <p className="m-0 mt-1.5 text-faint">{m.valueHint}</p>
+        <TipRow strong label={m.value} value={nf(value, 1)} />
+        <p className="m-0 mt-1.5 text-faint">{vm.mode === "market" ? m.valueHint : m.valueHintCustom}</p>
       </>
     }>
-      <span className={site.prospected ? "text-ink" : "text-dim"}>{site.prospected ? "" : "≈ "}{nf(site.value, 0)}</span>
+      <span className={site.prospected ? "text-ink" : "text-dim"}>{site.prospected ? "" : "≈ "}{nf(value, value < 10 ? 1 : 0)}</span>
     </Tip>
   );
 }
@@ -138,8 +154,16 @@ function Sites({ data }: { data: Mining }) {
   const [reachable, setReachable] = useState(true);
   const [hideOccupied, setHideOccupied] = useState(false);
   const [all, setAll] = useState(false);
+  const [vm, setVm] = usePersistentState<ValueMode>("mining.value", DEFAULT_MODE, isValueMode);
+  const setWeight = (k: ResKey, v: number) =>
+    setVm({ ...vm, weights: { ...vm.weights, [k]: Number.isFinite(v) && v >= 0 ? v : 0 } });
+
+  const values = useMemo(
+    () => new Map(data.sites.map((s) => [s.id, siteValue(s, data.resources, vm)])),
+    [data.sites, data.resources, vm]);
 
   const rows = useMemo(() => {
+    const val = (s: Site) => values.get(s.id) ?? 0;
     const needle = q.trim().toLowerCase();
     const xs = data.sites.filter((s) =>
       (!reachable || s.reachable)
@@ -150,7 +174,7 @@ function Sites({ data }: { data: Mining }) {
         case "site": return s.name;
         case "body": return s.body.name;
         case "au": return s.body.au ?? Infinity;
-        case "value": return s.value;
+        case "value": return val(s);
         case "status": return s.prospected ? 3 : s.probeEnRoute ? 2 : s.reachable ? 1 : 0;
         case "occupied": return s.occupant?.name ?? "￿";   // i liberi in fondo
         default: return s.yields[sort].value;
@@ -160,9 +184,9 @@ function Sites({ data }: { data: Mining }) {
     return xs.sort((a, b) => {
       const ka = key(a), kb = key(b);
       const c = typeof ka === "string" ? ka.localeCompare(kb as string) : ka - (kb as number);
-      return c * dir || b.value - a.value;
+      return c * dir || val(b) - val(a);
     });
-  }, [data.sites, sort, asc, q, reachable, hideOccupied]);
+  }, [data.sites, sort, asc, q, reachable, hideOccupied, values]);
   const shown = all ? rows : rows.slice(0, LIMIT);
   const th = { sort, asc, onSort: sortBy };
 
@@ -179,11 +203,34 @@ function Sites({ data }: { data: Mining }) {
           <input type="checkbox" checked={hideOccupied} onChange={(e) => setHideOccupied(e.target.checked)} className="p-0" />
           {m.hideOccupied}
         </label>
-        <Tip title={m.prices} content={
-          <>{data.resources.map((r) => <TipRow key={r.id} label={r.name} value={nf(r.price, 2)} />)}</>
-        }>
-          <span className="text-faint text-[11.5px] underline decoration-dotted">{m.prices}</span>
-        </Tip>
+        <label className="flex items-center gap-1.5 text-dim text-[12.5px]">
+          {m.valueBy}
+          <select value={vm.mode} onChange={(e) => setVm({ ...vm, mode: e.target.value as ValueMode["mode"] })}>
+            <option value="market">{m.valueMarket}</option>
+            <option value="custom">{m.valueCustom}</option>
+          </select>
+        </label>
+        {vm.mode === "market" ? (
+          <Tip title={m.prices} content={
+            <>{data.resources.map((r) => <TipRow key={r.id} label={r.name} value={nf(r.price, 2)} />)}</>
+          }>
+            <span className="text-faint text-[11.5px] underline decoration-dotted">{m.prices}</span>
+          </Tip>
+        ) : (
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {data.resources.map((r) => (
+              <label key={r.id} className="flex items-center gap-1 text-dim text-[12px]">
+                {r.icon ? <ResourceIcon icon={r.icon} size={12} /> : r.name}
+                <input type="number" min={0} step={0.5} value={vm.weights[r.id]}
+                  aria-label={r.name} className="w-14 p-0.5 text-right"
+                  onChange={(e) => setWeight(r.id, parseFloat(e.target.value))} />
+              </label>
+            ))}
+            <Tip title={m.valueCustom} content={m.weightsHint}>
+              <span className="text-faint text-[11.5px] underline decoration-dotted">?</span>
+            </Tip>
+          </span>
+        )}
       </div>
 
       {!rows.length ? <Empty>{m.none}</Empty> : (
@@ -197,7 +244,7 @@ function Sites({ data }: { data: Mining }) {
                 {data.resources.map((r) => (
                   <Th key={r.id} k={r.id} right hint={m.yieldHint} {...th}>{r.name}</Th>
                 ))}
-                <Th k="value" right hint={m.valueHint} {...th}>{m.value}</Th>
+                <Th k="value" right hint={vm.mode === "market" ? m.valueHint : m.valueHintCustom} {...th}>{m.value}</Th>
                 <Th k="status" {...th}>{m.status}</Th>
                 <Th k="occupied" last {...th}>{m.occupied}</Th>
               </tr>
@@ -216,7 +263,7 @@ function Sites({ data }: { data: Mining }) {
                       <YieldCell y={s.yields[r.id]} site={s} res={r} />
                     </td>
                   ))}
-                  <td className="py-1.5 pr-3 text-right whitespace-nowrap"><ValueCell site={s} res={data.resources} /></td>
+                  <td className="py-1.5 pr-3 text-right whitespace-nowrap"><ValueCell site={s} res={data.resources} vm={vm} value={values.get(s.id) ?? 0} /></td>
                   <td className="py-1.5 pr-3 whitespace-nowrap"><Status s={s} /></td>
                   <td className="py-1.5">
                     {s.occupant ? <FactionName f={s.occupant} extra={s.occupant.mine && <Tag tone="mine">{t.space.you}</Tag>} /> : <span className="text-faint">—</span>}
