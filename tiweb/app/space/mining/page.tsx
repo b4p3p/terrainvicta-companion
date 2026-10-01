@@ -226,6 +226,15 @@ function Sites({ data }: { data: Mining }) {
                   onChange={(e) => setWeight(r.id, parseFloat(e.target.value))} />
               </label>
             ))}
+            <button type="button" className="text-accent text-[12px] hover:text-ink"
+              onClick={() => setVm({ ...vm, weights: Object.fromEntries(
+                data.resources.map((r) => [r.id, Math.round(r.price * 100) / 100])) as Weights })}>
+              {m.weightsFromPrices}
+            </button>
+            <button type="button" className="text-accent text-[12px] hover:text-ink"
+              onClick={() => setVm({ ...vm, weights: DEFAULT_MODE.weights })}>
+              {m.weightsReset}
+            </button>
             <Tip title={m.valueCustom} content={m.weightsHint}>
               <span className="text-faint text-[11.5px] underline decoration-dotted">?</span>
             </Tip>
