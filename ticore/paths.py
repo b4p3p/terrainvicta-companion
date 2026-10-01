@@ -1,6 +1,7 @@
 """Individuazione di salvataggi, template e localizzazione del gioco."""
 
 import os
+import re
 
 from .texts import t
 
@@ -73,8 +74,54 @@ def resolve_save(arg=None):
     return saves[0][1]
 
 
+STEAM_DIRS = [
+    r"C:/Program Files (x86)/Steam",
+    r"C:/Program Files/Steam",
+]
+
+_GAME_SUBDIR = "steamapps/common/Terra Invicta"
+
+
+def _steam_roots():
+    """Le installazioni di Steam: quella del registro di Windows, se c'e', poi
+    quelle predefinite. `winreg` manca fuori da Windows (anche in Pyodide)."""
+    roots = []
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam") as k:
+            roots.append(winreg.QueryValueEx(k, "SteamPath")[0])
+    except (ImportError, OSError):
+        pass
+    return roots + STEAM_DIRS
+
+
+def _steam_libraries():
+    """Le librerie di Steam, anche su altri dischi (D:/SteamLibrary): stanno in
+    `steamapps/libraryfolders.vdf`, una riga `"path" "D:\\\\SteamLibrary"` per
+    libreria, con le barre rovesciate raddoppiate."""
+    libs = []
+    for root in _steam_roots():
+        libs.append(root)
+        try:
+            with open(os.path.join(root, "steamapps", "libraryfolders.vdf"),
+                      encoding="utf-8", errors="ignore") as f:
+                text = f.read()
+        except OSError:
+            continue
+        libs += [p.replace("\\\\", "\\") for p in re.findall(r'"path"\s+"([^"]+)"', text)]
+    return libs
+
+
 def game_dir():
+    # TI_GAME_DIR: l'installazione dove nessuna regola la trova
+    env = os.environ.get("TI_GAME_DIR")
+    if env and os.path.isdir(env):
+        return env
     for d in GAME_DIRS:
+        if os.path.isdir(d):
+            return d
+    for lib in _steam_libraries():
+        d = os.path.join(lib, _GAME_SUBDIR)
         if os.path.isdir(d):
             return d
     return None
