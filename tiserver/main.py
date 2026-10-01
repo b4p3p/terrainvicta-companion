@@ -261,6 +261,12 @@ def mining(lang: str = Query(None)):
         return state.mining(lang)
 
 
+@app.get("/api/yass")
+def yass(lang: str = Query(None)):
+    with http_errors():
+        return state.yass(lang)
+
+
 @app.get("/api/techs")
 def techs(lang: str = Query(None)):
     with http_errors():

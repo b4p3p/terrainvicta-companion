@@ -22,7 +22,7 @@ export const pct = (v: number | null | undefined, d = 1) =>
 export function Panel({
   title, sub, right, children, className = "",
 }: {
-  title?: string; sub?: string; right?: ReactNode;
+  title?: ReactNode; sub?: string; right?: ReactNode;
   children: ReactNode; className?: string;
 }) {
   return (

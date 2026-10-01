@@ -18,8 +18,9 @@ export interface ComboOption {
 const fold = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
 /** Combo con ricerca, su Headless UI: tastiera e ARIA li fa la libreria, lo
- *  stile resta quello di input/select in globals.css. Si scrive per filtrare,
- *  frecce e Invio per scegliere, Esc per chiudere. */
+ *  stile resta quello di input/select in globals.css. Si apre al clic sul
+ *  testo (`immediate`), che si seleziona: si scrive per filtrare, frecce e
+ *  Invio per scegliere, Esc per chiudere. */
 export function Combo({
   value, onChange, options, placeholder, width = 260,
 }: {
@@ -41,7 +42,7 @@ export function Combo({
 
   return (
     <Combobox value={value} onChange={(id: string | null) => id && onChange(id)}
-      onClose={() => setQuery("")}>
+      onClose={() => setQuery("")} immediate>
       <div className="relative inline-block" style={{ width }}>
         <ComboboxInput
           className="w-full pr-7"
@@ -58,8 +59,8 @@ export function Combo({
         </ComboboxButton>
       </div>
       <ComboboxOptions anchor="bottom start"
-        className="z-50 bg-raised border border-edge-lit max-h-[340px] overflow-y-auto
-                   w-[var(--input-width)] min-w-[220px] [--anchor-gap:2px] py-0.5
+        className="z-50 bg-raised border border-edge-lit !max-h-[380px] overflow-y-auto
+                   w-[var(--input-width)] min-w-[240px] [--anchor-gap:2px] pb-0.5
                    empty:invisible">
         {shown.length === 0 && (
           <div className="px-2 py-1.5 text-[12px] text-faint">—</div>
@@ -67,15 +68,17 @@ export function Combo({
         {shown.map((o, i) => (
           <div key={o.id}>
             {o.group && o.group !== shown[i - 1]?.group && (
-              <div className="px-2 pt-1.5 pb-0.5 text-[10.5px] uppercase tracking-[.06em]
-                              text-faint display border-t border-edge first:border-t-0">
+              <div className="sticky top-0 z-10 bg-bar px-2 pt-1.5 pb-1 text-[10.5px] uppercase
+                              tracking-[.06em] text-faint display border-b border-edge">
                 {o.group}
               </div>
             )}
             <ComboboxOption value={o.id}
-              className="px-2 py-[3px] text-[12px] cursor-pointer flex items-baseline gap-2
-                         text-dim data-[focus]:bg-sel data-[focus]:text-ink
-                         data-[selected]:text-accent">
+              className="pl-2 pr-2 py-[5px] text-[12.5px] cursor-pointer flex items-baseline gap-2
+                         text-dim border-l-2 border-transparent
+                         data-[focus]:bg-sel data-[focus]:text-ink
+                         data-[selected]:text-accent data-[selected]:border-accent group">
+              <span className="w-3 shrink-0 text-accent invisible group-data-[selected]:visible">✓</span>
               <span className="truncate">{o.label}</span>
               {o.hint && <span className="ml-auto text-faint text-[11px] shrink-0">{o.hint}</span>}
             </ComboboxOption>

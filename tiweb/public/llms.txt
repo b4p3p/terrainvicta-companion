@@ -10,6 +10,7 @@ Site: https://terrainvicta-companion.b4p3p.it/
 - Council: attribute coverage, missions nobody on the council can run, which recruit candidates would cover them.
 - Missions: the real attacking and defending factors of each mission from the game templates; targets ranked with raw values next to the score.
 - Nations: trends over time and a detail view per nation.
+- YASS (Yet Another Spreadsheet Simulator): nation calculators on the game's own formulas, fed by the save. A copy of the game's priorities panel with clickable pips (investment points, bonuses and shares match the game) drives spreadsheet-style sheets: cohesion and its resting value, the monthly effects of each priority, unrest, annexation (hostile regions, hostility removal) and a 1-20 year projection. Inspired by vindicator117's nation-building spreadsheets.
 - Factions: rival factions and councilors compared only on what the player's intel unlocks.
 - Space: visible habitats, Earth orbits with free slots, buildable modules and when they are affordable.
 - Mining: every base site ranked by yield (real values only on bodies the player has probed, the game's min-max range elsewhere) and the orgs with space bonuses, including rival ones as Hostile Takeover targets.

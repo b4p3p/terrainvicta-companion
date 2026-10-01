@@ -206,7 +206,7 @@ def check(save_path=None):
     dall'estratto: va aggiunta a KEEP_PREFIXES/KEEP_PATTERNS.
     """
     import tempfile
-    from . import factions, mining, missions, model, save, space, techs
+    from . import factions, mining, missions, model, save, space, techs, yass
     g = save.Game(save_path or paths.latest_save()[0])
 
     def run():
@@ -221,6 +221,7 @@ def check(save_path=None):
                 "space": space.overview(g, lang),
                 "mining": mining.overview(g, lang),
                 "techs": techs.overview(g, lang),
+                "yass": yass.overview(g, lang),
                 "details": {n["id"]: model.nation_detail(g, n["id"], lang)
                             for n in model.nations(g, lang)},
             }

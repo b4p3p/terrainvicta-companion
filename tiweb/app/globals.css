@@ -149,6 +149,31 @@ input, select, textarea {
   padding: 4px 8px;
   font-size: 12px;
 }
+/* Casella del gioco: FRA_checkbox (bordo 1px #6b828c, fondo #080c10),
+   FRA_checkbox_over al passaggio, la spunta e' lo sprite `checkmark`
+   (V spessa #d6fbfc) ridisegnata in SVG, FRA_checkbox_disable da spenta. */
+input[type="checkbox"] {
+  appearance: none;
+  flex: none;
+  width: 14px; height: 14px;
+  padding: 0; margin: 0;
+  border: 1px solid #6b828c;
+  background: #080c10 center / 12px 10px no-repeat;
+  cursor: var(--ti-cursor-valid);
+}
+input[type="checkbox"]:hover, label:hover > input[type="checkbox"] {
+  border-color: #add3de;
+  background-color: #496578;
+}
+input[type="checkbox"]:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 26'%3E%3Cpath d='M2 11l10 10L30 3' fill='none' stroke='%23d6fbfc' stroke-width='6'/%3E%3C/svg%3E");
+}
+input[type="checkbox"]:disabled {
+  border-color: #d6fbff;
+  background-color: #4a5152;
+  cursor: var(--ti-cursor-invalid);
+}
+
 input:focus-visible, select:focus-visible, textarea:focus-visible,
 button:focus-visible, a:focus-visible {
   outline: 1px solid var(--sel-edge);
@@ -213,4 +238,156 @@ html:not([data-engine="browser"]) .ti-splash { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .ti-pulse, .ti-scan { animation: none; }
+}
+
+/* ---------------------------------------------------------------- YASS */
+/* Il foglio di calcolo: righe numerate, colonne a lettere, barra fx e fogli
+   in basso come Excel, ma coi colori e lo spigolo vivo del gioco. */
+
+/* pannello Priorita' a sinistra, foglio a destra; sotto i 1100px uno sull'altro */
+.yass-layout { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1400px) { .yass-layout { grid-template-columns: max-content minmax(0, 1fr); align-items: start; } }
+/* il pannello resta fermo mentre il foglio scorre: con le colonne affiancate
+   a sinistra, una sopra l'altra in cima, alto al massimo meta' schermo */
+.yass-panel {
+  background: var(--panel); border: 1px solid var(--edge-lit); padding: 0 10px 8px;
+  position: sticky; top: calc(var(--shell-h, 0px) + 8px); z-index: 6;
+  max-height: calc((100vh - var(--shell-h, 0px)) / 2); overflow: auto;
+  border-bottom: 2px solid var(--accent);
+}
+@media (min-width: 1400px) { .yass-panel { max-height: calc(100vh - var(--shell-h, 0px) - 16px); border-bottom-width: 1px; border-bottom-color: var(--edge-lit); } }
+.yass-prio thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); padding-top: 8px; }
+/* la nota sotto la tabella va a capo dentro la larghezza della tabella, non la allarga */
+.yass-panel p { width: 0; min-width: 100%; }
+.yass-prio { border-collapse: collapse; font-size: 12px; }
+.yass-prio th {
+  font-family: var(--font-display); font-weight: 600; font-size: 11px; color: var(--ink-dim);
+  text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px 6px; text-align: right;
+}
+.yass-prio td { padding: 2px 8px; height: 28px; text-align: right; border-top: 1px solid color-mix(in srgb, var(--edge) 55%, transparent); }
+.yass-prio .yass-prio-cp { text-align: center; padding: 2px 3px; width: 44px; }
+.yass-prio th:first-child, .yass-prio td:first-child { text-align: left; padding-left: 2px; }
+.yass-pip {
+  display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 22px;
+  border: 1px solid transparent; background: transparent;
+}
+.yass-pip:hover { border-color: var(--edge-lit); background: var(--sel); }
+.yass-pip:focus-visible { outline: 1px solid var(--accent); outline-offset: 0; }
+.yass-pip-changed { border-color: var(--warn); }
+/* celle che dipendono dal pannello Priorita': segno accanto all'etichetta e
+   un lampo quando i pallini cambiano */
+.yass-link { display: inline-flex; margin-left: 6px; opacity: .7; }
+@keyframes yass-flash { from { background: color-mix(in srgb, var(--accent) 45%, transparent); } to { background: transparent; } }
+.yass-flash { display: inline-block; animation: yass-flash .9s ease-out; padding: 0 3px; margin: 0 -3px; }
+
+/* l'icona dei pallini dentro un testo */
+.yass-pip-word { display: inline-flex; vertical-align: middle; margin: 0 2px; }
+/* le priorita' che il foglio aperto usa: fondo appena tinto e filetto */
+.yass-prio-used td { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.yass-prio-used td:first-child { border-left: 2px solid var(--accent); }
+.yass-used-key {
+  display: inline-block; width: 12px; height: 10px; vertical-align: middle;
+  background: color-mix(in srgb, var(--accent) 18%, transparent); border-left: 2px solid var(--accent);
+}
+
+/* il nome della priorita' cambia tutta la riga */
+.yass-prio-row { display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 0; padding: 1px 4px 1px 0; color: inherit; }
+.yass-prio-row:hover { color: var(--accent); }
+
+.yass-fx {
+  display: flex; align-items: stretch; min-height: 26px;
+  background: var(--void); border: 1px solid var(--edge-lit); border-bottom: 0;
+  font-size: 12px;
+}
+.yass-name {
+  display: flex; align-items: center; justify-content: center; width: 58px;
+  border-right: 1px solid var(--edge-lit); color: var(--ink-dim); font-size: 11.5px;
+}
+.yass-fx-label {
+  display: flex; align-items: center; padding: 0 10px;
+  background: var(--bar); border-right: 1px solid var(--edge-lit);
+  color: var(--ink-dim); font-style: italic; font-family: Georgia, serif;
+}
+.yass-fx-body { display: flex; align-items: center; padding: 3px 10px; overflow-wrap: anywhere; }
+
+.yass-grid { border-collapse: collapse; width: 100%; font-size: 12px; }
+.yass-grid th, .yass-grid td {
+  border: 1px solid color-mix(in srgb, var(--edge) 55%, transparent);
+  padding: 3px 10px; height: 28px;
+}
+.yass-grid thead th {
+  background: var(--bar); color: var(--ink-faint); font-weight: 600;
+  font-family: var(--font-display); font-size: 10.5px; text-align: center; height: 20px; padding: 0 8px;
+}
+.yass-grid th:nth-child(2) { width: 30%; }
+.yass-grid th:nth-child(3) { width: 170px; }
+/* la tabella della Proiezione: colonne tutte uguali, niente larghezze del foglio */
+.yass-proj th:nth-child(2) { width: 110px; }
+.yass-proj th:nth-child(n+3) { width: auto; }
+.yass-proj .yass-section td:not(.yass-rn) { text-transform: none; letter-spacing: 0; font-size: 11.5px; }
+.yass-grid .yass-rn {
+  width: 34px; padding: 0 4px; background: var(--bar); color: var(--ink-faint);
+  font-size: 10.5px; text-align: center;
+}
+.yass-grid tbody tr { background: var(--panel); }
+.yass-section td:not(.yass-rn) {
+  background: var(--bar-deep); color: var(--ink-dim); box-shadow: inset 2px 0 0 var(--edge-lit);
+  font-family: var(--font-display); font-weight: 600; font-size: 11px;
+  letter-spacing: .05em; text-transform: uppercase;
+}
+.yass-val { text-align: right; white-space: nowrap; cursor: var(--ti-cursor-valid); }
+.yass-pick { padding: 2px 4px; text-align: left; }
+/* posto fisso per l'icona: le etichette restano allineate anche senza */
+.yass-icon { display: inline-flex; width: 15px; justify-content: center; flex: none; }
+/* etichette con spiegazione: sottolineatura a puntini, come gli altri tooltip */
+.yass-hinted { text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; }
+.yass-pick input { padding: 2px 6px; }
+/* tutti i fogli alti come il piu' lungo: le linguette restano ferme */
+.yass-body { min-height: 600px; }
+.yass-sel { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* una sola cornice, come in Excel: la selezione; niente anello del browser
+   sulla cella e niente bordo dell'input dentro la cella selezionata */
+.yass-val:focus, .yass-val:focus-visible { outline: none; }
+.yass-sel:focus, .yass-sel:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.yass-sel .yass-in, .yass-sel .yass-in:focus-visible { border-color: transparent; outline: none; }
+
+/* voci di una somma: rientrate e piu' piccole, sotto la riga che le somma */
+.yass-sub td:not(.yass-rn) { font-size: 11.5px; }
+.yass-sub td:nth-child(2) { padding-left: 34px; color: var(--ink-faint); }
+.yass-sub .yass-val { color: var(--ink-dim); }
+
+/* il risultato che risponde alla domanda del foglio */
+.yass-main td:not(.yass-rn) { background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
+.yass-main .yass-val { font-size: 13.5px; font-weight: 600; }
+
+/* matita del «e se…» sui valori della partita */
+.yass-pencil { display: inline-flex; color: var(--ink-faint); padding: 2px; }
+.yass-pencil:hover { color: var(--accent); }
+
+/* celle d'ingresso: le «blu» dei fogli di calcolo, col colore della fazione */
+.yass-in {
+  background: color-mix(in srgb, var(--accent) 14%, var(--void));
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  padding: 1px 6px; font-size: 12px; font-variant-numeric: tabular-nums;
+}
+.yass-in.yass-changed { border-color: var(--warn); color: var(--warn); }
+/* si trascina per cambiare il valore: la ↔ solo durante il trascinamento,
+   sopra il numero resta il cursore di testo */
+.yass-in { cursor: text; }
+body.yass-scrubbing, body.yass-scrubbing * { cursor: ew-resize !important; user-select: none; }
+
+/* la barra dei fogli resta in fondo allo schermo mentre la griglia scorre */
+.yass-sheets {
+  display: flex; flex-wrap: wrap; align-items: center; margin-top: 10px; border-top: 1px solid var(--edge-lit);
+  position: sticky; bottom: 0; z-index: 5; background: var(--raised); padding-bottom: 6px;
+}
+.yass-sheets button {
+  font-family: var(--font-display); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase;
+  padding: 0 14px; height: 26px; color: var(--ink-dim);
+  background: var(--panel); border: 1px solid var(--edge); border-top: 0; margin-right: -1px;
+}
+.yass-sheets button:hover { color: var(--ink); }
+.yass-sheets .yass-sheet-on {
+  color: var(--ink); background: var(--raised);
+  border-bottom: 2px solid var(--accent); margin-top: -1px; border-top: 1px solid var(--raised);
 }

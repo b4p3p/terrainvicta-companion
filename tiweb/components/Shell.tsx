@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { askNotificationPermission, useEngineStatus, useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { demoMode, engineMode, exitDemo, LOCKED_ENGINE, type EngineMode } from "@/lib/engine";
@@ -70,11 +70,23 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       else s.removeProperty(v);
   }, [cursor]);
 
+  /* Altezza della testata fissa, in --shell-h: chi resta fermo sotto di lei
+     (il pannello Priorita' di YASS) sa dove fermarsi. Cambia quando va a capo. */
+  const shellObs = useRef<ResizeObserver | null>(null);
+  const headerRef = useCallback((el: HTMLElement | null) => {
+    shellObs.current?.disconnect();
+    if (!el) return;
+    const set = () => document.documentElement.style.setProperty("--shell-h", `${el.offsetHeight}px`);
+    set();
+    shellObs.current = new ResizeObserver(set);
+    shellObs.current.observe(el);
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col"
       style={accent ? ({ "--accent": accent } as React.CSSProperties) : undefined}>
 
-      <header className="sticky top-0 z-20 bg-void border-b border-edge-lit">
+      <header ref={headerRef} className="sticky top-0 z-20 bg-void border-b border-edge-lit">
         {/* riga 1 — identità e stato della partita */}
         <div className="flex items-center gap-x-5 gap-y-1 flex-wrap px-4 min-h-9 py-1
                         border-b border-edge">

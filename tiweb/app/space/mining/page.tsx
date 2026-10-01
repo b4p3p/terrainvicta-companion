@@ -196,11 +196,11 @@ function Sites({ data }: { data: Mining }) {
         <input type="search" placeholder={m.filter} value={q}
           onChange={(e) => setQ(e.target.value)} className="min-w-[220px]" />
         <label className="flex items-center gap-1.5 text-dim text-[12.5px] cursor-pointer">
-          <input type="checkbox" checked={reachable} onChange={(e) => setReachable(e.target.checked)} className="p-0" />
+          <input type="checkbox" checked={reachable} onChange={(e) => setReachable(e.target.checked)} />
           {m.onlyReachable}
         </label>
         <label className="flex items-center gap-1.5 text-dim text-[12.5px] cursor-pointer">
-          <input type="checkbox" checked={hideOccupied} onChange={(e) => setHideOccupied(e.target.checked)} className="p-0" />
+          <input type="checkbox" checked={hideOccupied} onChange={(e) => setHideOccupied(e.target.checked)} />
           {m.hideOccupied}
         </label>
         <label className="flex items-center gap-1.5 text-dim text-[12.5px]">

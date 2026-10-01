@@ -14,8 +14,9 @@ import os
 import re
 from urllib.parse import unquote
 
-from . import (Game, SaveLocked, alerts, factions, gamedata, load, missions,
-               mining, model, paths, portable, presets, snapshot, space, store, techs, texts)
+from . import (Game, SaveLocked, alerts, factions, gamedata, load, mining,
+               missions, model, paths, portable, presets, snapshot, space,
+               store, techs, texts, yass)
 from .texts import t
 
 
@@ -235,6 +236,11 @@ class Service:
         self.require()
         return mining.overview(self.game, lang or self.lang)
 
+    def yass(self, lang=None):
+        """Dati di partenza dei calcolatori di nazione: vedi ticore/yass.py."""
+        self.require()
+        return yass.overview(self.game, lang or self.lang)
+
     def techs(self, lang=None):
         """Tecnologie avviabili e cosa sblocca ognuna: vedi ticore/techs.py."""
         self.require()
@@ -443,6 +449,7 @@ _ROUTES = [
     ("GET", r"/api/space", lambda s, q, b: s.space(q.get("lang"))),
     ("GET", r"/api/mining", lambda s, q, b: s.mining(q.get("lang"))),
     ("GET", r"/api/techs", lambda s, q, b: s.techs(q.get("lang"))),
+    ("GET", r"/api/yass", lambda s, q, b: s.yass(q.get("lang"))),
     ("GET", r"/api/diff", lambda s, q, b: s.diff()),
     ("GET", r"/api/presets", lambda s, q, b: s.presets_status(q.get("lang"))),
     ("GET", r"/api/presets/export", lambda s, q, b: s.presets_export()),

@@ -66,11 +66,12 @@ ti.py       CLI sottile sopra ticore (utile senza browser).
 | `space.py` | scheda Spazio: habitat visibili (intel >= `intelToSeeSpaceAssetLocationandComposition`, 0,1: stessa regola della finestra Habitat), orbite terrestri coi posti, moduli sbloccati. Controllo missioni = ultima voce giornaliera delle `Transactions` |
 | `mining.py` | scheda Estrazione: tutti i siti con la resa **vera solo sui corpi prospettati** (intel sul corpo >= 1,0), altrove la stima del gioco (`GetHabSiteExpectedProductivity_month`) con forchetta; raggiungibilità da `effectToExplore`. «Valore» = resa × prezzo di mercato, euristica nostra. Org spaziali: nostre, del mercato, altrui entro l'intel (bersagli di Acquisizione ostile) |
 | `techs.py` | scheda Tecnologie: le tecnologie avviabili e cosa sblocca ognuna per la tua fazione (UniqueProjectUnlocks/ShouldHide del gioco). Percentuale = `GetProjectUnlockChance` come nella schermata Ricerca; i mesi di comparsa sono una stima nostra dalle regole dei trigger |
+| `yass.py` | YASS (Yet Another Spreadsheet Simulator), sotto Nazioni: i dati di partenza dei calcolatori di nazione. I conti li fa l'interfaccia (`tiweb/lib/yass.ts`, stesse formule) perché rispondano a ogni cella cambiata. Pannello Priorità come nel gioco (validità, bonus, /M), effetti per completamento, coesione di riposo coi termini leggibili e un residuo ricavato dal valore del gioco. `python -m ticore.yass` confronta le formule col salvataggio |
 | `store.py` | SQLite in `~/.terrainvicta-companion/`: storico, note, obiettivi. La campagna è identificata da **fazione + difficoltà + `realWorldCampaignStart`** |
 
 ### API
 `/api/snapshot?lang=` · `/api/alerts` · `/api/missions` · `/api/missions/{id}/plan`
-· `/api/nations/trends` · `/api/nations/{name}/detail` · `/api/factions` (+ `councilors`) · `/api/space` · `/api/mining` · `/api/techs`
+· `/api/nations/trends` · `/api/nations/{name}/detail` · `/api/factions` (+ `councilors`) · `/api/space` · `/api/mining` · `/api/techs` · `/api/yass`
 · `/api/presets` (+ `install`, `restore`, `custom`)
 · `/api/nations` (dentro snapshot) · `/api/history` · `/api/campaigns` · `/api/diff`
 · `/api/goals` · `/api/notes` · `/api/saves` · `/api/languages` · `/api/stream` (SSE)
@@ -186,6 +187,9 @@ con `isAI == false`.
   Finanziamenti; `spaceflightBonus` → Programma spaziale, Capacità di lancio,
   exovelivoli; `MCBonus` → Controllo missioni. Acquisizione ostile può colpire
   anche il pool non assegnato della fazione bersaglio.
+- **Priorità di una nazione** (IL di `TINationState`, verificato sulla schermata Priorità della Francia: /M, Bonus e Perc. coincidono): gli IP del mese si dividono in parti uguali fra i punti di controllo, poi secondo i pallini delle sole priorità **valide** (`ValidPriority`: il gioco mostra solo quelle; un pallino su una priorità non valida non conta nel totale), × (1 + bonus). Bonus = fazione (`SumPriorityBonuses`: org e tratti dei consiglieri, effetti) + **diversità** del punto (per ogni altra priorità con pallini: Economia 0,5, le altre 0,2 × pallini / totale) + nazionale (Economia: federazione; eserciti: regioni minerarie). Un punto coi benefici sospesi non prende bonus positivi. Costo di un completamento: `priority_*` (Unità 2, Lancio 2, Controllo missioni 25, Armi nucleari 40 nel template).
+- **Effetti per completamento** = valore base × `priorityEffectPopScaling` = (pop / 50 mln)^−0,35. La Conoscenza sposta la coesione di 0,01 × scala **verso 5**: sopra 5 la abbassa. L'Unità aggiunge coesione (rende meno con istruzione e democrazia alte). Ogni 200 completamenti di Governo + Unità, sommati, una regione perde l'ostilità (`numPrioritiesForLegitimize`), a prescindere dalla popolazione.
+- **Coesione**: ogni mese va verso il riposo, in salita al più di 0,1, in discesa al più di clamp((disuguaglianza − 3)²/10, 0,1, 0,25). Quindi con poca Conoscenza **si ferma** a riposo + Conoscenze × passo; sale verso 5 solo se le Conoscenze del mese superano il calo massimo. Il **riposo** = 16 + termini, con la disuguaglianza come leva principale; il PIL pro capite alto non aiuta (pesa solo sotto il massimo degli ultimi 40 trimestri); sopra 6,5 la democrazia tira il riposo verso 5. Distanze e ideologia non le ricostruiamo: residuo dal valore salvato, stabile nello storico (oscillazione mediana 0,004).
 
 ## Cosa c'e' in cantiere
 
