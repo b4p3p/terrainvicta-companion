@@ -15,6 +15,7 @@ import asyncio
 import json
 import os
 import sys
+import threading
 from contextlib import contextmanager
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -46,6 +47,11 @@ if os.environ.get("TI_GAMEDATA"):
 state = Service()
 subscribers = set()
 
+# Le rotte sincrone girano in un pool di thread, ma il Service e' uno solo con
+# una sola lingua corrente: due richieste in lingue diverse (la pagina che si
+# apre, il cambio di lingua) si scambiavano snapshot e allerte. In fila.
+lock = threading.RLock()
+
 
 @app.middleware("http")
 async def request_lang(request: Request, call_next):
@@ -57,10 +63,11 @@ async def request_lang(request: Request, call_next):
 
 @contextmanager
 def http_errors():
-    try:
-        yield
-    except ServiceError as e:
-        raise HTTPException(e.status, e.message)
+    with lock:
+        try:
+            yield
+        except ServiceError as e:
+            raise HTTPException(e.status, e.message)
 
 
 async def broadcast(event):
@@ -80,12 +87,19 @@ async def startup():
     asyncio.create_task(watcher())
 
 
+def _reload():
+    """L'evento nella stessa lingua dello snapshot appena fatto."""
+    with lock:
+        return state.event() if state.reload() else None
+
+
 async def watcher():
     while True:
         await asyncio.sleep(POLL_SECONDS)
         try:
-            if await asyncio.to_thread(state.reload):
-                await broadcast(state.event())
+            event = await asyncio.to_thread(_reload)
+            if event:
+                await broadcast(event)
         except Exception as e:
             state.error = str(e)
 
