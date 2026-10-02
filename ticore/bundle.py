@@ -233,6 +233,18 @@ def check(save_path=None):
         build(d)
         load(d)                         # dall'estratto
         extract = run()
+        # come nel browser: niente cartella del gioco. Qui contano solo le
+        # eccezioni (chi legge un file del gioco senza l'estratto si rompe qui
+        # e non in produzione); i valori possono cambiare, per esempio senza i
+        # preset installati nel gioco
+        real_template_dir = paths.template_dir
+        paths.template_dir = lambda: None
+        try:
+            run()
+        except Exception as e:          # noqa: BLE001 - va riportato, non nascosto
+            raise SystemExit(f"Senza la cartella del gioco (come nel browser) si rompe: {e!r}")
+        finally:
+            paths.template_dir = real_template_dir
     gamedata.use_game_files()
     return _diff(full, extract)
 
