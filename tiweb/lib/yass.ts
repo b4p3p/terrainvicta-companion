@@ -149,14 +149,61 @@ export function perCompletion(k: YassConstants, e: EffectConstants, n: EffectInp
   } as Record<string, Partial<Record<"pcgdp" | "inequality" | "education" | "cohesion" | "democracy", number>>>;
 }
 
+// ---------------------------------------------------------------- crescita
+// Gli IP seguono il PIL (TINationState.ModifyGDP, SetBaseInvestmentPoints_month);
+// il tetto del Controllo missioni segue il PIL di ogni regione e l'istruzione
+// (TIRegionState.get_maxMissionControl, NationalGDPProportion).
+
+export interface GrowthConstants {
+  ipGdpExp: number; unrestIPFree: number; unrestIPStep: number;
+  mcDiv: number; mcDivPerEdu: number; mcDivMin: number;
+  cpGdpScale: number; cpCostScaling: number; cpCostDivisor: number;
+}
+
+/** IP dal PIL: (PIL / 1 mld)^0,35, meno la penalita' dei disordini sopra 2. */
+export function baseIP(g: GrowthConstants, gdp: number, unrest: number) {
+  const pen = Math.max(0, unrest - g.unrestIPFree) / g.unrestIPStep;
+  return gdp > 0 ? Math.pow(gdp / 1e9, g.ipGdpExp) * Math.max(0, 1 - pen) : 0;
+}
+
+/** Divisore del tetto MC: PIL regionale (mld) per un posto in piu'. */
+export const mcDivisor = (g: GrowthConstants, education: number) =>
+  Math.max(g.mcDivMin, g.mcDiv - g.mcDivPerEdu * education);
+
+/** Tetto del Controllo missioni: ogni regione 1 + PIL regionale / divisore,
+    mai sotto quello che ha gia'. Il PIL si divide coi pesi delle regioni. */
+export function mcCap(g: GrowthConstants, gdp: number, regions: { gdpWeight: number; missionControl: number }[], education: number) {
+  const total = regions.reduce((t, r) => t + r.gdpWeight, 0);
+  const div = mcDivisor(g, education);
+  return regions.reduce((t, r) =>
+    t + (total ? Math.max(r.missionControl, 1 + Math.floor(gdp / 1e9 * r.gdpWeight / total / div)) : r.missionControl), 0);
+}
+
+/** Costo in CP di tutta la nazione: (PIL / K)^0,6 / 2, diviso fra i suoi punti. */
+export const cpCost = (g: GrowthConstants, gdp: number) =>
+  g.cpGdpScale > 0 ? Math.pow(gdp / g.cpGdpScale, g.cpCostScaling) / g.cpCostDivisor : 0;
+
 // ---------------------------------------------------------------- proiezione
 // La nazione mese per mese coi pallini di oggi: effetti delle priorita'
 // ricalcolati ogni mese (con piu' istruzione l'Economia rende di piu'), ritorno
-// della coesione verso il riposo. Fermi: popolazione, coesione di riposo, punti
-// di investimento, esercito. Stima per orientarsi, non simulazione completa.
+// della coesione verso il riposo. Con `growth` gli IP seguono il PIL e i
+// disordini, e il Controllo missioni si accumula fino al tetto. Fermi:
+// popolazione, esercito. Stima per orientarsi, non simulazione completa.
 
 export interface NationState {
   cohesion: number; rest: number; pcgdp: number; inequality: number; democracy: number; education: number; unrest: number;
+  /** solo con `growth`: PIL, IP del mese, Controllo missioni e tetto */
+  gdp?: number; ip?: number; mc?: number; mcCap?: number;
+}
+export interface GrowthInputs {
+  g: GrowthConstants;
+  population: number;                 // milioni, ferma
+  ip0: number;                        // IP del mese oggi: i completamenti di oggi sono per questi
+  regions: { gdpWeight: number; missionControl: number }[];
+  mcIP: number;                       // IP al mese sul Controllo missioni, oggi (gia' col bonus)
+  mcCost: number;                     // IP per un punto di Controllo missioni
+  /** completamenti al mese col Controllo missioni pieno: i suoi pallini non contano piu' */
+  completionsFull: Record<string, number>;
 }
 export interface ProjectionInputs {
   start: Omit<NationState, "unrest" | "rest">;
@@ -166,6 +213,7 @@ export interface ProjectionInputs {
   completions: Record<string, number>;
   /** coesione di riposo dallo stato del mese; senza, resta `rest` */
   restOf?: (s: Omit<NationState, "unrest" | "rest">, unrest: number) => number;
+  growth?: GrowthInputs;
 }
 
 const unrestOf = (k: YassConstants, s: Omit<NationState, "unrest" | "rest">, p: ProjectionInputs) =>
@@ -176,10 +224,37 @@ const unrestOf = (k: YassConstants, s: Omit<NationState, "unrest" | "rest">, p: 
 export function projectNation(k: YassConstants, e: EffectConstants, p: ProjectionInputs, at: number[]): NationState[] {
   const last = Math.max(...at);
   let s = { ...p.start };
+  const gr = p.growth;
   const restAt = (st: typeof s) => (p.restOf ? p.restOf(st, unrestOf(k, st, p)) : p.rest);
-  const out = new Map<number, NationState>([[0, { ...s, rest: restAt(s), unrest: unrestOf(k, s, p) }]]);
-  const c = (id: string) => p.completions[id] ?? 0;
+  // crescita: PIL dal PIL pro capite (popolazione ferma), IP dal PIL, MC verso il tetto
+  const gdpOf = (st: typeof s) => (gr ? st.pcgdp * gr.population * 1e6 : 0);
+  // cio' che negli IP non viene dal PIL (eserciti, consiglieri) resta fermo:
+  // ricavato da oggi, cosi' al mese 0 gli IP sono quelli della cella
+  const ipOther = gr ? gr.ip0 - baseIP(gr.g, gdpOf(p.start), unrestOf(k, p.start, p)) : 0;
+  const ipOf = (st: typeof s) => (gr ? Math.max(0, baseIP(gr.g, gdpOf(st), unrestOf(k, st, p)) + ipOther) : 0);
+  let mc = gr ? gr.regions.reduce((t, r) => t + r.missionControl, 0) : 0;
+  let mcPoints = 0;
+  const capOf = (st: typeof s) => (gr ? mcCap(gr.g, gdpOf(st), gr.regions, st.education) : 0);
+  const snap = (st: typeof s): NationState => ({
+    ...st, rest: restAt(st), unrest: unrestOf(k, st, p),
+    ...(gr ? { gdp: gdpOf(st), ip: ipOf(st), mc, mcCap: capOf(st) } : {}),
+  });
+  const out = new Map<number, NationState>([[0, snap(s)]]);
   for (let m = 1; m <= last; m++) {
+    // gli IP del mese rispetto a oggi: tutti i completamenti scalano con loro;
+    // a Controllo missioni pieno la sua priorita' non e' valida e i suoi pallini
+    // passano alle altre
+    let ratio = 1, comp = p.completions;
+    if (gr) {
+      ratio = gr.ip0 > 0 ? ipOf(s) / gr.ip0 : 1;
+      if (mc < capOf(s)) {
+        mcPoints += gr.mcIP * ratio;
+        while (mcPoints >= gr.mcCost && mc < capOf(s)) { mcPoints -= gr.mcCost; mc += 1; }
+      } else {
+        comp = gr.completionsFull;
+      }
+    }
+    const c = (id: string) => (comp[id] ?? 0) * ratio;
     const per = perCompletion(k, e, {
       scaling: p.scaling, education: s.education, democracy: s.democracy, cohesion: s.cohesion,
       resourceRegions: p.resourceRegions, coreEcoRegions: p.coreEcoRegions,
@@ -199,7 +274,7 @@ export function projectNation(k: YassConstants, e: EffectConstants, p: Projectio
       democracy: Math.min(10, Math.max(0, s.democracy + sum("democracy"))),
       education: Math.max(0, s.education + sum("education")),
     };
-    if (at.includes(m)) out.set(m, { ...s, rest: restAt(s), unrest: unrestOf(k, s, p) });
+    if (at.includes(m)) out.set(m, snap(s));
   }
   return at.map((m) => out.get(m)!);
 }

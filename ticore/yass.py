@@ -42,6 +42,7 @@ nazione: niente di nascosto.
 """
 
 from . import gamedata
+from .model import CP_COST_DIVISOR, CP_COST_SCALING   # (PIL / K) ^ 0,6 / 2 per nazione
 from .names import Namer
 
 # costanti della DLL: in TIGlobalConfig.json non ci sono, valgono i default
@@ -76,6 +77,47 @@ EFFECTS = {
     "uniCohMin": 0.025,          # unityMinCohesionChange
     "uniEdu": -0.001,            # unityPriorityEducationChange
 }
+# Crescita (TINationState.ModifyGDP, SetBaseInvestmentPoints_month;
+# TIRegionState.get_maxMissionControl, NationalGDPProportion): gli IP seguono
+# il PIL, il tetto del Controllo missioni il PIL di ogni regione
+IP_GDP_EXP = 0.35                   # TIGlobalConfig.controlPointIPScaling (x controlPointIPFactor 1)
+UNREST_IP_FREE = 2.0                # investmentPoints_unrestPenalty_frac = max(0, disordini - 2) / 10
+UNREST_IP_STEP = 10.0
+MC_DIV = 300.0                      # tetto MC di una regione: 1 + PIL regionale (mld) /
+MC_DIV_PER_EDU = 6.0                #   max(200, 300 - 6 x istruzione)
+MC_DIV_MIN = 200.0
+GDP_WEIGHT_CORE = 1.25              # TIGlobalConfig.coreEcoRegionGDPModifier
+GDP_WEIGHT_RESOURCE = 1.25          # TIGlobalConfig.coreResourceRegionGDPModifier (miniere e petrolio)
+GDP_WEIGHT_COLONY = 0.5             # TIGlobalConfig.colonyRegionGDPModifier
+
+
+def gdp_weight(r):
+    """Peso della regione nella divisione del PIL nazionale (NationalGDPProportion)."""
+    w = r.get("populationInMillions") or 0
+    if r.get("coreEconomicRegion"):
+        w *= GDP_WEIGHT_CORE
+    if r.get("resourceRegion") or r.get("oilRegion"):
+        w *= GDP_WEIGHT_RESOURCE
+    if r.get("colonyRegion"):
+        w *= GDP_WEIGHT_COLONY
+    return w
+
+
+def base_ip(gdp, unrest):
+    """IP del mese senza consiglieri ne' eserciti: (PIL / 1 mld)^0,35, meno la
+    penalita' dei disordini."""
+    pen = max(0.0, unrest - UNREST_IP_FREE) / UNREST_IP_STEP
+    return (gdp / 1e9) ** IP_GDP_EXP * max(0.0, 1 - pen) if gdp > 0 else 0.0
+
+
+def mc_cap(gdp, weights, missions, education):
+    """Tetto del Controllo missioni della nazione: somma dei tetti delle regioni."""
+    total = sum(weights)
+    div = max(MC_DIV_MIN, MC_DIV - MC_DIV_PER_EDU * education)
+    return sum(max(m, 1 + int(gdp / 1e9 * w / total / div)) if total else m
+               for w, m in zip(weights, missions))
+
+
 # costo in IP di un completamento: TIGlobalConfig.priority_*. Valori del
 # template del gioco (Armi nucleari 40; la DLL ha 25), cosi' la versione nel
 # browser, che non ha i file del gioco, da' gli stessi numeri dell'API locale
@@ -353,13 +395,16 @@ def overview(g, lang="ita"):
             "legitimizeProgress": n.get("accumulatedLegitimizeClaimTriggers") or 0,
             "resourceRegions": (n.get("numMiningRegions_dailyCache") or 0) + (n.get("numOilRegions_dailyCache") or 0),
             "ip": n.get("baseInvestmentPoints_month") or 0,
+            # quello che negli IP non viene dal PIL: eserciti (meno) e consiglieri (piu')
+            "ipOther": (n.get("baseInvestmentPoints_month") or 0) - base_ip(n.get("GDP") or 0, n.get("unrest") or 0),
             "controlPoints": len(n.get("controlPoints") or []),
             "myControlPoints": my_cps.get(nid, []),
             "priorities": prows,
             "restModel": rest_model(g, n, resid_med),
             "panelCPs": pcps,
             "regions": [{"id": rid, "name": nm.region(r), "population": r.get("populationInMillions") or 0,
-                         "hostile": rid in hostile} for rid, r in regs],
+                         "hostile": rid in hostile, "gdpWeight": gdp_weight(r),
+                         "missionControl": r.get("missionControl") or 0} for rid, r in regs],
             "claims": _ids(n.get("claims")),
             "hostileClaims": sorted(hostile),
         })
@@ -389,6 +434,15 @@ def overview(g, lang="ita"):
             "severeInequality": SEVERE_INEQUALITY,
             "priorityCost": priority_costs(ip_mult),
             "pcgdpPerUnrest": gv.get("fixedPCGDPToReduceUnrestBy1") or 0,
+            "ipGdpExp": IP_GDP_EXP,
+            "unrestIPFree": UNREST_IP_FREE,
+            "unrestIPStep": UNREST_IP_STEP,
+            "mcDiv": MC_DIV,
+            "mcDivPerEdu": MC_DIV_PER_EDU,
+            "mcDivMin": MC_DIV_MIN,
+            "cpGdpScale": gv.get("fixedPCGDPToRaiseBaseCPMaintenanceCostBy1") or 0,
+            "cpCostScaling": CP_COST_SCALING,
+            "cpCostDivisor": CP_COST_DIVISOR,
         },
     }
 
@@ -443,7 +497,33 @@ def check(save_path=None):
             bad.append(f"disordini {n['name']}: {calc:.3f} invece di {n['unrestRest']:.3f}")
         else:
             unrest_ok += 1
-    return len(d["nations"]), unrest_ok, bad
+    # IP dal PIL: dove non ci sono eserciti il gioco scrive esattamente
+    # (PIL / 1 mld)^0,35 meno i disordini (i consiglieri che consigliano sono rari)
+    ip_ok = 0
+    for n in d["nations"]:
+        nat = g.nations.get(n["id"]) or {}
+        if nat.get("armies"):
+            continue
+        if abs(n["ipOther"]) > 0.01:
+            bad.append(f"IP {n['name']}: {n['ip']:.3f}, dal PIL {n['ip'] - n['ipOther']:.3f}")
+        else:
+            ip_ok += 1
+    # tetto MC: la priorita' e' valida se una regione e' sotto il tetto; per i
+    # miei punti il gioco lo dice coi pallini contati (_fit_validity)
+    mc_ok = 0
+    for n in d["nations"]:
+        nat = g.nations.get(n["id"]) or {}
+        mc = next((r for r in n["priorities"] if r["id"] == "MissionControl"), None)
+        if not nat.get("spaceFlightProgram") or not any(cp["priorities"].get("MissionControl") for cp in n["panelCPs"]):
+            continue
+        regs = n["regions"]
+        cap = mc_cap(n["gdp"], [r["gdpWeight"] for r in regs], [r["missionControl"] for r in regs], n["education"])
+        have = sum(r["missionControl"] for r in regs)
+        if (mc is not None) != (have < cap):
+            bad.append(f"tetto MC {n['name']}: {have}/{cap}, il gioco la da' {'valida' if mc else 'non valida'}")
+        else:
+            mc_ok += 1
+    return len(d["nations"]), unrest_ok, ip_ok, mc_ok, bad
 
 
 # ---------------------------------------------------------------- coesione di riposo
@@ -576,7 +656,8 @@ def rest_model(g, n, fallback):
 
 
 if __name__ == "__main__":
-    total, unrest_ok, bad = check()
-    print(f"{total} nazioni, disordini verificati su {unrest_ok} senza esercito")
+    total, unrest_ok, ip_ok, mc_ok, bad = check()
+    print(f"{total} nazioni, disordini verificati su {unrest_ok} senza esercito, "
+          f"IP dal PIL su {ip_ok}, tetto MC su {mc_ok} coi miei pallini")
     print("\n".join(bad) if bad else "Nessuna differenza.")
     raise SystemExit(1 if bad else 0)

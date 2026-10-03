@@ -11,12 +11,12 @@ import { Tip } from "@/components/Tip";
 import { YassIcon } from "@/components/YassIcon";
 import { PipGlyph, PipText, PriorityPanel } from "./PriorityPanel";
 import {
-  type EffectConstants, type NationState, type PanelCP, type Pips as PipMap, type PriorityRow, type YassConstants,
-  type RestModel, decreaseCap, maxInequalityFor, panel, perCompletion, projectNation, restParts, hostileUnrest, knowledgeStep, monthlyMovement,
+  type EffectConstants, type GrowthConstants, type NationState, type PanelCP, type Pips as PipMap, type PriorityRow, type YassConstants,
+  type RestModel, baseIP, cpCost, decreaseCap, maxInequalityFor, panel, perCompletion, projectNation, restParts, hostileUnrest, knowledgeStep, monthlyMovement,
   popScaling,
 } from "@/lib/yass";
 
-interface Region { id: number; name: string; population: number; hostile: boolean }
+interface Region { id: number; name: string; population: number; hostile: boolean; gdpWeight: number; missionControl: number }
 interface Nation {
   id: number; name: string; mine: boolean;
   population: number; gdp: number;
@@ -30,7 +30,7 @@ interface Nation {
 }
 interface Yass {
   nations: Nation[];
-  constants: YassConstants & {
+  constants: YassConstants & GrowthConstants & {
     diversity: Record<string, number>; effects: EffectConstants; priorityCost: Record<string, number>; legitimize: number;
     ineqCohesionMult: number; severeInequality: number;
   };
@@ -47,21 +47,23 @@ const NO_TESTS: Tests = { over: {}, pips: {} };
 const isTests = (v: unknown): v is Tests =>
   !!v && typeof v === "object" && typeof (v as Tests).over === "object" && typeof (v as Tests).pips === "object";
 
-type Sheet = "cohesion" | "effects" | "unrest" | "annex" | "projection";
-const SHEETS: Sheet[] = ["cohesion", "effects", "unrest", "annex", "projection"];
+type Sheet = "cohesion" | "effects" | "unrest" | "annex" | "projection" | "split";
+const SHEETS: Sheet[] = ["cohesion", "effects", "unrest", "annex", "projection", "split"];
 // le priorita' del pannello che ogni foglio usa nei suoi conti
 const USED_BY_SHEET: Record<Sheet, string[]> = {
   cohesion: ["Knowledge"],
   effects: ["Economy", "Welfare", "Knowledge", "Government", "Unity"],
   unrest: ["Economy", "Knowledge", "Government", "Unity"],
   annex: ["Government", "Unity"],
-  projection: ["Economy", "Welfare", "Knowledge", "Government", "Unity"],
+  projection: ["Economy", "Welfare", "Knowledge", "Government", "Unity", "MissionControl"],
+  split: [],
 };
 const isSheet = (v: unknown): v is Sheet => SHEETS.includes(v as Sheet);
 const isStr = (v: unknown): v is string => typeof v === "string";
 
 type InputKey = "nationIP" | "education" | "population" | "cohesion" | "cohesionRest" | "inequality" | "knowledgeIP"
-  | "pcgdp" | "democracy" | "hostileShare" | "armyOther" | "unrestTarget" | "annexedDemocracy" | "target";
+  | "pcgdp" | "democracy" | "hostileShare" | "armyOther" | "unrestTarget" | "annexedDemocracy" | "target"
+  | "splitGdp" | "splitN";
 
 const REDDIT = "https://www.reddit.com/r/TerraInvicta/comments/1wrmm62/nation_building_calculators_and_other_references/";
 
@@ -94,6 +96,7 @@ function defaults(n: Nation, k: YassConstants, annexed: Nation | null, knowledge
     nationIP: n.ip, education: n.education, population: n.population, cohesion: n.cohesion, cohesionRest: n.cohesionRest, inequality: n.inequality,
     knowledgeIP, pcgdp: pc, democracy: n.democracy, hostileShare: share * 100,
     armyOther: army, unrestTarget: 2, annexedDemocracy: annexed?.democracy ?? 0, target: k.cohesionTarget,
+    splitGdp: n.gdp / 1e9, splitN: 2,
   };
 }
 
@@ -102,7 +105,7 @@ function defaults(n: Nation, k: YassConstants, annexed: Nation | null, knowledge
 // valori letti dalla partita: si possono sovrascrivere per un «e se…»; gli
 // altri ingressi sono scelte dell'utente, che il salvataggio non ha
 const FROM_SAVE = new Set<InputKey>(["nationIP", "knowledgeIP", "education", "population", "cohesion", "cohesionRest", "inequality",
-  "pcgdp", "democracy", "hostileShare", "armyOther", "annexedDemocracy"]);
+  "pcgdp", "democracy", "hostileShare", "armyOther", "annexedDemocracy", "splitGdp"]);
 
 type Row =
   | { kind: "section"; label: string }
@@ -116,6 +119,7 @@ type Row =
 // icona del gioco per ogni riga, le stesse della pagina Nazioni
 const COHESION = "ICO_Cohesion_mid", UNREST = "ICO_Unrest_mid", PC = "ICO_per_capita_GDP";
 const KNOWLEDGE = "ICO_knowledge_priority", IP = "ICO_investments", POP = "ICO_population", GOV = "ICO_gov_type";
+const GDP = "ICO_economy_priority", CP = "ICO_ControlPoint_empty";
 const ICONS: Record<string, string> = {
   population: POP, education: "ICO_education", cohesion: COHESION, cohesionRest: COHESION, inequality: "ICO_inequality",
   nationIP: IP, knowledgeIP: KNOWLEDGE, pcgdp: PC, democracy: GOV, annexedDemocracy: GOV,
@@ -129,6 +133,8 @@ const ICONS: Record<string, string> = {
   rRest: COHESION, rIneq: "ICO_inequality", rPop: POP, rPc: PC, rHostile: UNREST, rGov: GOV, rMaxIneq: "ICO_inequality",
   uCohM: COHESION, uCohDrift: COHESION, uCohKno: KNOWLEDGE, uCohUni: "ICO_unity_priority", uPcM: PC, uDemM: GOV, uM: UNREST, uMonths: UNREST,
   tPc: PC, tIneq: "ICO_inequality", tEdu: "ICO_education", tDem: GOV, tCoh: COHESION,
+  splitGdp: GDP, splitN: CP, sIp: IP, sCp: CP, sEff: IP, sGdpPart: GDP, sIpPart: IP, sIpTot: IP, sCpTot: CP,
+  sIpGain: IP, sCpGain: CP, sIp1: IP, sCp1: CP, sEff1: IP,
 };
 const STAT_ICON: Record<string, string> = { pcgdp: PC, inequality: "ICO_inequality", education: "ICO_education", cohesion: COHESION, democracy: GOV };
 const iconFor = (id: string) => ICONS[id] ?? (/^p\d+$/.test(id) ? COHESION : undefined)
@@ -136,7 +142,7 @@ const iconFor = (id: string) => ICONS[id] ?? (/^p\d+$/.test(id) ? COHESION : und
   ?? STAT_ICON[Object.keys(STAT_ICON).find((s) => id.startsWith("e") && id.endsWith(s)) ?? ""];
 
 // i valori non scendono sotto zero, tranne il residuo dei disordini
-const minFor = (k: InputKey) => (k === "armyOther" ? -Infinity : 0);
+const minFor = (k: InputKey) => (k === "armyOther" ? -Infinity : k === "splitN" ? 1 : 0);
 
 const rowId = (r: Exclude<Row, { kind: "section" }>) => (r.kind === "input" ? r.key : r.id);
 const isChoice = (r: Row) => (r.kind === "input" && !FROM_SAVE.has(r.key)) || r.kind === "pick";
@@ -291,7 +297,8 @@ function Grid({ rows, values, originals, edited, set, unset, selected, select, p
   const hints = y.hints as Record<string, string>;
   // la spiegazione di ogni riga; le righe «fra N anni» la condividono
   const hintFor = (id: string) =>
-    (hints[id] ?? (/^p\d+$/.test(id) ? hints.pYears : undefined))?.replace("{pc}", nf(pcgdpPerUnrest, 0));
+    // le righe «una nazione sola» del foglio Dividi (sIp1…) spiegate come le altre
+    (hints[id] ?? hints[id.replace(/^(s[A-Z]\w*)1$/, "$1")] ?? (/^p\d+$/.test(id) ? hints.pYears : undefined))?.replace("{pc}", nf(pcgdpPerUnrest, 0));
 
   const cellAt = (n: number) => table.current?.querySelector<HTMLElement>(`[data-cell="${n}"]`) ?? null;
   /** Fuoco alla prossima cella di valori, saltando le intestazioni. */
@@ -418,8 +425,8 @@ function Grid({ rows, values, originals, edited, set, unset, selected, select, p
 // ---------------------------------------------------------------- proiezione
 
 const PROJ_YEARS = [0, 1, 2, 5, 10, 20];
-type StatKey = "cohesion" | "rest" | "unrest" | "pcgdp" | "inequality" | "democracy" | "education";
-const PROJ_COLS: { key: StatKey; icon: string; digits: number; upIsGood: boolean }[] = [
+type StatKey = "cohesion" | "rest" | "unrest" | "pcgdp" | "inequality" | "democracy" | "education" | "gdp" | "ip" | "mc" | "mcCap";
+const PROJ_COLS: { key: StatKey; icon: string; digits: number; upIsGood: boolean; scale?: number }[] = [
   { key: "cohesion", icon: "ICO_Cohesion_mid", digits: 2, upIsGood: true },
   { key: "rest", icon: "ICO_Cohesion_mid", digits: 2, upIsGood: true },
   { key: "unrest", icon: "ICO_Unrest_mid", digits: 2, upIsGood: false },
@@ -427,6 +434,11 @@ const PROJ_COLS: { key: StatKey; icon: string; digits: number; upIsGood: boolean
   { key: "inequality", icon: "ICO_inequality", digits: 2, upIsGood: false },
   { key: "democracy", icon: "ICO_gov_type", digits: 2, upIsGood: true },
   { key: "education", icon: "ICO_education", digits: 2, upIsGood: true },
+  // crescita: ci sono solo se la proiezione ha i dati delle regioni
+  { key: "gdp", icon: "ICO_economy_priority", digits: 0, upIsGood: true, scale: 1e9 },
+  { key: "ip", icon: "ICO_investments", digits: 2, upIsGood: true },
+  { key: "mc", icon: "ICO_mission_control", digits: 0, upIsGood: true },
+  { key: "mcCap", icon: "ICO_mission_control", digits: 0, upIsGood: true },
 ];
 
 /** La nazione fra 1, 2, 5… anni coi pallini di oggi: righe gli anni, colonne
@@ -439,17 +451,19 @@ function ProjectionTable({ states, years, panelSig, selected, onSelect }: {
   const { t } = useSettings();
   const y = t.yass;
   const now = states[0];
+  const cols = PROJ_COLS.filter((c) => now[c.key] !== undefined);
+  const val = (st: NationState, c: (typeof PROJ_COLS)[number]) => (st[c.key] ?? 0) / (c.scale ?? 1);
   return (
     <div className="overflow-x-auto mt-3">
       <table className="yass-grid yass-proj">
         <thead>
-          <tr><th className="yass-rn" /><th>A</th>{PROJ_COLS.map((c, i) => <th key={c.key}>{String.fromCharCode(66 + i)}</th>)}</tr>
+          <tr><th className="yass-rn" /><th>A</th>{cols.map((c, i) => <th key={c.key}>{String.fromCharCode(66 + i)}</th>)}</tr>
         </thead>
         <tbody>
           <tr className="yass-section">
             <td className="yass-rn">1</td>
             <td>{y.projWhen}</td>
-            {PROJ_COLS.map((c) => (
+            {cols.map((c) => (
               <td key={c.key} className="text-right">
                 <span className="inline-flex items-center gap-1.5 justify-end">
                   <ResourceIcon icon={c.icon} size={14} />{y.projCols[c.key]}
@@ -463,20 +477,20 @@ function ProjectionTable({ states, years, panelSig, selected, onSelect }: {
               <td className={r === 0 ? "text-ink" : "text-dim"}>
                 {years[r] === 0 ? y.projNow : y.projIn.replace("{n}", String(years[r])).replace("{u}", years[r] === 1 ? y.year : y.years)}
               </td>
-              {PROJ_COLS.map((c, i) => {
-                const d = st[c.key] - now[c.key];
+              {cols.map((c, i) => {
+                const d = val(st, c) - val(now, c);
                 const tone = r === 0 || Math.abs(d) < 10 ** -c.digits / 2 ? "" : (d > 0) === c.upIsGood ? "text-good" : "text-bad";
                 const ref = `${String.fromCharCode(66 + i)}${r + 2}`;
                 const text = r === 0
-                  ? y.projFxNow.replace("{v}", nf(st[c.key], c.digits))
-                  : y.projFx.replace("{n}", String(years[r] * 12)).replace("{from}", nf(now[c.key], c.digits))
-                    .replace("{to}", nf(st[c.key], c.digits)).replace("{d}", (d >= 0 ? "+" : "") + nf(d, c.digits))
+                  ? y.projFxNow.replace("{v}", nf(val(st, c), c.digits))
+                  : y.projFx.replace("{n}", String(years[r] * 12)).replace("{from}", nf(val(now, c), c.digits))
+                    .replace("{to}", nf(val(st, c), c.digits)).replace("{d}", (d >= 0 ? "+" : "") + nf(d, c.digits))
                     .replace("{how}", y.projHow[c.key]);
                 return (
                   <td key={c.key} tabIndex={0}
                     className={`yass-val ${tone} ${selected?.ref === ref ? "yass-sel" : ""}`}
                     onClick={() => onSelect({ ref, text })} onFocus={() => onSelect({ ref, text })}>
-                    {r === 0 ? nf(st[c.key], c.digits) : <span key={panelSig} className="yass-flash">{nf(st[c.key], c.digits)}</span>}
+                    {r === 0 ? nf(val(st, c), c.digits) : <span key={panelSig} className="yass-flash">{nf(val(st, c), c.digits)}</span>}
                   </td>
                 );
               })}
@@ -498,6 +512,8 @@ export default function YassPage() {
   const [nationId, setNationId] = usePersistentState<string>("yass.nation", "", isStr);
   const [annexId, setAnnexId] = usePersistentState<string>("yass.annex", "", isStr);
   const [sheet, setSheet] = usePersistentState<Sheet>("yass.sheet", "cohesion", isSheet);
+  // la miniguida del foglio: si nasconde una volta per tutti i fogli
+  const [howTo, setHowTo] = usePersistentState<boolean>("yass.howto", true, (x): x is boolean => typeof x === "boolean");
   // le prove restano nel browser, una voce per partita: una campagna nuova parte pulita
   const [tests, setTests] = usePersistentState<Tests>(`yass.tests.${data?.campaign ?? "none"}`, NO_TESTS, isTests);
   const over = tests.over;
@@ -891,9 +907,52 @@ export default function YassPage() {
     }
   }
 
+  if (sheet === "split") {
+    const nParts = Math.max(1, Math.round(v.splitN));
+    const gdp = v.splitGdp * 1e9;
+    const ip1 = baseIP(k, gdp, 0), cp1 = cpCost(k, gdp);
+    const ipP = baseIP(k, gdp / nParts, 0), cpP = cpCost(k, gdp / nParts);
+    const ipN = ipP * nParts, cpN = cpP * nParts;
+    const x = (a: number, b: number) => (b ? `× ${nf(a / b, 2)}` : "—");
+    rows = [
+      { kind: "section", label: y.inputs },
+      { kind: "input", key: "splitGdp", label: y.splitGdp, digits: 0 },
+      { kind: "input", key: "splitN", label: y.splitN, digits: 0 },
+      { kind: "section", label: y.results },
+      { kind: "section", label: y.splitWhole },
+      { kind: "out", id: "sIp1", label: y.sIp, value: nf(ip1, 2),
+        formula: `= ${nf(v.splitGdp, 0)} ^ ${f(k.ipGdpExp)}` },
+      { kind: "out", id: "sCp1", label: y.sCp, value: nf(cp1, 2),
+        formula: `= (${nf(gdp, 0)} / ${nf(k.cpGdpScale, 0)}) ^ ${f(k.cpCostScaling, 1)} / ${f(k.cpCostDivisor, 0)}` },
+      { kind: "out", id: "sEff1", label: y.sEff, value: nf(cp1 ? ip1 / cp1 : 0, 3),
+        formula: `= ${f(ip1)} / ${f(cp1)}` },
+      { kind: "section", label: y.splitParts.replace("{n}", String(nParts)) },
+      { kind: "out", id: "sGdpPart", label: y.sGdpPart, value: nf(v.splitGdp / nParts, 0),
+        formula: `= ${nf(v.splitGdp, 0)} / ${nParts}` },
+      { kind: "out", id: "sIpPart", label: y.sIpPart, value: nf(ipP, 2),
+        formula: `= ${nf(v.splitGdp / nParts, 0)} ^ ${f(k.ipGdpExp)}` },
+      { kind: "out", id: "sIpTot", label: y.sIpTot, value: nf(ipN, 2), main: true,
+        formula: `= ${f(ipP)} × ${nParts}` },
+      { kind: "out", id: "sCpTot", label: y.sCpTot, value: nf(cpN, 2), main: true,
+        formula: `= (${nf(gdp / nParts, 0)} / ${nf(k.cpGdpScale, 0)}) ^ ${f(k.cpCostScaling, 1)} / ${f(k.cpCostDivisor, 0)} × ${nParts}` },
+      { kind: "out", id: "sEff", label: y.sEff, value: nf(cpN ? ipN / cpN : 0, 3), tone: ipN / cpN > ip1 / cp1 + 1e-9 ? "good" : undefined,
+        formula: `= ${f(ipN)} / ${f(cpN)}` },
+      { kind: "out", id: "sIpGain", label: y.sIpGain, value: x(ipN, ip1), tone: nParts > 1 ? "good" : undefined,
+        formula: `= ${nParts} ^ (1 − ${f(k.ipGdpExp)}) = ${f(ipN)} / ${f(ip1)}` },
+      { kind: "out", id: "sCpGain", label: y.sCpGain, value: x(cpN, cp1), tone: nParts > 1 ? "bad" : undefined,
+        formula: `= ${nParts} ^ (1 − ${f(k.cpCostScaling, 1)}) = ${f(cpN)} / ${f(cp1)}` },
+    ];
+  }
+
   let projection: ReactNode = null;
   if (sheet === "projection") {
     const at = PROJ_YEARS.map((yy) => yy * 12);
+    // a Controllo missioni pieno la sua priorita' non vale: i pallini si
+    // ricontano senza, e gli IP vanno alle altre priorita'
+    const full = panel(nation.priorities.filter((r) => r.id !== "MissionControl"), nation.panelCPs, effPips,
+      nationIPNow, nation.controlPoints, k.diversity);
+    const fullOf = (id: string) => (id === "Knowledge" && mine.knowledgeIP !== undefined ? v.knowledgeIP
+      : full.find((r) => r.id === id)?.ip ?? 0) / (k.priorityCost[id] ?? 1);
     const states = projectNation(k, k.effects, {
       start: { cohesion: v.cohesion, pcgdp: v.pcgdp, inequality: v.inequality, democracy: v.democracy, education: v.education },
       rest: v.cohesionRest, scaling, hostileShare: v.hostileShare / 100, armyOther: v.armyOther,
@@ -904,6 +963,12 @@ export default function YassPage() {
       restOf: mine.cohesionRest === undefined
         ? (st, unrest) => restParts(k, nation.restModel, { ...st, unrest, hostileShare: v.hostileShare / 100 }).rest
         : undefined,
+      growth: {
+        g: k, population: v.population, ip0: v.nationIP, regions: nation.regions,
+        mcIP: results.find((r) => r.id === "MissionControl")?.ip ?? 0,
+        mcCost: k.priorityCost.MissionControl ?? 25,
+        completionsFull: Object.fromEntries(Object.keys(per).map((id) => [id, fullOf(id)])),
+      },
     }, at);
     rows = [
       { kind: "section", label: y.inputs },
@@ -915,6 +980,8 @@ export default function YassPage() {
       { kind: "input", key: "pcgdp", label: y.pcgdp, digits: 0 },
       { kind: "input", key: "hostileShare", label: y.hostileShare, digits: 1 },
       { kind: "input", key: "armyOther", label: y.armyOther, digits: 2 },
+      { kind: "input", key: "population", label: y.population, digits: 1 },
+      { kind: "input", key: "nationIP", label: y.nationIP, digits: 1 },
       { kind: "input", key: "knowledgeIP", label: y.knowledgeIP, digits: 2 },
     ];
     projection = (
@@ -977,6 +1044,15 @@ export default function YassPage() {
           }} />
       </section>
       <div className="min-w-0">
+      {howTo ? (
+        <div className="yass-howto">
+          <p><b>{y.howWhat}</b> {y.howTo[sheet].what}</p>
+          <p><b>{y.howWhen}</b> {y.howTo[sheet].when}</p>
+          <button type="button" onClick={() => setHowTo(false)} className="text-accent hover:text-ink">{y.howHide}</button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setHowTo(true)} className="yass-howto-show text-accent hover:text-ink">{y.howShow}</button>
+      )}
       <div className="yass-fx">
         <span className="yass-name">{sel ? `B${selIndex + 1}` : sheet === "projection" && projSel ? projSel.ref : ""}</span>
         <span className="yass-fx-label">fx</span>
@@ -988,6 +1064,7 @@ export default function YassPage() {
         selected={selected} select={setSelected} pcgdpPerUnrest={k.pcgdpPerUnrest}
         panelSig={results.map((r) => r.ip.toFixed(3)).join("|")} />
       {sheet === "annex" && <p className="text-faint text-[11.5px] mt-2 mb-0">{annexed ? y.annexNote : y.pickAnnexedHint}</p>}
+      {sheet === "split" && <p className="text-faint text-[11.5px] mt-2 mb-0">{y.splitNote}</p>}
       {projection}
       </div>
 

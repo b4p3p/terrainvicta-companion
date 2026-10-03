@@ -344,6 +344,16 @@ html:not([data-engine="browser"]) .ti-splash { display: none; }
 .yass-pick input { padding: 2px 6px; }
 /* tutti i fogli alti come il piu' lungo: le linguette restano ferme */
 .yass-body { min-height: 600px; }
+/* miniguida del foglio: a cosa serve e quando usarlo */
+.yass-howto {
+  position: relative; margin-bottom: 10px; padding: 8px 70px 8px 12px; font-size: 12.5px; line-height: 1.5;
+  background: var(--panel); border: 1px solid var(--edge-lit); border-left: 3px solid var(--accent); color: var(--ink-dim);
+}
+.yass-howto p { margin: 0; }
+.yass-howto p + p { margin-top: 4px; }
+.yass-howto b { color: var(--ink); font-weight: 600; margin-right: 4px; }
+.yass-howto button { position: absolute; top: 8px; right: 12px; font-size: 11.5px; }
+.yass-howto-show { display: block; margin: 0 0 8px auto; font-size: 11.5px; }
 .yass-sel { outline: 2px solid var(--accent); outline-offset: -2px; }
 /* una sola cornice, come in Excel: la selezione; niente anello del browser
    sulla cella e niente bordo dell'input dentro la cella selezionata */

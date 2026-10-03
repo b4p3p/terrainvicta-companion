@@ -33,6 +33,7 @@ Thumbs.db
 # (deploy/ ha una copia anche sul server, in ~/terrainvicta-deploy-backup)
 ROADMAP.md
 deploy/
+note/
 
 # sfondo di «Chi sono»: va sul sito con il deploy, non nel repo
 tiweb/public/about-bg.webp
