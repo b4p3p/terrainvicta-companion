@@ -342,6 +342,13 @@ html:not([data-engine="browser"]) .ti-splash { display: none; }
 /* etichette con spiegazione: sottolineatura a puntini, come gli altri tooltip */
 .yass-hinted { text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; }
 .yass-pick input { padding: 2px 6px; }
+/* scorciatoie di valore (le soglie di Dividi): bottoni piccoli, quello attivo acceso */
+.yass-preset {
+  padding: 1px 8px; font-size: 11.5px; color: var(--ink-dim);
+  border: 1px solid var(--edge-lit); background: var(--bar-deep);
+}
+.yass-preset:hover { color: var(--ink); }
+.yass-preset-on { color: var(--ink); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
 /* tutti i fogli alti come il piu' lungo: le linguette restano ferme */
 .yass-body { min-height: 600px; }
 /* miniguida del foglio: a cosa serve e quando usarlo */

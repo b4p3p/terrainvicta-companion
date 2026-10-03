@@ -37,6 +37,20 @@ Formule lette dall'IL di Assembly-CSharp.dll (TINationState):
   annettente + `democracyDecreaseToMakeHostileClaim` (1,5), se l'annettente non
   la rivendica, o se la rivendica in modo ostile.
 
+- `SetBaseInvestmentPoints_month`: IP = economyScore x (1 + bonus Consiglia)
+  x (1 - occupazione) x (1 - penalita' dei disordini) - eserciti.
+  `GetAdvisingScore(Amministrazione)`: i consiglieri attivi che consigliano la
+  nazione, dal piu' bravo, Amministrazione / 100 / posizione (il secondo vale
+  la meta', il terzo un terzo). Contiamo solo i nostri: chi altro consiglia
+  una nazione il gioco non lo dice.
+- `OnEconomyPriorityComplete`: ogni Economia completata conta un passo verso
+  una regione petrolifera (500), mineraria (750) o economica centrale (1200),
+  in quest'ordine, se la nazione ne ha una candidata
+  (`CacheRegionValues`). Petrolio e miniere: regioni col flag del template
+  (`oilCapable`, `mineCapable`; il petrolio finche' c'e'); regione economica
+  centrale: quota del PIL nazionale sopra 500 mld
+  (`CandidateCoreEconomicRegions`). Il contatore e' della regione.
+
 Le nazioni, le rivendicazioni e le statistiche sono quelle della schermata
 nazione: niente di nascosto.
 """
@@ -89,6 +103,12 @@ MC_DIV_MIN = 200.0
 GDP_WEIGHT_CORE = 1.25              # TIGlobalConfig.coreEcoRegionGDPModifier
 GDP_WEIGHT_RESOURCE = 1.25          # TIGlobalConfig.coreResourceRegionGDPModifier (miniere e petrolio)
 GDP_WEIGHT_COLONY = 0.5             # TIGlobalConfig.colonyRegionGDPModifier
+# regioni sviluppate dall'Economia (TIGlobalConfig, default della DLL: il
+# template non li ridefinisce) e la soglia di CandidateCoreEconomicRegions
+ECOS_FOR_CORE_ECO = 1200            # numEcosForCoreEcoRegion
+ECOS_FOR_CORE_MINING = 750          # numEcosForCoreMiningRegion
+ECOS_FOR_CORE_OIL = 500             # numEcosForCoreOilRegion
+CORE_ECO_MIN_GDP_BN = 500.0         # nationalGDPShareValue_bn > 500
 
 
 def gdp_weight(r):
@@ -108,6 +128,22 @@ def base_ip(gdp, unrest):
     penalita' dei disordini."""
     pen = max(0.0, unrest - UNREST_IP_FREE) / UNREST_IP_STEP
     return (gdp / 1e9) ** IP_GDP_EXP * max(0.0, 1 - pen) if gdp > 0 else 0.0
+
+
+def advise_bonus(g, n):
+    """Bonus agli IP dai NOSTRI consiglieri che consigliano la nazione
+    (GetAdvisingScore con l'Amministrazione): dal piu' bravo, AMM / 100 /
+    posizione. Anche i nomi, per la nota accanto alla cella."""
+    from .council import councilor_view
+    mine = {c["value"] for c in (g.me.get("councilors") or [])}
+    adv = []
+    for ref in n.get("advisingCouncilors") or []:
+        c = g.councilors.get(ref["value"])
+        if not c or ref["value"] not in mine or c.get("active") is False:
+            continue
+        adv.append((councilor_view(g, c)["attributes"]["Administration"], c.get("displayName")))
+    adv.sort(key=lambda x: -x[0])
+    return sum(a / 100 / (i + 1) for i, (a, _) in enumerate(adv)), [name for _, name in adv]
 
 
 def mc_cap(gdp, weights, missions, education):
@@ -377,6 +413,7 @@ def overview(g, lang="ita"):
             continue
         hostile = set(_ids(n.get("hostileClaims")))
         prows, pcps = priority_panel(g, n, lang, pbonus)
+        advise, advisers = advise_bonus(g, n)
         out.append({
             "id": nid,
             "name": nm.nation(n),
@@ -397,6 +434,9 @@ def overview(g, lang="ita"):
             "ip": n.get("baseInvestmentPoints_month") or 0,
             # quello che negli IP non viene dal PIL: eserciti (meno) e consiglieri (piu')
             "ipOther": (n.get("baseInvestmentPoints_month") or 0) - base_ip(n.get("GDP") or 0, n.get("unrest") or 0),
+            # bonus Consiglia dei nostri consiglieri, gia' dentro "ip"
+            "advise": advise,
+            "advisers": advisers,
             "controlPoints": len(n.get("controlPoints") or []),
             "myControlPoints": my_cps.get(nid, []),
             "priorities": prows,
@@ -443,6 +483,10 @@ def overview(g, lang="ita"):
             "cpGdpScale": gv.get("fixedPCGDPToRaiseBaseCPMaintenanceCostBy1") or 0,
             "cpCostScaling": CP_COST_SCALING,
             "cpCostDivisor": CP_COST_DIVISOR,
+            "ecosForCoreEco": ECOS_FOR_CORE_ECO,
+            "ecosForCoreMining": ECOS_FOR_CORE_MINING,
+            "ecosForCoreOil": ECOS_FOR_CORE_OIL,
+            "coreEcoMinGdp": CORE_ECO_MIN_GDP_BN,
         },
     }
 

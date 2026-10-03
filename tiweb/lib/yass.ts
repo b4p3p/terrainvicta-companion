@@ -158,6 +158,7 @@ export interface GrowthConstants {
   ipGdpExp: number; unrestIPFree: number; unrestIPStep: number;
   mcDiv: number; mcDivPerEdu: number; mcDivMin: number;
   cpGdpScale: number; cpCostScaling: number; cpCostDivisor: number;
+  ecosForCoreEco: number; ecosForCoreMining: number; ecosForCoreOil: number; coreEcoMinGdp: number;
 }
 
 /** IP dal PIL: (PIL / 1 mld)^0,35, meno la penalita' dei disordini sopra 2. */
@@ -183,6 +184,51 @@ export function mcCap(g: GrowthConstants, gdp: number, regions: { gdpWeight: num
 export const cpCost = (g: GrowthConstants, gdp: number) =>
   g.cpGdpScale > 0 ? Math.pow(gdp / g.cpGdpScale, g.cpCostScaling) / g.cpCostDivisor : 0;
 
+// ---------------------------------------------------------------- dividi
+// Un pezzo di nazione con gli stessi pallini in percentuale: cosa rende in un
+// mese. Senza disordini, eserciti e consiglieri; il PIL pro capite e' quello
+// della nazione da cui nasce.
+
+export interface PieceInputs {
+  gdp: number;              // dollari
+  pcgdp: number;            // del pezzo: la popolazione e' PIL / pro capite
+  education: number; democracy: number;
+  coreEcoRegions: number; resourceRegions: number;
+  /** la regione piu' ricca ha piu' di 500 mld: puo' diventare economica centrale */
+  coreEcoCandidate: boolean;
+  ecoShare: number; mcShare: number;      // quota degli IP, 0-1
+  ecoCost: number; mcCost: number;        // IP per un completamento
+}
+export interface Piece {
+  population: number; ip: number; cp: number;
+  ecoComp: number;          // Economie completate al mese
+  pcgdpMonth: number;       // PIL pro capite in piu' al mese
+  gdpMonth: number;         // PIL in piu' al mese (dollari)
+  mcMonth: number;          // punti di Controllo missioni al mese, se c'e' posto
+  capMonth: number;         // posti di Controllo missioni nuovi al mese dal PIL
+  coreEcoMonths: number | null;  // mesi per una regione economica centrale
+}
+
+export function piece(k: YassConstants, e: EffectConstants, g: GrowthConstants, p: PieceInputs): Piece {
+  const population = p.pcgdp > 0 ? p.gdp / p.pcgdp / 1e6 : 0;
+  const ip = baseIP(g, p.gdp, 0);
+  const ecoComp = ip * p.ecoShare / p.ecoCost;
+  const per = perCompletion(k, e, {
+    scaling: popScaling(k, population), education: p.education, democracy: p.democracy, cohesion: k.cohesionTarget,
+    resourceRegions: p.resourceRegions, coreEcoRegions: p.coreEcoRegions,
+  });
+  const pcgdpMonth = ecoComp * (per.Economy.pcgdp ?? 0);
+  const gdpMonth = pcgdpMonth * population * 1e6;
+  return {
+    population, ip, cp: cpCost(g, p.gdp), ecoComp, pcgdpMonth, gdpMonth,
+    mcMonth: ip * p.mcShare / p.mcCost,
+    // il tetto e' 1 + PIL regionale / divisore per regione: la somma cresce
+    // come il PIL nazionale / divisore, a scalini
+    capMonth: gdpMonth / 1e9 / mcDivisor(g, p.education),
+    coreEcoMonths: p.coreEcoCandidate && ecoComp > 0 ? g.ecosForCoreEco / ecoComp : null,
+  };
+}
+
 // ---------------------------------------------------------------- proiezione
 // La nazione mese per mese coi pallini di oggi: effetti delle priorita'
 // ricalcolati ogni mese (con piu' istruzione l'Economia rende di piu'), ritorno
@@ -199,6 +245,8 @@ export interface GrowthInputs {
   g: GrowthConstants;
   population: number;                 // milioni, ferma
   ip0: number;                        // IP del mese oggi: i completamenti di oggi sono per questi
+  /** bonus Consiglia gia' dentro ip0 e quello da provare, dal primo mese */
+  advise0: number; advise: number;
   regions: { gdpWeight: number; missionControl: number }[];
   mcIP: number;                       // IP al mese sul Controllo missioni, oggi (gia' col bonus)
   mcCost: number;                     // IP per un punto di Controllo missioni
@@ -228,18 +276,18 @@ export function projectNation(k: YassConstants, e: EffectConstants, p: Projectio
   const restAt = (st: typeof s) => (p.restOf ? p.restOf(st, unrestOf(k, st, p)) : p.rest);
   // crescita: PIL dal PIL pro capite (popolazione ferma), IP dal PIL, MC verso il tetto
   const gdpOf = (st: typeof s) => (gr ? st.pcgdp * gr.population * 1e6 : 0);
-  // cio' che negli IP non viene dal PIL (eserciti, consiglieri) resta fermo:
-  // ricavato da oggi, cosi' al mese 0 gli IP sono quelli della cella
-  const ipOther = gr ? gr.ip0 - baseIP(gr.g, gdpOf(p.start), unrestOf(k, p.start, p)) : 0;
-  const ipOf = (st: typeof s) => (gr ? Math.max(0, baseIP(gr.g, gdpOf(st), unrestOf(k, st, p)) + ipOther) : 0);
+  // IP = base dal PIL x (1 + Consiglia) + il resto (eserciti, consiglieri
+  // altrui) fermo, ricavato da oggi: al mese 0 gli IP sono quelli della cella
+  const ipOther = gr ? gr.ip0 - baseIP(gr.g, gdpOf(p.start), unrestOf(k, p.start, p)) * (1 + gr.advise0) : 0;
+  const ipOf = (st: typeof s) => (gr ? Math.max(0, baseIP(gr.g, gdpOf(st), unrestOf(k, st, p)) * (1 + gr.advise) + ipOther) : 0);
   let mc = gr ? gr.regions.reduce((t, r) => t + r.missionControl, 0) : 0;
   let mcPoints = 0;
   const capOf = (st: typeof s) => (gr ? mcCap(gr.g, gdpOf(st), gr.regions, st.education) : 0);
-  const snap = (st: typeof s): NationState => ({
+  const snap = (st: typeof s, now = false): NationState => ({
     ...st, rest: restAt(st), unrest: unrestOf(k, st, p),
-    ...(gr ? { gdp: gdpOf(st), ip: ipOf(st), mc, mcCap: capOf(st) } : {}),
+    ...(gr ? { gdp: gdpOf(st), ip: now ? gr.ip0 : ipOf(st), mc, mcCap: capOf(st) } : {}),
   });
-  const out = new Map<number, NationState>([[0, snap(s)]]);
+  const out = new Map<number, NationState>([[0, snap(s, true)]]);
   for (let m = 1; m <= last; m++) {
     // gli IP del mese rispetto a oggi: tutti i completamenti scalano con loro;
     // a Controllo missioni pieno la sua priorita' non e' valida e i suoi pallini

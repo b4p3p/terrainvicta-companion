@@ -12,8 +12,8 @@ import { YassIcon } from "@/components/YassIcon";
 import { PipGlyph, PipText, PriorityPanel } from "./PriorityPanel";
 import {
   type EffectConstants, type GrowthConstants, type NationState, type PanelCP, type Pips as PipMap, type PriorityRow, type YassConstants,
-  type RestModel, baseIP, cpCost, decreaseCap, maxInequalityFor, panel, perCompletion, projectNation, restParts, hostileUnrest, knowledgeStep, monthlyMovement,
-  popScaling,
+  type Piece, type RestModel, baseIP, cpCost, decreaseCap, maxInequalityFor, panel, perCompletion, piece, projectNation, restParts, hostileUnrest,
+  knowledgeStep, monthlyMovement, popScaling,
 } from "@/lib/yass";
 
 interface Region { id: number; name: string; population: number; hostile: boolean; gdpWeight: number; missionControl: number }
@@ -24,6 +24,8 @@ interface Nation {
   democracy: number; inequality: number; education: number; popScaling: number; ip: number;
   coreEcoRegions: number; resourceRegions: number; legitimizeProgress: number;
   restModel: RestModel;
+  /** bonus Consiglia dei nostri consiglieri (0,25 = +25% IP) e i loro nomi */
+  advise: number; advisers: string[];
   controlPoints: number;
   priorities: PriorityRow[]; panelCPs: PanelCP[];
   regions: Region[]; claims: number[]; hostileClaims: number[];
@@ -63,7 +65,8 @@ const isStr = (v: unknown): v is string => typeof v === "string";
 
 type InputKey = "nationIP" | "education" | "population" | "cohesion" | "cohesionRest" | "inequality" | "knowledgeIP"
   | "pcgdp" | "democracy" | "hostileShare" | "armyOther" | "unrestTarget" | "annexedDemocracy" | "target"
-  | "splitGdp" | "splitN";
+  | "splitGdp" | "splitN" | "advise"
+  | "splitPiece" | "splitK" | "splitEco" | "splitMc" | "splitPieceCore";
 
 const REDDIT = "https://www.reddit.com/r/TerraInvicta/comments/1wrmm62/nation_building_calculators_and_other_references/";
 
@@ -96,7 +99,8 @@ function defaults(n: Nation, k: YassConstants, annexed: Nation | null, knowledge
     nationIP: n.ip, education: n.education, population: n.population, cohesion: n.cohesion, cohesionRest: n.cohesionRest, inequality: n.inequality,
     knowledgeIP, pcgdp: pc, democracy: n.democracy, hostileShare: share * 100,
     armyOther: army, unrestTarget: 2, annexedDemocracy: annexed?.democracy ?? 0, target: k.cohesionTarget,
-    splitGdp: n.gdp / 1e9, splitN: 2,
+    splitGdp: n.gdp / 1e9, splitN: 2, advise: n.advise * 100,
+    splitPiece: 500, splitK: 1, splitEco: 50, splitMc: 40, splitPieceCore: 0,
   };
 }
 
@@ -105,7 +109,7 @@ function defaults(n: Nation, k: YassConstants, annexed: Nation | null, knowledge
 // valori letti dalla partita: si possono sovrascrivere per un «e se…»; gli
 // altri ingressi sono scelte dell'utente, che il salvataggio non ha
 const FROM_SAVE = new Set<InputKey>(["nationIP", "knowledgeIP", "education", "population", "cohesion", "cohesionRest", "inequality",
-  "pcgdp", "democracy", "hostileShare", "armyOther", "annexedDemocracy", "splitGdp"]);
+  "pcgdp", "democracy", "hostileShare", "armyOther", "annexedDemocracy", "splitGdp", "advise"]);
 
 type Row =
   | { kind: "section"; label: string }
@@ -135,6 +139,10 @@ const ICONS: Record<string, string> = {
   tPc: PC, tIneq: "ICO_inequality", tEdu: "ICO_education", tDem: GOV, tCoh: COHESION,
   splitGdp: GDP, splitN: CP, sIp: IP, sCp: CP, sEff: IP, sGdpPart: GDP, sIpPart: IP, sIpTot: IP, sCpTot: CP,
   sIpGain: IP, sCpGain: CP, sIp1: IP, sCp1: CP, sEff1: IP,
+  advise: "ICO_administration", splitPiece: GDP, splitK: CP, splitEco: GDP, splitMc: "ICO_mission_control",
+  splitPieceCore: GDP, splitPresets: GDP,
+  pPop: POP, pIp: IP, pCp: CP, pCap: "ICO_mission_control", pMc: "ICO_mission_control", pCapMonth: "ICO_mission_control",
+  pPc: PC, pCore: GDP,
 };
 const STAT_ICON: Record<string, string> = { pcgdp: PC, inequality: "ICO_inequality", education: "ICO_education", cohesion: COHESION, democracy: GOV };
 const iconFor = (id: string) => ICONS[id] ?? (/^p\d+$/.test(id) ? COHESION : undefined)
@@ -143,6 +151,7 @@ const iconFor = (id: string) => ICONS[id] ?? (/^p\d+$/.test(id) ? COHESION : und
 
 // i valori non scendono sotto zero, tranne il residuo dei disordini
 const minFor = (k: InputKey) => (k === "armyOther" ? -Infinity : k === "splitN" ? 1 : 0);
+const maxFor = (k: InputKey) => (k === "splitEco" || k === "splitMc" ? 100 : Infinity);
 
 const rowId = (r: Exclude<Row, { kind: "section" }>) => (r.kind === "input" ? r.key : r.id);
 const isChoice = (r: Row) => (r.kind === "input" && !FROM_SAVE.has(r.key)) || r.kind === "pick";
@@ -165,8 +174,8 @@ const roundTo = (v: number, step: number) => {
     Tastiera: ↑/↓ alzano e abbassano il valore (Maiusc ×10, Alt passo fine);
     Invio conferma e resta sulla cella, col testo selezionato per un altro
     tentativo; Tab e Maiusc+Tab passano alla riga dopo e prima; Esc annulla. */
-function InputCell({ value, digits, edited, min, onChange, onFocus, onMove, onCancel }: {
-  value: number; digits: number; edited: boolean; min: number;
+function InputCell({ value, digits, edited, min, max = Infinity, onChange, onFocus, onMove, onCancel }: {
+  value: number; digits: number; edited: boolean; min: number; max?: number;
   onChange: (v: number) => void; onFocus: () => void;
   onMove: (delta: number) => void; onCancel: (start: number) => void;
 }) {
@@ -175,8 +184,8 @@ function InputCell({ value, digits, edited, min, onChange, onFocus, onMove, onCa
   const ref = useRef<HTMLInputElement>(null);
   const drag = useRef<{ x: number; v: number; active: boolean } | null>(null);
   // valori correnti per i gestori registrati una volta sola (rotella)
-  const live = useRef({ value, draft, min, digits, onChange });
-  useLayoutEffect(() => { live.current = { value, draft, min, digits, onChange }; });
+  const live = useRef({ value, draft, min, max, digits, onChange });
+  useLayoutEffect(() => { live.current = { value, draft, min, max, digits, onChange }; });
 
   const current = () => {
     const d = live.current.draft != null ? parseNum(live.current.draft) : null;
@@ -184,7 +193,7 @@ function InputCell({ value, digits, edited, min, onChange, onFocus, onMove, onCa
   };
   /** Imposta un valore nuovo: arrotondato al passo, mai sotto il minimo. */
   const apply = (v: number, step: number) => {
-    const x = Math.max(live.current.min, roundTo(v, step));
+    const x = Math.min(live.current.max, Math.max(live.current.min, roundTo(v, step)));
     live.current.onChange(x);
     setDraft(editText(x, live.current.digits));
     return x;
@@ -358,7 +367,7 @@ function Grid({ rows, values, originals, edited, set, unset, selected, select, p
             } else if (r.kind === "pick") {
               cell = r.node;
             } else if (!FROM_SAVE.has(r.key)) {
-              cell = <InputCell value={values[r.key]} digits={r.digits} edited={false} min={minFor(r.key)}
+              cell = <InputCell value={values[r.key]} digits={r.digits} edited={false} min={minFor(r.key)} max={maxFor(r.key)}
                 onChange={(v) => set(r.key, v)} onFocus={() => select(id)}
                 onMove={(d) => move(n, d)} onCancel={(v) => { set(r.key, v); move(n, 0); }} />;
             } else if (edited.has(r.key)) {
@@ -503,6 +512,78 @@ function ProjectionTable({ states, years, panelSig, selected, onSelect }: {
   );
 }
 
+// ---------------------------------------------------------------- confronto (Dividi)
+
+type CmpKey = "gdp" | "ip" | "cp" | "eff" | "mc" | "cap" | "core";
+const CMP_COLS: { key: CmpKey; icon: string; digits: number; upIsGood: boolean }[] = [
+  { key: "gdp", icon: "ICO_economy_priority", digits: 0, upIsGood: true },
+  { key: "ip", icon: "ICO_investments", digits: 2, upIsGood: true },
+  { key: "cp", icon: "ICO_ControlPoint_empty", digits: 2, upIsGood: false },
+  { key: "eff", icon: "ICO_investments", digits: 2, upIsGood: true },
+  { key: "mc", icon: "ICO_mission_control", digits: 2, upIsGood: true },
+  { key: "cap", icon: "ICO_mission_control", digits: 2, upIsGood: true },
+  { key: "core", icon: "ICO_economy_priority", digits: 2, upIsGood: true },
+];
+export interface CmpRow {
+  label: string; main?: boolean;
+  /** riga delle differenze: verde o rossa secondo il segno */
+  delta?: boolean;
+  values: Record<CmpKey, number | null>;
+  formulas: Record<CmpKey, string>;
+}
+
+/** Una nazione sola contro quel che resta più gli indipendenti staccati, una
+    riga per caso, come la tabella della Proiezione. */
+function CompareTable({ rows, selected, onSelect }: {
+  rows: CmpRow[]; selected: { ref: string } | null; onSelect: (s: { ref: string; text: string }) => void;
+}) {
+  const { t } = useSettings();
+  const y = t.yass;
+  return (
+    <div className="overflow-x-auto mt-3">
+      <table className="yass-grid yass-proj">
+        <thead>
+          <tr><th className="yass-rn" /><th>A</th>{CMP_COLS.map((c, i) => <th key={c.key}>{String.fromCharCode(66 + i)}</th>)}</tr>
+        </thead>
+        <tbody>
+          <tr className="yass-section">
+            <td className="yass-rn">1</td>
+            <td>{y.cmpWhat}</td>
+            {CMP_COLS.map((c) => (
+              <td key={c.key} className="text-right">
+                <Tip title={y.cmpCols[c.key]} content={y.cmpHints[c.key]} width={320}>
+                  <span className="inline-flex items-center gap-1.5 justify-end yass-hinted">
+                    <ResourceIcon icon={c.icon} size={14} />{y.cmpCols[c.key]}
+                  </span>
+                </Tip>
+              </td>
+            ))}
+          </tr>
+          {rows.map((r, ri) => (
+            <tr key={r.label} className={r.main ? "yass-main" : ""}>
+              <td className="yass-rn">{ri + 2}</td>
+              <td className={r.main ? "text-ink" : "text-dim"}>{r.label}</td>
+              {CMP_COLS.map((c, i) => {
+                const v = r.values[c.key];
+                const ref = `${String.fromCharCode(66 + i)}${ri + 2}`;
+                const tone = !r.delta || v == null || Math.abs(v) < 10 ** -c.digits / 2 ? "" : (v > 0) === c.upIsGood ? "text-good" : "text-bad";
+                const text = r.formulas[c.key];
+                return (
+                  <td key={c.key} tabIndex={0}
+                    className={`yass-val ${tone} ${selected?.ref === ref ? "yass-sel" : ""}`}
+                    onClick={() => onSelect({ ref, text })} onFocus={() => onSelect({ ref, text })}>
+                    {v == null ? <span className="text-faint">—</span> : (r.delta && v > 0 ? "+" : "") + nf(v, c.digits)}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- pagina
 
 export default function YassPage() {
@@ -531,6 +612,7 @@ export default function YassPage() {
       const i = SHEETS.indexOf(sheet) + (e.key === "PageDown" ? 1 : -1);
       setSheet(SHEETS[(i + SHEETS.length) % SHEETS.length]);
       setSelected(null);
+      setProjSel(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -907,6 +989,7 @@ export default function YassPage() {
     }
   }
 
+  let splitTable: ReactNode = null;
   if (sheet === "split") {
     const nParts = Math.max(1, Math.round(v.splitN));
     const gdp = v.splitGdp * 1e9;
@@ -942,6 +1025,107 @@ export default function YassPage() {
       { kind: "out", id: "sCpGain", label: y.sCpGain, value: x(cpN, cp1), tone: nParts > 1 ? "bad" : undefined,
         formula: `= ${nParts} ^ (1 − ${f(k.cpCostScaling, 1)}) = ${f(cpN)} / ${f(cp1)}` },
     ];
+
+    // ------------------------------------------ staccare K indipendenti
+    // stessi pallini in percentuale ovunque; il pro capite e' quello della
+    // nazione, perche' il PIL si divide per popolazione
+    const kN = Math.max(0, Math.round(v.splitK));
+    const eco = Math.min(100, Math.max(0, v.splitEco)) / 100, mcS = Math.min(100, Math.max(0, v.splitMc)) / 100;
+    const pieceGdp = v.splitPiece * 1e9;
+    const restGdp = Math.max(0, gdp - kN * pieceGdp);
+    const tooBig = kN * pieceGdp >= gdp;
+    // quota della regione piu' ricca: decide se puo' nascere una regione economica centrale
+    const wTot = nation.regions.reduce((t, r) => t + r.gdpWeight, 0);
+    const topShare = wTot ? Math.max(...nation.regions.map((r) => r.gdpWeight)) / wTot : 1;
+    const base = {
+      pcgdp: v.pcgdp, education: v.education, democracy: v.democracy,
+      ecoShare: eco, mcShare: mcS, ecoCost: k.priorityCost.Economy ?? 1, mcCost: k.priorityCost.MissionControl ?? 25,
+    };
+    const whole = piece(k, k.effects, k, { ...base, gdp, coreEcoRegions: nation.coreEcoRegions, resourceRegions: nation.resourceRegions,
+      coreEcoCandidate: gdp * topShare / 1e9 > k.coreEcoMinGdp });
+    const rest = piece(k, k.effects, k, { ...base, gdp: restGdp, coreEcoRegions: nation.coreEcoRegions, resourceRegions: nation.resourceRegions,
+      coreEcoCandidate: restGdp * topShare / 1e9 > k.coreEcoMinGdp });
+    const one = piece(k, k.effects, k, { ...base, gdp: pieceGdp, coreEcoRegions: Math.round(v.splitPieceCore), resourceRegions: 0,
+      coreEcoCandidate: v.splitPiece > k.coreEcoMinGdp && v.splitPieceCore < 1 });
+    const div1 = Math.max(k.mcDivMin, k.mcDiv - k.mcDivPerEdu * v.education);
+    const coreYear = (pc: Piece) => (pc.coreEcoMonths ? 12 / pc.coreEcoMonths : 0);
+    const pctTxt = `${nf(eco * 100, 0)}% / ${nf(mcS * 100, 0)}%`;
+
+    const preset = (bn: number) => (
+      <button key={bn} type="button" onClick={() => set("splitPiece", bn)}
+        className={`yass-preset ${Math.abs(v.splitPiece - bn) < 0.5 ? "yass-preset-on" : ""}`}>{nf(bn, 0)}</button>
+    );
+    // gli ingressi del secondo calcolo vanno con quelli del primo
+    rows.splice(rows.findIndex((r) => r.kind === "input" && r.key === "splitN") + 1, 0,
+      { kind: "input", key: "splitPiece", label: y.splitPiece, digits: 0 },
+      { kind: "pick", id: "splitPresets", label: y.splitPresets, node: <span className="inline-flex gap-1">{[500, 7000, 20000].map(preset)}</span>,
+        note: y.splitPresetsNote },
+      { kind: "input", key: "splitK", label: y.splitK, digits: 0,
+        note: tooBig ? <span className="text-bad">{y.splitTooBig}</span> : undefined },
+      { kind: "input", key: "splitPieceCore", label: y.splitPieceCore, digits: 0 },
+      { kind: "input", key: "splitEco", label: y.splitEco, digits: 0 },
+      { kind: "input", key: "splitMc", label: y.splitMc, digits: 0 },
+      { kind: "input", key: "pcgdp", label: y.pcgdp, digits: 0 },
+      { kind: "input", key: "education", label: y.education, digits: 2 },
+      { kind: "input", key: "democracy", label: y.democracy, digits: 2 },
+    );
+    rows.push(
+      { kind: "section", label: y.pieceTitle.replace("{k}", String(kN)).replace("{gdp}", nf(v.splitPiece, 0)) },
+      { kind: "out", id: "pPop", label: y.pPop, value: nf(one.population, 1),
+        formula: `= ${nf(v.splitPiece, 0)} mld / ${nf(v.pcgdp, 0)} $` },
+      { kind: "out", id: "pIp", label: y.sIp, value: nf(one.ip, 2), formula: `= ${nf(v.splitPiece, 0)} ^ ${f(k.ipGdpExp)}` },
+      { kind: "out", id: "pCp", label: y.sCp, value: nf(one.cp, 2),
+        formula: `= (${nf(pieceGdp, 0)} / ${nf(k.cpGdpScale, 0)}) ^ ${f(k.cpCostScaling, 1)} / ${f(k.cpCostDivisor, 0)}` },
+      { kind: "out", id: "pCap", label: y.pCap, value: nf(1 + Math.floor(v.splitPiece / div1), 0),
+        formula: `= 1 + ⌊${nf(v.splitPiece, 0)} / ${nf(div1, 0)}⌋   ${y.pCapF}` },
+      { kind: "out", id: "pMc", label: y.pMc, value: nf(one.mcMonth, 2), main: true,
+        formula: `= ${f(one.ip)} × ${nf(mcS * 100, 0)}% / ${f(base.mcCost, 0)}` },
+      { kind: "out", id: "pPc", label: y.ePcgdp, value: nf(one.pcgdpMonth, 0),
+        formula: `= ${f(one.ecoComp)} ${y.ecoPerMonth} × ${nf(one.ecoComp ? one.pcgdpMonth / one.ecoComp : 0, 1)} $` },
+      { kind: "out", id: "pCapMonth", label: y.pCapMonth, value: nf(one.capMonth, 2), main: true,
+        tone: one.capMonth < one.mcMonth ? "warn" : undefined,
+        note: one.capMonth < one.mcMonth ? <span className="text-warn">{y.pCapShort}</span> : undefined,
+        formula: `= ${nf(one.pcgdpMonth, 0)} $ × ${f(one.population, 1)} mln / ${nf(div1, 0)} mld` },
+      { kind: "out", id: "pCore", label: y.pCore, value: one.coreEcoMonths == null
+          ? <span className="text-warn">{v.splitPieceCore >= 1 ? y.pCoreHas : y.pCoreNever.replace("{min}", nf(k.coreEcoMinGdp, 0))}</span>
+          : duration(Math.ceil(one.coreEcoMonths)),
+        formula: one.coreEcoMonths == null ? y.pCoreRule.replace("{min}", nf(k.coreEcoMinGdp, 0))
+          : `= ${nf(k.ecosForCoreEco, 0)} / ${f(one.ecoComp)}` },
+    );
+
+    const sum = (a: Piece, b: Piece, n: number) => ({
+      ip: a.ip + n * b.ip, cp: a.cp + n * b.cp, mc: a.mcMonth + n * b.mcMonth, cap: a.capMonth + n * b.capMonth,
+      core: coreYear(a) + n * coreYear(b),
+    });
+    const tot = sum(rest, one, kN);
+    const vals = (g: number, pc: { ip: number; cp: number; mc: number; cap: number; core: number }): CmpRow["values"] => ({
+      gdp: g / 1e9, ip: pc.ip, cp: pc.cp, eff: pc.cp ? pc.ip / pc.cp : null, mc: pc.mc, cap: pc.cap, core: pc.core,
+    });
+    const ofPiece = (pc: Piece) => ({ ip: pc.ip, cp: pc.cp, mc: pc.mcMonth, cap: pc.capMonth, core: coreYear(pc) });
+    const fxPiece = (name: string, g: number, pc: Piece, cores: number): CmpRow["formulas"] => ({
+      gdp: `${name}: ${nf(g / 1e9, 0)} mld.`,
+      ip: `${name}: (${nf(g / 1e9, 0)} mld)^${f(k.ipGdpExp)} = ${f(pc.ip)}. ${y.cmpNoBonus}`,
+      cp: `${name}: (${nf(g, 0)} / ${nf(k.cpGdpScale, 0)})^${f(k.cpCostScaling, 1)} / ${f(k.cpCostDivisor, 0)} = ${f(pc.cp)}.`,
+      eff: `${name}: ${f(pc.ip)} / ${f(pc.cp)}.`,
+      mc: `${name}: ${f(pc.ip)} IP × ${nf(mcS * 100, 0)}% / ${f(base.mcCost, 0)} = ${f(pc.mcMonth)} ${y.cmpMcIfRoom}`,
+      cap: `${name}: ${f(pc.ecoComp)} ${y.ecoPerMonth} × ${nf(pc.ecoComp ? pc.pcgdpMonth / pc.ecoComp : 0, 1)} $ × ${f(pc.population, 1)} mln / ${nf(div1, 0)} mld = ${f(pc.capMonth)}.`,
+      core: pc.coreEcoMonths == null ? `${name}: ${y.pCoreRule.replace("{min}", nf(k.coreEcoMinGdp, 0))}`
+        : `${name}: 12 / (${nf(k.ecosForCoreEco, 0)} / ${f(pc.ecoComp)}) = ${f(coreYear(pc))} ${y.cmpCoreNote.replace("{n}", String(cores))}`,
+    });
+    const sumFx = (key: CmpKey) => `= ${f(vals(restGdp, ofPiece(rest))[key] ?? 0)} + ${kN} × ${f(vals(pieceGdp, ofPiece(one))[key] ?? 0)}`;
+    const w = vals(gdp, ofPiece(whole)), d = vals(gdp, tot);
+    splitTable = (
+      <CompareTable selected={projSel} onSelect={(s) => { setSelected(null); setProjSel(s); }} rows={[
+        { label: y.cmpWhole, main: true, values: w, formulas: fxPiece(y.cmpWhole, gdp, whole, nation.coreEcoRegions) },
+        { label: y.cmpRest, values: vals(restGdp, ofPiece(rest)), formulas: fxPiece(y.cmpRest, restGdp, rest, nation.coreEcoRegions) },
+        { label: y.cmpOne, values: vals(pieceGdp, ofPiece(one)), formulas: fxPiece(y.cmpOne, pieceGdp, one, Math.round(v.splitPieceCore)) },
+        { label: y.cmpSplit.replace("{k}", String(kN)), main: true, values: d,
+          formulas: Object.fromEntries(CMP_COLS.map((c) => [c.key, c.key === "eff" ? `= ${f(tot.ip)} / ${f(tot.cp)}` : c.key === "gdp" ? `= ${nf(restGdp / 1e9, 0)} + ${kN} × ${nf(v.splitPiece, 0)}` : sumFx(c.key)])) as CmpRow["formulas"] },
+        { label: y.cmpDelta, delta: true,
+          values: Object.fromEntries(CMP_COLS.map((c) => [c.key, d[c.key] != null && w[c.key] != null ? d[c.key]! - w[c.key]! : null])) as CmpRow["values"],
+          formulas: Object.fromEntries(CMP_COLS.map((c) => [c.key, `= ${f(d[c.key] ?? 0)} − ${f(w[c.key] ?? 0)}   ${y.cmpDeltaNote.replace("{p}", pctTxt)}`])) as CmpRow["formulas"] },
+      ]} />
+    );
   }
 
   let projection: ReactNode = null;
@@ -965,6 +1149,7 @@ export default function YassPage() {
         : undefined,
       growth: {
         g: k, population: v.population, ip0: v.nationIP, regions: nation.regions,
+        advise0: nation.advise, advise: Math.max(0, v.advise) / 100,
         mcIP: results.find((r) => r.id === "MissionControl")?.ip ?? 0,
         mcCost: k.priorityCost.MissionControl ?? 25,
         completionsFull: Object.fromEntries(Object.keys(per).map((id) => [id, fullOf(id)])),
@@ -983,10 +1168,12 @@ export default function YassPage() {
       { kind: "input", key: "population", label: y.population, digits: 1 },
       { kind: "input", key: "nationIP", label: y.nationIP, digits: 1 },
       { kind: "input", key: "knowledgeIP", label: y.knowledgeIP, digits: 2 },
+      { kind: "input", key: "advise", label: y.advise, digits: 0,
+        note: nation.advisers.length ? y.adviseBy.replace("{who}", nation.advisers.join(", ")) : y.adviseNone },
     ];
     projection = (
       <ProjectionTable states={states} years={PROJ_YEARS} panelSig={results.map((r) => r.ip.toFixed(3)).join("|")}
-        selected={projSel} onSelect={setProjSel} />
+        selected={projSel} onSelect={(s) => { setSelected(null); setProjSel(s); }} />
     );
   }
 
@@ -1003,7 +1190,8 @@ export default function YassPage() {
   }
   const selIndex = rows.findIndex((r) => r.kind !== "section" && rowId(r) === selected);
   const sel = selIndex >= 0 ? rows[selIndex] as Exclude<Row, { kind: "section" }> : null;
-  const fx = !sel ? (sheet === "projection" && projSel ? <span>{projSel.text}</span> : <span className="text-faint">{y.fxHint}</span>)
+  const tableSel = (sheet === "projection" || sheet === "split") && projSel;
+  const fx = !sel ? (tableSel ? <span>{projSel.text}</span> : <span className="text-faint">{y.fxHint}</span>)
     : sel.kind === "pick" ? <span className="text-dim">{y.choiceCell}</span>
     : sel.kind === "input"
       ? <span className="text-dim">{FROM_SAVE.has(sel.key)
@@ -1054,7 +1242,7 @@ export default function YassPage() {
         <button type="button" onClick={() => setHowTo(true)} className="yass-howto-show text-accent hover:text-ink">{y.howShow}</button>
       )}
       <div className="yass-fx">
-        <span className="yass-name">{sel ? `B${selIndex + 1}` : sheet === "projection" && projSel ? projSel.ref : ""}</span>
+        <span className="yass-name">{sel ? `B${selIndex + 1}` : tableSel ? projSel.ref : ""}</span>
         <span className="yass-fx-label">fx</span>
         <span className="yass-fx-body">{fx}</span>
       </div>
@@ -1064,13 +1252,14 @@ export default function YassPage() {
         selected={selected} select={setSelected} pcgdpPerUnrest={k.pcgdpPerUnrest}
         panelSig={results.map((r) => r.ip.toFixed(3)).join("|")} />
       {sheet === "annex" && <p className="text-faint text-[11.5px] mt-2 mb-0">{annexed ? y.annexNote : y.pickAnnexedHint}</p>}
+      {splitTable}
       {sheet === "split" && <p className="text-faint text-[11.5px] mt-2 mb-0">{y.splitNote}</p>}
       {projection}
       </div>
 
       <nav className="yass-sheets" aria-label={y.sheetsLabel}>
         {SHEETS.map((s) => (
-          <button key={s} type="button" onClick={() => { setSheet(s); setSelected(null); }}
+          <button key={s} type="button" onClick={() => { setSheet(s); setSelected(null); setProjSel(null); }}
             aria-current={s === sheet ? "page" : undefined}
             className={s === sheet ? "yass-sheet-on" : ""}>
             {y.sheets[s]}
