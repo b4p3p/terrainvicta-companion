@@ -19,7 +19,9 @@ Formule lette dall'IL di Assembly-CSharp.dll (TINationState):
 - Bonus della fazione alla Conoscenza (`TIFactionState.SumPriorityBonuses`):
   `knowledgeBonus` delle org dei consiglieri + `priorityBonuses` dei loro
   tratti + laboratori degli habitat in orbita bassa + effetti `KnowledgePriority`.
-  Gli habitat non li calcoliamo: se ce ne sono, `leoMissing` lo dice.
+  Laboratori (`SumLEOHabPriorityBonuses`): moduli attivi delle stazioni in
+  orbita bassa con la regola della priorita' (`LEOBonusKnowledge`...), somma di
+  `specialRulesValue`, al piu' `LEOHabModulePriorityBonusCap` (0,3).
 - Bonus di diversita' del punto (`TIControlPoint`, `priorityDiversityBonus`):
   per ogni altra priorita' con pallini, il suo valore (Economia 0,5, le altre
   0,2) x i suoi pallini / i pallini del punto; zero se il punto ha una sola
@@ -49,14 +51,24 @@ Formule lette dall'IL di Assembly-CSharp.dll (TINationState):
   (`CacheRegionValues`). Petrolio e miniere: regioni col flag del template
   (`oilCapable`, `mineCapable`; il petrolio finche' c'e'); regione economica
   centrale: quota del PIL nazionale sopra 500 mld
-  (`CandidateCoreEconomicRegions`). Il contatore e' della regione.
+  (`CandidateCoreEconomicRegions`). Il contatore e' della regione e il gioco
+  lo mostra («Current progress: x/1200»). Fra le candidate va avanti quella
+  col contatore piu' alto, poi la quota del PIL piu' alta. Una regione che
+  diventa economica centrale smette di essere regione di risorse.
+- Effetto di un'Economia (`get_economyPriorityPerCapitaIncomeChange`): base,
+  per regione di risorse e per regione economica centrale passano ciascuno per
+  `SumEffectsModifiers` della fazione che ha il punto esecutivo (contesti
+  `Economy_BasePCGDPIncrease`, `Economy_ResourcePCGDPMultiplier`,
+  `Economy_CoreEcoPCGDPMultiplier`): le tecnologie danno x1,02 alla base.
+- Al mese il pro capite cresce di (pc / 20)^0,35 x K x E: gli IP crescono con
+  (pop x pc)^0,35, l'effetto cala con pop^-0,35, e la popolazione si elide.
 
 Le nazioni, le rivendicazioni e le statistiche sono quelle della schermata
 nazione: niente di nascosto.
 """
 
 from . import gamedata
-from .model import CP_COST_DIVISOR, CP_COST_SCALING   # (PIL / K) ^ 0,6 / 2 per nazione
+from .model import CP_COST_DIVISOR, CP_COST_SCALING, cp_gdp_scale, leo_modules   # (PIL / K) ^ 0,6 / 2 per nazione
 from .names import Namer
 
 # costanti della DLL: in TIGlobalConfig.json non ci sono, valgono i default
@@ -123,6 +135,22 @@ def gdp_weight(r):
     return w
 
 
+def region_view(nm, rid, r, hostile, rtpl):
+    """Una regione per YASS: peso nel PIL, Controllo missioni e lo sviluppo
+    dall'Economia (flag del template, contatori che il gioco mostra)."""
+    tp = rtpl.get(r.get("templateName")) or {}
+    return {"id": rid, "name": nm.region(r), "population": r.get("populationInMillions") or 0,
+            "hostile": rid in hostile, "gdpWeight": gdp_weight(r),
+            "missionControl": r.get("missionControl") or 0,
+            "core": bool(r.get("coreEconomicRegion")),
+            "mine": bool(r.get("resourceRegion")), "oil": bool(r.get("oilRegion")),
+            "colony": bool(r.get("colonyRegion")), "nuked": bool(r.get("nuclearDetonations")),
+            "oilCapable": bool(tp.get("oilCapable")), "mineCapable": bool(tp.get("mineCapable")),
+            "accOil": r.get("accumulatedCoreOilRegionTriggers") or 0,
+            "accMine": r.get("accumulatedCoreMiningRegionTriggers") or 0,
+            "accCore": r.get("accumulatedCoreEconomyRegionTriggers") or 0}
+
+
 def base_ip(gdp, unrest):
     """IP del mese senza consiglieri ne' eserciti: (PIL / 1 mld)^0,35, meno la
     penalita' dei disordini."""
@@ -130,20 +158,34 @@ def base_ip(gdp, unrest):
     return (gdp / 1e9) ** IP_GDP_EXP * max(0.0, 1 - pen) if gdp > 0 else 0.0
 
 
+def _advise_score(adv):
+    adv = sorted(adv, key=lambda x: -x[0])
+    return sum(a / 100 / (i + 1) for i, (a, _) in enumerate(adv)), [name for _, name in adv]
+
+
 def advise_bonus(g, n):
     """Bonus agli IP dai NOSTRI consiglieri che consigliano la nazione
     (GetAdvisingScore con l'Amministrazione): dal piu' bravo, AMM / 100 /
-    posizione. Anche i nomi, per la nota accanto alla cella."""
+    posizione. Due letture: chi consiglia ora (`advisingCouncilors`, gia'
+    dentro gli IP del salvataggio) e chi ha Consiglia assegnata come missione
+    attiva, che entra in vigore alla risoluzione: un salvataggio fatto in fase
+    missioni ha la prima lista vuota. Anche i nomi, per la nota della cella."""
     from .council import councilor_view
     mine = {c["value"] for c in (g.me.get("councilors") or [])}
-    adv = []
+    nid = (n.get("ID") or {}).get("value")
+    missions = g.state("TIMissionState")
+    now, assigned = [], []
     for ref in n.get("advisingCouncilors") or []:
         c = g.councilors.get(ref["value"])
-        if not c or ref["value"] not in mine or c.get("active") is False:
-            continue
-        adv.append((councilor_view(g, c)["attributes"]["Administration"], c.get("displayName")))
-    adv.sort(key=lambda x: -x[0])
-    return sum(a / 100 / (i + 1) for i, (a, _) in enumerate(adv)), [name for _, name in adv]
+        if c and ref["value"] in mine and c.get("active") is not False:
+            now.append((councilor_view(g, c)["attributes"]["Administration"], c.get("displayName")))
+    for c in g.my_councilors():
+        m = missions.get((c.get("activeMission") or {}).get("value")) or {}
+        if m.get("templateName") == "Advise" and (m.get("target") or {}).get("value") == nid:
+            assigned.append((councilor_view(g, c)["attributes"]["Administration"], c.get("displayName")))
+    b_now, who_now = _advise_score(now)
+    b_next, who_next = _advise_score(assigned) if assigned else (b_now, who_now)
+    return b_now, who_now, b_next, who_next
 
 
 def mc_cap(gdp, weights, missions, education):
@@ -226,10 +268,95 @@ EFFECT_CONTEXT = {
 }
 
 
-def faction_priority_bonuses(g):
+# priorita' -> regola dei moduli che la potenzia (TIFactionState.SumLEOHabPriorityBonuses)
+LEO_RULE = {
+    "Economy": "LEOBonusEconomy", "Welfare": "LEOBonusWelfare", "Environment": "LEOBonusEnvironment",
+    "Knowledge": "LEOBonusKnowledge", "Government": "LEOBonusGovernment", "Unity": "LEOBonusUnity",
+    "Oppression": "LEOBonusOppression", "LaunchFacilities": "LEOBonusLaunchFacilities",
+    "MissionControl": "LEOBonusMissionControl", "Military": "LEOBonusMiltech",
+}
+LEO_CAP = 0.3                       # TIGlobalConfig.LEOHabModulePriorityBonusCap
+
+
+def leo_bonuses(g, faction=None):
+    """{priorita': (bonus, [(modulo, valore, quanti)])} dai laboratori delle
+    stazioni in orbita bassa: somma dei moduli attivi, al piu' LEO_CAP."""
+    tpl = gamedata.templates()["habModules"]
+    count = {}
+    for m in leo_modules(g, faction):
+        count[m] = count.get(m, 0) + 1
+    out = {}
+    for kind, rule in LEO_RULE.items():
+        mods = [(m, (tpl.get(m) or {}).get("specialRulesValue") or 0, n) for m, n in count.items()
+                if rule in ((tpl.get(m) or {}).get("specialRules") or [])]
+        total = sum(v * n for _, v, n in mods)
+        if total:
+            out[kind] = (min(total, LEO_CAP), mods)
+    return out
+
+
+def _leo_part(g, kind, lang="ita", faction=None):
+    b, mods = leo_bonuses(g, faction).get(kind, (0.0, []))
+    if not b:
+        return []
+    what = ", ".join("%s%s" % ("%d x " % n if n > 1 else "",
+                               gamedata.loc(lang, "TIHabModuleTemplate", "displayName", m, m))
+                     for m, _, n in mods)
+    raw = sum(v * n for _, v, n in mods)
+    if raw > b:     # oltre il tetto i moduli in piu' non servono
+        what += " (%d%%, tetto %d%%)" % (round(raw * 100), round(LEO_CAP * 100))
+    return [{"source": "hab", "name": what, "who": None, "bonus": b}]
+
+
+def _faction_effects(g, faction):
+    """{contesto: [nomi degli effetti]} di una fazione (TIEffectsState.factionEffects)."""
+    fx = next(iter(g.state("TIEffectsState").values()), {})
+    fid = ((faction or {}).get("ID") or {}).get("value")
+    return next((e.get("Value") or {} for e in fx.get("factionEffectsNames") or []
+                 if (e.get("Key") or {}).get("value") == fid), {})
+
+
+ECO_PC_CONTEXT = {"base": "Economy_BasePCGDPIncrease", "resource": "Economy_ResourcePCGDPMultiplier",
+                  "core": "Economy_CoreEcoPCGDPMultiplier"}
+
+
+def _apply_effects(value, names, tpl):
+    """TIEffectsState.SumEffectsModifiers: le operazioni in fila sul valore."""
+    v = value
+    for name in names:
+        e = tpl.get(name) or {}
+        x, op = e.get("value") or 0, e.get("operation", "Additive")
+        if op == "Additive":
+            v += x
+        elif op == "Multiplicative":
+            v *= x
+        elif op == "Set":
+            v = x
+        elif op == "Minimum":
+            v = max(v, x)
+        elif op == "Maximum":
+            v = min(v, x)
+    return v
+
+
+def economy_multipliers(g, n):
+    """Fattori su base, regioni di risorse e regioni economiche centrali di
+    un'Economia: effetti della fazione col punto esecutivo (il primo punto)."""
+    cps = n.get("controlPoints") or []
+    cp = g.cps.get(cps[0]["value"]) if cps else None
+    fac = g.factions.get(((cp or {}).get("faction") or {}).get("value"))
+    if not fac:
+        return {k: 1.0 for k in ECO_PC_CONTEXT}
+    names = _faction_effects(g, fac)
+    tpl = gamedata.templates()["effects"]
+    base = {"base": EFFECTS["ecoPcBase"], "resource": EFFECTS["ecoPcPerResource"], "core": EFFECTS["ecoPcPerCore"]}
+    return {k: _apply_effects(base[k], names.get(ctx) or [], tpl) / base[k] for k, ctx in ECO_PC_CONTEXT.items()}
+
+
+def faction_priority_bonuses(g, lang="ita"):
     """{priorita': (bonus, voci)} della fazione del giocatore: org e tratti dei
-    consiglieri, effetti. Come TIFactionState.SumPriorityBonuses, senza gli
-    habitat in orbita bassa."""
+    consiglieri, laboratori in orbita bassa, effetti. Come
+    TIFactionState.SumPriorityBonuses."""
     tpl = gamedata.templates()
     fx = next(iter(g.state("TIEffectsState").values()), {})
     my_id = (g.me.get("ID") or {}).get("value")
@@ -249,6 +376,7 @@ def faction_priority_bonuses(g):
                 for pb in (tpl["traits"].get(tn) or {}).get("priorityBonuses") or []:
                     if pb.get("priority") == kind and pb.get("bonus"):
                         parts.append({"source": "trait", "name": tn, "who": who, "bonus": pb["bonus"]})
+        parts += _leo_part(g, kind, lang)
         for name in mine.get(EFFECT_CONTEXT.get(kind, "")) or []:
             et = tpl["effects"].get(name) or {}
             if et.get("value") and et.get("operation", "Additive") == "Additive":
@@ -333,7 +461,7 @@ def priority_panel(g, n, lang, fbonus):
     return rows, cps
 
 
-def faction_knowledge_bonus(g):
+def faction_knowledge_bonus(g, lang="ita"):
     """Bonus della fazione alla priorita' Conoscenza, con le voci."""
     tpl = gamedata.templates()
     parts = []
@@ -348,10 +476,8 @@ def faction_knowledge_bonus(g):
             for pb in (tpl["traits"].get(tn) or {}).get("priorityBonuses") or []:
                 if pb.get("priority") == "Knowledge" and pb.get("bonus"):
                     parts.append({"source": "trait", "name": tn, "who": name, "bonus": pb["bonus"]})
-    fx = next(iter(g.state("TIEffectsState").values()), {})
-    my_id = (g.me.get("ID") or {}).get("value")
-    mine = next((e.get("Value") or {} for e in fx.get("factionEffectsNames") or []
-                 if (e.get("Key") or {}).get("value") == my_id), {})
+    parts += _leo_part(g, "Knowledge", lang)
+    mine = _faction_effects(g, g.me)
     for name in mine.get("KnowledgePriority") or []:
         v = (tpl["effects"].get(name) or {}).get("value") or 0
         if v:
@@ -375,12 +501,12 @@ def overview(g, lang="ita"):
     regions = g.state("TIRegionState")
     mine = {(g.ref(cp, "nation", g.nations) or {}).get("ID", {}).get("value")
             for cp in g.my_control_points()}
-    fbonus, fparts = faction_knowledge_bonus(g)
+    fbonus, fparts = faction_knowledge_bonus(g, lang)
     # residuo tipico della coesione di riposo, per le nazioni in cui non si ricava
     resids = sorted(r for r in (cohesion_terms(g, x)[1] for x in g.nations.values()
                                 if x.get("displayName") and x.get("regions")) if r is not None)
     resid_med = resids[len(resids) // 2] if resids else 0.0
-    pbonus = faction_priority_bonuses(g)
+    pbonus = faction_priority_bonuses(g, lang)
     # i miei punti di controllo, nazione per nazione: quota dei pallini sulla
     # Conoscenza e bonus totale del punto
     my_cps = {}
@@ -402,6 +528,7 @@ def overview(g, lang="ita"):
             "disabled": bool(cp.get("benefitsDisabled")),
         })
 
+    rtpl = gamedata.templates().get("regions") or {}
     out = []
     for nid, n in g.nations.items():
         if not n.get("displayName") or not n.get("exists", True) or n.get("archived"):
@@ -413,7 +540,7 @@ def overview(g, lang="ita"):
             continue
         hostile = set(_ids(n.get("hostileClaims")))
         prows, pcps = priority_panel(g, n, lang, pbonus)
-        advise, advisers = advise_bonus(g, n)
+        advise, advisers, advise_next, advisers_next = advise_bonus(g, n)
         out.append({
             "id": nid,
             "name": nm.nation(n),
@@ -437,14 +564,19 @@ def overview(g, lang="ita"):
             # bonus Consiglia dei nostri consiglieri, gia' dentro "ip"
             "advise": advise,
             "advisers": advisers,
+            # Consiglia assegnata come missione: vale dalla risoluzione
+            "adviseNext": advise_next,
+            "advisersNext": advisers_next,
             "controlPoints": len(n.get("controlPoints") or []),
             "myControlPoints": my_cps.get(nid, []),
             "priorities": prows,
             "restModel": rest_model(g, n, resid_med),
             "panelCPs": pcps,
-            "regions": [{"id": rid, "name": nm.region(r), "population": r.get("populationInMillions") or 0,
-                         "hostile": rid in hostile, "gdpWeight": gdp_weight(r),
-                         "missionControl": r.get("missionControl") or 0} for rid, r in regs],
+            "regions": [region_view(nm, rid, r, hostile, rtpl) for rid, r in regs],
+            # puo' ancora sviluppare petrolio e miniere (politiche e fine del petrolio)
+            "canOil": not n.get("policy_noOilDevelopment") and not gv.get("endOfOil"),
+            "canMine": not n.get("policy_noMineralDevelopment"),
+            "ecoMult": economy_multipliers(g, n),
             "claims": _ids(n.get("claims")),
             "hostileClaims": sorted(hostile),
         })
@@ -453,8 +585,7 @@ def overview(g, lang="ita"):
         "nations": out,
         "faction": g.me.get("templateName"),
         "campaign": g.campaign_key(),
-        "knowledgeBonus": {"total": fbonus, "parts": fparts,
-                           "leoMissing": bool(g.me.get("habs"))},
+        "knowledgeBonus": {"total": fbonus, "parts": fparts},
         "constants": {
             "popScalingBase": POP_SCALING_BASE / 1e6,     # in milioni, come population
             "popScalingExp": POP_SCALING_EXP,
@@ -480,13 +611,15 @@ def overview(g, lang="ita"):
             "mcDiv": MC_DIV,
             "mcDivPerEdu": MC_DIV_PER_EDU,
             "mcDivMin": MC_DIV_MIN,
-            "cpGdpScale": gv.get("fixedPCGDPToRaiseBaseCPMaintenanceCostBy1") or 0,
+            "cpGdpScale": cp_gdp_scale(g),
             "cpCostScaling": CP_COST_SCALING,
             "cpCostDivisor": CP_COST_DIVISOR,
             "ecosForCoreEco": ECOS_FOR_CORE_ECO,
             "ecosForCoreMining": ECOS_FOR_CORE_MINING,
             "ecosForCoreOil": ECOS_FOR_CORE_OIL,
             "coreEcoMinGdp": CORE_ECO_MIN_GDP_BN,
+            "gdpWeightCore": GDP_WEIGHT_CORE,
+            "gdpWeightResource": GDP_WEIGHT_RESOURCE,
         },
     }
 
@@ -542,11 +675,12 @@ def check(save_path=None):
         else:
             unrest_ok += 1
     # IP dal PIL: dove non ci sono eserciti il gioco scrive esattamente
-    # (PIL / 1 mld)^0,35 meno i disordini (i consiglieri che consigliano sono rari)
+    # (PIL / 1 mld)^0,35 meno i disordini
     ip_ok = 0
     for n in d["nations"]:
         nat = g.nations.get(n["id"]) or {}
-        if nat.get("armies"):
+        # chi consiglia (anche altre fazioni) alza gli IP: si confronta senza
+        if nat.get("armies") or nat.get("advisingCouncilors"):
             continue
         if abs(n["ipOther"]) > 0.01:
             bad.append(f"IP {n['name']}: {n['ip']:.3f}, dal PIL {n['ip'] - n['ipOther']:.3f}")
@@ -567,7 +701,67 @@ def check(save_path=None):
             bad.append(f"tetto MC {n['name']}: {have}/{cap}, il gioco la da' {'valida' if mc else 'non valida'}")
         else:
             mc_ok += 1
-    return len(d["nations"]), unrest_ok, ip_ok, mc_ok, bad
+    eco_ok, eco_skip, eco_bad = check_economy(g, d)
+    return len(d["nations"]), unrest_ok, ip_ok, mc_ok, (eco_ok, eco_skip), bad + eco_bad
+
+
+def economy_per_completion(n):
+    """PIL pro capite in piu' per un'Economia (get_economyPriorityPerCapitaIncomeChange)."""
+    mu = n["ecoMult"]
+    k = (EFFECTS["ecoPcBase"] * mu["base"] + n["resourceRegions"] * EFFECTS["ecoPcPerResource"] * mu["resource"]
+         + n["coreEcoRegions"] * EFFECTS["ecoPcPerCore"] * mu["core"] + n["democracy"] * 0.5 + n["education"])
+    return k * n["popScaling"]
+
+
+def economy_ip(n):
+    """IP del mese sull'Economia dai miei punti, coi bonus (ControlPointWeightsTotalToPriorityIP)."""
+    row = next((r for r in n["priorities"] if r["id"] == "Economy"), None)
+    if row is None:
+        return 0.0
+    per_cp = n["ip"] / max(1, n["controlPoints"])
+    out = 0.0
+    for cp in n["panelCPs"]:
+        if not cp["total"]:
+            continue
+        b = row["factionBonus"] + row["nationalBonus"] + diversity_bonus(cp["priorities"], cp["total"], "Economy")
+        if cp["disabled"] and b > 0:
+            b = 0.0
+        out += per_cp * (cp["priorities"].get("Economy") or 0) / cp["total"] * (1 + b)
+    return out / (PRIORITY_COST_DEFAULT["Economy"][1] or 1)
+
+
+def check_economy(g, d, tolerance=0.1):
+    """Le Economie del mese contro il registro del gioco
+    (`tracker_GDPChangeReason_CurrentTrackingPeriod`, voce EconomyPriority):
+    PIL dall'Economia / (effetto di un completamento x popolazione) = quante
+    Economie ha completato. Solo il primo del mese (il registro copre il mese
+    appena chiuso), solo le nazioni coi punti tutti miei e senza Consiglia
+    nostra in corso o appena finita (nel mese non si sa per quanti giorni) e
+    senza territorio cambiato nel mese.
+    Ritorna (verificate, saltate, differenze)."""
+    if g.game_date()[2] != 1:
+        return 0, 0, []
+    advised = set()
+    for c in g.my_councilors():
+        if c.get("priorMissionTemplateName") == "Advise":
+            advised.add((c.get("priorMissionTarget") or {}).get("value"))
+    ok, skipped, bad = 0, 0, []
+    for n in d["nations"]:
+        tr = (g.nations.get(n["id"]) or {}).get("tracker_GDPChangeReason_CurrentTrackingPeriod") or {}
+        gdp = tr.get("GDPReason_EconomyPriority") or 0
+        if gdp <= 0 or len(n["panelCPs"]) != n["controlPoints"] or not n["controlPoints"]:
+            continue
+        # nata, annessa o divisa nel mese: il registro copre solo una parte del mese
+        if n["advise"] or n["adviseNext"] or n["id"] in advised or tr.get("GDPReason_TerritoryChange"):
+            skipped += 1
+            continue
+        model = economy_ip(n)
+        done = gdp / (economy_per_completion(n) * n["population"] * 1e6)
+        if model and abs(done / model - 1) <= tolerance:
+            ok += 1
+        else:
+            bad.append(f"Economia {n['name']}: {done:.1f} completate secondo il gioco, {model:.1f} dal modello")
+    return ok, skipped, bad
 
 
 # ---------------------------------------------------------------- coesione di riposo
@@ -700,8 +894,16 @@ def rest_model(g, n, fallback):
 
 
 if __name__ == "__main__":
-    total, unrest_ok, ip_ok, mc_ok, bad = check()
-    print(f"{total} nazioni, disordini verificati su {unrest_ok} senza esercito, "
-          f"IP dal PIL su {ip_ok}, tetto MC su {mc_ok} coi miei pallini")
-    print("\n".join(bad) if bad else "Nessuna differenza.")
-    raise SystemExit(1 if bad else 0)
+    # python -m ticore.yass [salvataggio ...]: senza argomenti l'ultimo salvataggio
+    import sys
+    failed = False
+    for path in sys.argv[1:] or [None]:
+        total, unrest_ok, ip_ok, mc_ok, (eco_ok, eco_skip), bad = check(path)
+        if path:
+            print(path)
+        print(f"{total} nazioni, disordini verificati su {unrest_ok} senza esercito, "
+              f"IP dal PIL su {ip_ok}, tetto MC su {mc_ok} coi miei pallini, "
+              f"Economie del mese su {eco_ok} (saltate {eco_skip}: Consiglia o confini cambiati)")
+        print("\n".join(bad) if bad else "Nessuna differenza.")
+        failed = failed or bool(bad)
+    raise SystemExit(1 if failed else 0)

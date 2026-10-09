@@ -124,6 +124,8 @@ def _dump(path, obj):
 # famiglie grandi di cui ci servono pochi campi (ticore/mining.py): il resto
 # (orbite, note degli astronomi) peserebbe mezzo megabyte nel browser
 SLIM_FIELDS = {
+    # YASS: quali regioni l'Economia puo' sviluppare in petrolio o miniere
+    "regions": ("dataName", "oilCapable", "mineCapable"),
     "habSites": ("dataName", "miningProfileName"),
     "spaceBodies": ("dataName", "barycenterName", "objectType", "mass_kg", "density_gcm3",
                     "semiMajorAxis_AU", "effectToExplore", "alternativeEffectToExplore"),

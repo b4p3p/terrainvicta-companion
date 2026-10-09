@@ -34,6 +34,7 @@ _TEMPLATE_FILES = {
     "habSites": "TIHabSiteTemplate.json",
     "spaceBodies": "TISpaceBodyTemplate.json",
     "miningProfiles": "TIMiningProfileTemplate.json",
+    "regions": "TIRegionTemplate.json",
 }
 
 

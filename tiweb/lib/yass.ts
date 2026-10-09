@@ -78,7 +78,7 @@ export function monthsTo(series: number[], target: number) {
 export interface PriorityRow {
   id: string; name: string; icon: string; certain: boolean;
   factionBonus: number; nationalBonus: number;
-  parts: { source: "org" | "trait" | "effect"; name: string; who: string | null; bonus: number }[];
+  parts: { source: "org" | "trait" | "hab" | "effect"; name: string; who: string | null; bonus: number }[];
 }
 export interface PanelCP { index: number; priorities: Record<string, number>; total: number; disabled: boolean }
 export type Pips = Record<number, Record<string, number>>;   // punto -> priorita' -> pallini
@@ -114,16 +114,29 @@ export function panel(rows: PriorityRow[], cps: PanelCP[], pips: Pips, nationIP:
 // ---------------------------------------------------------------- effetti
 // Cosa fa un completamento di ogni priorita' (TINationState.On*PriorityComplete
 // e le proprieta' *PriorityXxxChange), moltiplicato per i completamenti del
-// mese: IP alla priorita' / costo. Effetti di tecnologie sulle priorita' esclusi.
+// mese: IP alla priorita' / costo. Dell'Economia contano anche gli effetti della
+// fazione col punto esecutivo su base, risorse e regioni economiche (`ecoMult`).
 
 export interface EffectConstants {
   ecoPcBase: number; ecoPcPerResource: number; ecoPcPerCore: number;
   ecoIneq: number; ecoIneqPerResource: number; welIneq: number;
   knoEdu: number; govDem: number; uniCoh: number; uniCohMin: number; uniEdu: number;
 }
+export interface EcoMult { base: number; resource: number; core: number }
 export interface EffectInputs {
   scaling: number; education: number; democracy: number; cohesion: number;
   resourceRegions: number; coreEcoRegions: number;
+  /** effetti su base, regioni di risorse, regioni economiche centrali (x1 se mancano) */
+  ecoMult?: EcoMult;
+}
+
+/** K: il pro capite che un'Economia aggiunge prima della scala per popolazione
+    (get_economyPriorityPerCapitaIncomeChange). Le regioni economiche centrali
+    si contano su tutta la nazione: e' l'unico termine che premia la taglia. */
+export function economyK(e: EffectConstants, n: Omit<EffectInputs, "scaling" | "cohesion">) {
+  const m = n.ecoMult ?? { base: 1, resource: 1, core: 1 };
+  return e.ecoPcBase * m.base + n.resourceRegions * e.ecoPcPerResource * m.resource
+    + n.coreEcoRegions * e.ecoPcPerCore * m.core + n.democracy * 0.5 + n.education;
 }
 
 /** Per completamento, priorita' per priorita'. */
@@ -135,8 +148,7 @@ export function perCompletion(k: YassConstants, e: EffectConstants, n: EffectInp
   const knowledge = { education: s * eduFactor * e.knoEdu, cohesion: knowledgeStep(k, s, n.cohesion) };
   return {
     Economy: {
-      pcgdp: (e.ecoPcBase + n.resourceRegions * e.ecoPcPerResource + n.coreEcoRegions * e.ecoPcPerCore
-        + n.democracy * 0.5 + edu) * s,
+      pcgdp: economyK(e, n) * s,
       inequality: (e.ecoIneq + e.ecoIneqPerResource * n.resourceRegions) * s,
     },
     Welfare: { inequality: e.welIneq * s },
@@ -159,6 +171,8 @@ export interface GrowthConstants {
   mcDiv: number; mcDivPerEdu: number; mcDivMin: number;
   cpGdpScale: number; cpCostScaling: number; cpCostDivisor: number;
   ecosForCoreEco: number; ecosForCoreMining: number; ecosForCoreOil: number; coreEcoMinGdp: number;
+  /** peso nel PIL nazionale di una regione economica centrale e di una di risorse */
+  gdpWeightCore: number; gdpWeightResource: number;
 }
 
 /** IP dal PIL: (PIL / 1 mld)^0,35, meno la penalita' dei disordini sopra 2. */
@@ -194,6 +208,7 @@ export interface PieceInputs {
   pcgdp: number;            // del pezzo: la popolazione e' PIL / pro capite
   education: number; democracy: number;
   coreEcoRegions: number; resourceRegions: number;
+  ecoMult?: EcoMult;
   /** la regione piu' ricca ha piu' di 500 mld: puo' diventare economica centrale */
   coreEcoCandidate: boolean;
   ecoShare: number; mcShare: number;      // quota degli IP, 0-1
@@ -215,7 +230,7 @@ export function piece(k: YassConstants, e: EffectConstants, g: GrowthConstants, 
   const ecoComp = ip * p.ecoShare / p.ecoCost;
   const per = perCompletion(k, e, {
     scaling: popScaling(k, population), education: p.education, democracy: p.democracy, cohesion: k.cohesionTarget,
-    resourceRegions: p.resourceRegions, coreEcoRegions: p.coreEcoRegions,
+    resourceRegions: p.resourceRegions, coreEcoRegions: p.coreEcoRegions, ecoMult: p.ecoMult,
   });
   const pcgdpMonth = ecoComp * (per.Economy.pcgdp ?? 0);
   const gdpMonth = pcgdpMonth * population * 1e6;
@@ -233,13 +248,63 @@ export function piece(k: YassConstants, e: EffectConstants, g: GrowthConstants, 
 // La nazione mese per mese coi pallini di oggi: effetti delle priorita'
 // ricalcolati ogni mese (con piu' istruzione l'Economia rende di piu'), ritorno
 // della coesione verso il riposo. Con `growth` gli IP seguono il PIL e i
-// disordini, e il Controllo missioni si accumula fino al tetto. Fermi:
-// popolazione, esercito. Stima per orientarsi, non simulazione completa.
+// disordini, il Controllo missioni si accumula fino al tetto e l'Economia
+// sviluppa petrolio, miniere e regioni economiche centrali. Fermi: popolazione,
+// esercito. Stima per orientarsi, non simulazione completa.
 
 export interface NationState {
   cohesion: number; rest: number; pcgdp: number; inequality: number; democracy: number; education: number; unrest: number;
-  /** solo con `growth`: PIL, IP del mese, Controllo missioni e tetto */
-  gdp?: number; ip?: number; mc?: number; mcCap?: number;
+  /** solo con `growth`: PIL, IP del mese, Controllo missioni e tetto, regioni
+      economiche centrali e di risorse */
+  gdp?: number; ip?: number; mc?: number; mcCap?: number; core?: number; resource?: number;
+}
+
+/** Una regione per la crescita: peso nel PIL, Controllo missioni e sviluppo
+    dall'Economia (flag e contatori del salvataggio). */
+export interface GrowthRegion {
+  gdpWeight: number; missionControl: number;
+  core: boolean; mine: boolean; oil: boolean; colony: boolean; nuked: boolean;
+  oilCapable: boolean; mineCapable: boolean;
+  accOil: number; accMine: number; accCore: number;
+}
+
+/** OnEconomyPriorityComplete: ogni Economia fa un passo verso una regione
+    petrolifera, se ce n'e' una candidata; se no mineraria; se no economica
+    centrale (quota del PIL sopra la soglia). Fra le candidate la piu' avanti,
+    poi la piu' ricca. Una regione economica centrale smette di essere di
+    risorse. Modifica `regs` sul posto. */
+export function developRegions(g: GrowthConstants, regs: GrowthRegion[], gdp: number, completions: number,
+  canOil: boolean, canMine: boolean) {
+  let left = completions;
+  for (let guard = 0; left > 1e-9 && guard < 1000; guard++) {
+    const total = regs.reduce((t, r) => t + r.gdpWeight, 0);
+    const share = (r: GrowthRegion) => (total ? gdp / 1e9 * r.gdpWeight / total : 0);
+    const free = (r: GrowthRegion) => !r.core && !r.mine && !r.oil && !r.nuked;
+    const pick = (ok: (r: GrowthRegion) => boolean, acc: (r: GrowthRegion) => number) =>
+      regs.filter(ok).sort((a, b) => acc(b) - acc(a) || share(b) - share(a))[0];
+    let r: GrowthRegion | undefined;
+    let kind: "oil" | "mine" | "core";
+    if (canOil && regs.some((x) => free(x) && x.oilCapable)) { kind = "oil"; r = pick((x) => free(x) && x.oilCapable, (x) => x.accOil); }
+    else if (canMine && regs.some((x) => free(x) && x.mineCapable)) { kind = "mine"; r = pick((x) => free(x) && x.mineCapable, (x) => x.accMine); }
+    else { kind = "core"; r = pick((x) => !x.core && !x.colony && !x.nuked && share(x) > g.coreEcoMinGdp, (x) => x.accCore); }
+    if (!r) return;     // nessuna candidata: il passo si perde
+    const key = kind === "oil" ? "accOil" : kind === "mine" ? "accMine" : "accCore";
+    const need = (kind === "oil" ? g.ecosForCoreOil : kind === "mine" ? g.ecosForCoreMining : g.ecosForCoreEco) - r[key];
+    const step = Math.min(left, need);
+    r[key] += step;
+    left -= step;
+    if (step < need - 1e-9) return;
+    r[key] = 0;
+    if (kind === "core") {
+      if (r.mine || r.oil) r.gdpWeight /= g.gdpWeightResource;
+      r.mine = r.oil = false;
+      r.core = true;
+      r.gdpWeight *= g.gdpWeightCore;
+    } else {
+      r[kind] = true;
+      r.gdpWeight *= g.gdpWeightResource;
+    }
+  }
 }
 export interface GrowthInputs {
   g: GrowthConstants;
@@ -247,7 +312,9 @@ export interface GrowthInputs {
   ip0: number;                        // IP del mese oggi: i completamenti di oggi sono per questi
   /** bonus Consiglia gia' dentro ip0 e quello da provare, dal primo mese */
   advise0: number; advise: number;
-  regions: { gdpWeight: number; missionControl: number }[];
+  regions: GrowthRegion[];
+  /** la nazione puo' sviluppare petrolio e miniere (politiche, fine del petrolio) */
+  canOil: boolean; canMine: boolean;
   mcIP: number;                       // IP al mese sul Controllo missioni, oggi (gia' col bonus)
   mcCost: number;                     // IP per un punto di Controllo missioni
   /** completamenti al mese col Controllo missioni pieno: i suoi pallini non contano piu' */
@@ -256,7 +323,7 @@ export interface GrowthInputs {
 export interface ProjectionInputs {
   start: Omit<NationState, "unrest" | "rest">;
   rest: number; scaling: number; hostileShare: number; armyOther: number;
-  resourceRegions: number; coreEcoRegions: number;
+  resourceRegions: number; coreEcoRegions: number; ecoMult?: EcoMult;
   /** completamenti al mese, priorita' per priorita' */
   completions: Record<string, number>;
   /** coesione di riposo dallo stato del mese; senza, resta `rest` */
@@ -282,10 +349,14 @@ export function projectNation(k: YassConstants, e: EffectConstants, p: Projectio
   const ipOf = (st: typeof s) => (gr ? Math.max(0, baseIP(gr.g, gdpOf(st), unrestOf(k, st, p)) * (1 + gr.advise) + ipOther) : 0);
   let mc = gr ? gr.regions.reduce((t, r) => t + r.missionControl, 0) : 0;
   let mcPoints = 0;
-  const capOf = (st: typeof s) => (gr ? mcCap(gr.g, gdpOf(st), gr.regions, st.education) : 0);
+  // le regioni cambiano: l'Economia ne sviluppa di nuove, e cambiano i pesi nel PIL
+  const regs = gr ? gr.regions.map((r) => ({ ...r })) : [];
+  const coreOf = () => (gr ? regs.filter((r) => r.core).length : p.coreEcoRegions);
+  const resOf = () => (gr ? regs.filter((r) => r.mine || r.oil).length : p.resourceRegions);
+  const capOf = (st: typeof s) => (gr ? mcCap(gr.g, gdpOf(st), regs, st.education) : 0);
   const snap = (st: typeof s, now = false): NationState => ({
     ...st, rest: restAt(st), unrest: unrestOf(k, st, p),
-    ...(gr ? { gdp: gdpOf(st), ip: now ? gr.ip0 : ipOf(st), mc, mcCap: capOf(st) } : {}),
+    ...(gr ? { gdp: gdpOf(st), ip: now ? gr.ip0 : ipOf(st), mc, mcCap: capOf(st), core: coreOf(), resource: resOf() } : {}),
   });
   const out = new Map<number, NationState>([[0, snap(s, true)]]);
   for (let m = 1; m <= last; m++) {
@@ -305,7 +376,7 @@ export function projectNation(k: YassConstants, e: EffectConstants, p: Projectio
     const c = (id: string) => (comp[id] ?? 0) * ratio;
     const per = perCompletion(k, e, {
       scaling: p.scaling, education: s.education, democracy: s.democracy, cohesion: s.cohesion,
-      resourceRegions: p.resourceRegions, coreEcoRegions: p.coreEcoRegions,
+      resourceRegions: resOf(), coreEcoRegions: coreOf(), ecoMult: p.ecoMult,
     });
     const sum = (stat: "pcgdp" | "inequality" | "education" | "democracy") =>
       Object.keys(per).reduce((t, id) => t + c(id) * (per[id][stat] ?? 0), 0);
@@ -322,6 +393,9 @@ export function projectNation(k: YassConstants, e: EffectConstants, p: Projectio
       democracy: Math.min(10, Math.max(0, s.democracy + sum("democracy"))),
       education: Math.max(0, s.education + sum("education")),
     };
+    // le Economie del mese, dopo averne preso l'effetto: passi verso petrolio,
+    // miniere e regioni economiche centrali
+    if (gr) developRegions(gr.g, regs, gdpOf(s), c("Economy"), gr.canOil, gr.canMine);
     if (at.includes(m)) out.set(m, snap(s));
   }
   return at.map((m) => out.get(m)!);

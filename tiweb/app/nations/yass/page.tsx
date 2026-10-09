@@ -12,11 +12,11 @@ import { YassIcon } from "@/components/YassIcon";
 import { PipGlyph, PipText, PriorityPanel } from "./PriorityPanel";
 import {
   type EffectConstants, type GrowthConstants, type NationState, type PanelCP, type Pips as PipMap, type PriorityRow, type YassConstants,
-  type Piece, type RestModel, baseIP, cpCost, decreaseCap, maxInequalityFor, panel, perCompletion, piece, projectNation, restParts, hostileUnrest,
-  knowledgeStep, monthlyMovement, popScaling,
+  type EcoMult, type GrowthRegion, type Piece, type RestModel, baseIP, cpCost, decreaseCap, economyK, maxInequalityFor, panel, perCompletion, piece,
+  projectNation, restParts, hostileUnrest, knowledgeStep, monthlyMovement, popScaling,
 } from "@/lib/yass";
 
-interface Region { id: number; name: string; population: number; hostile: boolean; gdpWeight: number; missionControl: number }
+interface Region extends GrowthRegion { id: number; name: string; population: number; hostile: boolean }
 interface Nation {
   id: number; name: string; mine: boolean;
   population: number; gdp: number;
@@ -24,8 +24,12 @@ interface Nation {
   democracy: number; inequality: number; education: number; popScaling: number; ip: number;
   coreEcoRegions: number; resourceRegions: number; legitimizeProgress: number;
   restModel: RestModel;
-  /** bonus Consiglia dei nostri consiglieri (0,25 = +25% IP) e i loro nomi */
-  advise: number; advisers: string[];
+  /** bonus Consiglia dei nostri consiglieri (0,25 = +25% IP) e i loro nomi:
+      chi consiglia ora (gia' negli IP) e chi ha la missione assegnata */
+  advise: number; advisers: string[]; adviseNext: number; advisersNext: string[];
+  /** effetti sull'Economia: base, regioni di risorse, regioni economiche centrali */
+  ecoMult: EcoMult;
+  canOil: boolean; canMine: boolean;
   controlPoints: number;
   priorities: PriorityRow[]; panelCPs: PanelCP[];
   regions: Region[]; claims: number[]; hostileClaims: number[];
@@ -99,7 +103,7 @@ function defaults(n: Nation, k: YassConstants, annexed: Nation | null, knowledge
     nationIP: n.ip, education: n.education, population: n.population, cohesion: n.cohesion, cohesionRest: n.cohesionRest, inequality: n.inequality,
     knowledgeIP, pcgdp: pc, democracy: n.democracy, hostileShare: share * 100,
     armyOther: army, unrestTarget: 2, annexedDemocracy: annexed?.democracy ?? 0, target: k.cohesionTarget,
-    splitGdp: n.gdp / 1e9, splitN: 2, advise: n.advise * 100,
+    splitGdp: n.gdp / 1e9, splitN: 2, advise: n.adviseNext * 100,
     splitPiece: 500, splitK: 1, splitEco: 50, splitMc: 40, splitPieceCore: 0,
   };
 }
@@ -142,7 +146,7 @@ const ICONS: Record<string, string> = {
   advise: "ICO_administration", splitPiece: GDP, splitK: CP, splitEco: GDP, splitMc: "ICO_mission_control",
   splitPieceCore: GDP, splitPresets: GDP,
   pPop: POP, pIp: IP, pCp: CP, pCap: "ICO_mission_control", pMc: "ICO_mission_control", pCapMonth: "ICO_mission_control",
-  pPc: PC, pCore: GDP,
+  pPc: PC, pCore: GDP, pK: GDP,
 };
 const STAT_ICON: Record<string, string> = { pcgdp: PC, inequality: "ICO_inequality", education: "ICO_education", cohesion: COHESION, democracy: GOV };
 const iconFor = (id: string) => ICONS[id] ?? (/^p\d+$/.test(id) ? COHESION : undefined)
@@ -434,7 +438,8 @@ function Grid({ rows, values, originals, edited, set, unset, selected, select, p
 // ---------------------------------------------------------------- proiezione
 
 const PROJ_YEARS = [0, 1, 2, 5, 10, 20];
-type StatKey = "cohesion" | "rest" | "unrest" | "pcgdp" | "inequality" | "democracy" | "education" | "gdp" | "ip" | "mc" | "mcCap";
+type StatKey = "cohesion" | "rest" | "unrest" | "pcgdp" | "inequality" | "democracy" | "education" | "gdp" | "ip" | "mc" | "mcCap"
+  | "core" | "resource";
 const PROJ_COLS: { key: StatKey; icon: string; digits: number; upIsGood: boolean; scale?: number }[] = [
   { key: "cohesion", icon: "ICO_Cohesion_mid", digits: 2, upIsGood: true },
   { key: "rest", icon: "ICO_Cohesion_mid", digits: 2, upIsGood: true },
@@ -448,6 +453,8 @@ const PROJ_COLS: { key: StatKey; icon: string; digits: number; upIsGood: boolean
   { key: "ip", icon: "ICO_investments", digits: 2, upIsGood: true },
   { key: "mc", icon: "ICO_mission_control", digits: 0, upIsGood: true },
   { key: "mcCap", icon: "ICO_mission_control", digits: 0, upIsGood: true },
+  { key: "core", icon: "ICO_economy_priority", digits: 0, upIsGood: true },
+  { key: "resource", icon: "ICO_economy_priority", digits: 0, upIsGood: true },
 ];
 
 /** La nazione fra 1, 2, 5… anni coi pallini di oggi: righe gli anni, colonne
@@ -514,12 +521,13 @@ function ProjectionTable({ states, years, panelSig, selected, onSelect }: {
 
 // ---------------------------------------------------------------- confronto (Dividi)
 
-type CmpKey = "gdp" | "ip" | "cp" | "eff" | "mc" | "cap" | "core";
+type CmpKey = "gdp" | "ip" | "cp" | "eff" | "pc" | "mc" | "cap" | "core";
 const CMP_COLS: { key: CmpKey; icon: string; digits: number; upIsGood: boolean }[] = [
   { key: "gdp", icon: "ICO_economy_priority", digits: 0, upIsGood: true },
   { key: "ip", icon: "ICO_investments", digits: 2, upIsGood: true },
   { key: "cp", icon: "ICO_ControlPoint_empty", digits: 2, upIsGood: false },
   { key: "eff", icon: "ICO_investments", digits: 2, upIsGood: true },
+  { key: "pc", icon: "ICO_per_capita_GDP", digits: 0, upIsGood: true },
   { key: "mc", icon: "ICO_mission_control", digits: 2, upIsGood: true },
   { key: "cap", icon: "ICO_mission_control", digits: 2, upIsGood: true },
   { key: "core", icon: "ICO_economy_priority", digits: 2, upIsGood: true },
@@ -715,7 +723,7 @@ export default function YassPage() {
   // effetti delle priorita' al mese: completamenti (IP / costo) x effetto per completamento
   const per = perCompletion(k, k.effects, {
     scaling, education: v.education, democracy: v.democracy, cohesion: v.cohesion,
-    resourceRegions: nation.resourceRegions, coreEcoRegions: nation.coreEcoRegions,
+    resourceRegions: nation.resourceRegions, coreEcoRegions: nation.coreEcoRegions, ecoMult: nation.ecoMult,
   });
   const ipOf = (id: string) => (id === "Knowledge" ? v.knowledgeIP : results.find((r) => r.id === id)?.ip ?? 0);
   const compOf = (id: string) => ipOf(id) / (k.priorityCost[id] ?? 1);
@@ -1038,15 +1046,21 @@ export default function YassPage() {
     const wTot = nation.regions.reduce((t, r) => t + r.gdpWeight, 0);
     const topShare = wTot ? Math.max(...nation.regions.map((r) => r.gdpWeight)) / wTot : 1;
     const base = {
-      pcgdp: v.pcgdp, education: v.education, democracy: v.democracy,
+      pcgdp: v.pcgdp, education: v.education, democracy: v.democracy, ecoMult: nation.ecoMult,
       ecoShare: eco, mcShare: mcS, ecoCost: k.priorityCost.Economy ?? 1, mcCost: k.priorityCost.MissionControl ?? 25,
     };
+    // le regioni economiche centrali si contano per nazione: quelle che gli
+    // indipendenti si portano via non contano piu' per la nazione madre
+    const pieceCore = Math.max(0, Math.round(v.splitPieceCore));
+    const restCore = Math.max(0, nation.coreEcoRegions - kN * pieceCore);
     const whole = piece(k, k.effects, k, { ...base, gdp, coreEcoRegions: nation.coreEcoRegions, resourceRegions: nation.resourceRegions,
       coreEcoCandidate: gdp * topShare / 1e9 > k.coreEcoMinGdp });
-    const rest = piece(k, k.effects, k, { ...base, gdp: restGdp, coreEcoRegions: nation.coreEcoRegions, resourceRegions: nation.resourceRegions,
+    const rest = piece(k, k.effects, k, { ...base, gdp: restGdp, coreEcoRegions: restCore, resourceRegions: nation.resourceRegions,
       coreEcoCandidate: restGdp * topShare / 1e9 > k.coreEcoMinGdp });
-    const one = piece(k, k.effects, k, { ...base, gdp: pieceGdp, coreEcoRegions: Math.round(v.splitPieceCore), resourceRegions: 0,
-      coreEcoCandidate: v.splitPiece > k.coreEcoMinGdp && v.splitPieceCore < 1 });
+    const one = piece(k, k.effects, k, { ...base, gdp: pieceGdp, coreEcoRegions: pieceCore, resourceRegions: 0,
+      coreEcoCandidate: v.splitPiece > k.coreEcoMinGdp && pieceCore < 1 });
+    const kOf = (core: number, res: number) => economyK(k.effects, { education: v.education, democracy: v.democracy,
+      coreEcoRegions: core, resourceRegions: res, ecoMult: nation.ecoMult });
     const div1 = Math.max(k.mcDivMin, k.mcDiv - k.mcDivPerEdu * v.education);
     const coreYear = (pc: Piece) => (pc.coreEcoMonths ? 12 / pc.coreEcoMonths : 0);
     const pctTxt = `${nf(eco * 100, 0)}% / ${nf(mcS * 100, 0)}%`;
@@ -1062,7 +1076,10 @@ export default function YassPage() {
         note: y.splitPresetsNote },
       { kind: "input", key: "splitK", label: y.splitK, digits: 0,
         note: tooBig ? <span className="text-bad">{y.splitTooBig}</span> : undefined },
-      { kind: "input", key: "splitPieceCore", label: y.splitPieceCore, digits: 0 },
+      { kind: "input", key: "splitPieceCore", label: y.splitPieceCore, digits: 0,
+        note: kN * pieceCore > nation.coreEcoRegions
+          ? <span className="text-warn">{y.splitCoreTooMany.replace("{n}", String(nation.coreEcoRegions))}</span>
+          : y.splitCoreNote.replace("{rest}", String(restCore)) },
       { kind: "input", key: "splitEco", label: y.splitEco, digits: 0 },
       { kind: "input", key: "splitMc", label: y.splitMc, digits: 0 },
       { kind: "input", key: "pcgdp", label: y.pcgdp, digits: 0 },
@@ -1082,6 +1099,9 @@ export default function YassPage() {
         formula: `= ${f(one.ip)} × ${nf(mcS * 100, 0)}% / ${f(base.mcCost, 0)}` },
       { kind: "out", id: "pPc", label: y.ePcgdp, value: nf(one.pcgdpMonth, 0),
         formula: `= ${f(one.ecoComp)} ${y.ecoPerMonth} × ${nf(one.ecoComp ? one.pcgdpMonth / one.ecoComp : 0, 1)} $` },
+      { kind: "out", id: "pK", label: y.pK, value: nf(kOf(pieceCore, 0), 1),
+        note: y.pKNote.replace("{whole}", nf(kOf(nation.coreEcoRegions, nation.resourceRegions), 1)),
+        formula: y.pKF },
       { kind: "out", id: "pCapMonth", label: y.pCapMonth, value: nf(one.capMonth, 2), main: true,
         tone: one.capMonth < one.mcMonth ? "warn" : undefined,
         note: one.capMonth < one.mcMonth ? <span className="text-warn">{y.pCapShort}</span> : undefined,
@@ -1093,20 +1113,23 @@ export default function YassPage() {
           : `= ${nf(k.ecosForCoreEco, 0)} / ${f(one.ecoComp)}` },
     );
 
+    // pro capite dell'insieme: il PIL in piu' di tutti sulla popolazione di tutti
     const sum = (a: Piece, b: Piece, n: number) => ({
       ip: a.ip + n * b.ip, cp: a.cp + n * b.cp, mc: a.mcMonth + n * b.mcMonth, cap: a.capMonth + n * b.capMonth,
       core: coreYear(a) + n * coreYear(b),
+      pc: (a.gdpMonth + n * b.gdpMonth) / Math.max(1, (a.population + n * b.population) * 1e6),
     });
     const tot = sum(rest, one, kN);
-    const vals = (g: number, pc: { ip: number; cp: number; mc: number; cap: number; core: number }): CmpRow["values"] => ({
-      gdp: g / 1e9, ip: pc.ip, cp: pc.cp, eff: pc.cp ? pc.ip / pc.cp : null, mc: pc.mc, cap: pc.cap, core: pc.core,
+    const vals = (g: number, pc: { ip: number; cp: number; mc: number; cap: number; core: number; pc: number }): CmpRow["values"] => ({
+      gdp: g / 1e9, ip: pc.ip, cp: pc.cp, eff: pc.cp ? pc.ip / pc.cp : null, pc: pc.pc, mc: pc.mc, cap: pc.cap, core: pc.core,
     });
-    const ofPiece = (pc: Piece) => ({ ip: pc.ip, cp: pc.cp, mc: pc.mcMonth, cap: pc.capMonth, core: coreYear(pc) });
+    const ofPiece = (pc: Piece) => ({ ip: pc.ip, cp: pc.cp, mc: pc.mcMonth, cap: pc.capMonth, core: coreYear(pc), pc: pc.pcgdpMonth });
     const fxPiece = (name: string, g: number, pc: Piece, cores: number): CmpRow["formulas"] => ({
       gdp: `${name}: ${nf(g / 1e9, 0)} mld.`,
       ip: `${name}: (${nf(g / 1e9, 0)} mld)^${f(k.ipGdpExp)} = ${f(pc.ip)}. ${y.cmpNoBonus}`,
       cp: `${name}: (${nf(g, 0)} / ${nf(k.cpGdpScale, 0)})^${f(k.cpCostScaling, 1)} / ${f(k.cpCostDivisor, 0)} = ${f(pc.cp)}.`,
       eff: `${name}: ${f(pc.ip)} / ${f(pc.cp)}.`,
+      pc: `${name}: ${f(pc.ecoComp)} ${y.ecoPerMonth} × ${nf(pc.ecoComp ? pc.pcgdpMonth / pc.ecoComp : 0, 1)} $ = ${nf(pc.pcgdpMonth, 0)} $. ${y.cmpPcNote.replace("{k}", nf(kOf(cores, pc === one ? 0 : nation.resourceRegions), 1)).replace("{n}", String(cores))}`,
       mc: `${name}: ${f(pc.ip)} IP × ${nf(mcS * 100, 0)}% / ${f(base.mcCost, 0)} = ${f(pc.mcMonth)} ${y.cmpMcIfRoom}`,
       cap: `${name}: ${f(pc.ecoComp)} ${y.ecoPerMonth} × ${nf(pc.ecoComp ? pc.pcgdpMonth / pc.ecoComp : 0, 1)} $ × ${f(pc.population, 1)} mln / ${nf(div1, 0)} mld = ${f(pc.capMonth)}.`,
       core: pc.coreEcoMonths == null ? `${name}: ${y.pCoreRule.replace("{min}", nf(k.coreEcoMinGdp, 0))}`
@@ -1117,10 +1140,12 @@ export default function YassPage() {
     splitTable = (
       <CompareTable selected={projSel} onSelect={(s) => { setSelected(null); setProjSel(s); }} rows={[
         { label: y.cmpWhole, main: true, values: w, formulas: fxPiece(y.cmpWhole, gdp, whole, nation.coreEcoRegions) },
-        { label: y.cmpRest, values: vals(restGdp, ofPiece(rest)), formulas: fxPiece(y.cmpRest, restGdp, rest, nation.coreEcoRegions) },
-        { label: y.cmpOne, values: vals(pieceGdp, ofPiece(one)), formulas: fxPiece(y.cmpOne, pieceGdp, one, Math.round(v.splitPieceCore)) },
+        { label: y.cmpRest, values: vals(restGdp, ofPiece(rest)), formulas: fxPiece(y.cmpRest, restGdp, rest, restCore) },
+        { label: y.cmpOne, values: vals(pieceGdp, ofPiece(one)), formulas: fxPiece(y.cmpOne, pieceGdp, one, pieceCore) },
         { label: y.cmpSplit.replace("{k}", String(kN)), main: true, values: d,
-          formulas: Object.fromEntries(CMP_COLS.map((c) => [c.key, c.key === "eff" ? `= ${f(tot.ip)} / ${f(tot.cp)}` : c.key === "gdp" ? `= ${nf(restGdp / 1e9, 0)} + ${kN} × ${nf(v.splitPiece, 0)}` : sumFx(c.key)])) as CmpRow["formulas"] },
+          formulas: Object.fromEntries(CMP_COLS.map((c) => [c.key, c.key === "eff" ? `= ${f(tot.ip)} / ${f(tot.cp)}`
+            : c.key === "gdp" ? `= ${nf(restGdp / 1e9, 0)} + ${kN} × ${nf(v.splitPiece, 0)}`
+            : c.key === "pc" ? y.cmpPcSum.replace("{v}", nf(tot.pc, 0)) : sumFx(c.key)])) as CmpRow["formulas"] },
         { label: y.cmpDelta, delta: true,
           values: Object.fromEntries(CMP_COLS.map((c) => [c.key, d[c.key] != null && w[c.key] != null ? d[c.key]! - w[c.key]! : null])) as CmpRow["values"],
           formulas: Object.fromEntries(CMP_COLS.map((c) => [c.key, `= ${f(d[c.key] ?? 0)} − ${f(w[c.key] ?? 0)}   ${y.cmpDeltaNote.replace("{p}", pctTxt)}`])) as CmpRow["formulas"] },
@@ -1140,7 +1165,7 @@ export default function YassPage() {
     const states = projectNation(k, k.effects, {
       start: { cohesion: v.cohesion, pcgdp: v.pcgdp, inequality: v.inequality, democracy: v.democracy, education: v.education },
       rest: v.cohesionRest, scaling, hostileShare: v.hostileShare / 100, armyOther: v.armyOther,
-      resourceRegions: nation.resourceRegions, coreEcoRegions: nation.coreEcoRegions,
+      resourceRegions: nation.resourceRegions, coreEcoRegions: nation.coreEcoRegions, ecoMult: nation.ecoMult,
       completions: Object.fromEntries(Object.keys(per).map((id) => [id, compOf(id)])),
       // il riposo segue disuguaglianza, istruzione, democrazia e PIL del mese;
       // se l'hai fissato con la matita resta fermo
@@ -1149,6 +1174,7 @@ export default function YassPage() {
         : undefined,
       growth: {
         g: k, population: v.population, ip0: v.nationIP, regions: nation.regions,
+        canOil: nation.canOil, canMine: nation.canMine,
         advise0: nation.advise, advise: Math.max(0, v.advise) / 100,
         mcIP: results.find((r) => r.id === "MissionControl")?.ip ?? 0,
         mcCost: k.priorityCost.MissionControl ?? 25,
@@ -1169,7 +1195,10 @@ export default function YassPage() {
       { kind: "input", key: "nationIP", label: y.nationIP, digits: 1 },
       { kind: "input", key: "knowledgeIP", label: y.knowledgeIP, digits: 2 },
       { kind: "input", key: "advise", label: y.advise, digits: 0,
-        note: nation.advisers.length ? y.adviseBy.replace("{who}", nation.advisers.join(", ")) : y.adviseNone },
+        note: nation.advisersNext.join() !== nation.advisers.join()
+          ? <span className="text-warn">{y.advisePending.replace("{who}", nation.advisersNext.join(", ") || y.nobody)
+              .replace("{now}", nf(nation.advise * 100, 0))}</span>
+          : nation.advisers.length ? y.adviseBy.replace("{who}", nation.advisers.join(", ")) : y.adviseNone },
     ];
     projection = (
       <ProjectionTable states={states} years={PROJ_YEARS} panelSig={results.map((r) => r.ip.toFixed(3)).join("|")}
