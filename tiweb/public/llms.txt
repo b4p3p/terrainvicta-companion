@@ -30,7 +30,7 @@ Demo without the game, in any browser (a real campaign of the author's, the Resi
 ## Facts
 
 - Not a cheat: real councilor loyalty, intel the player hasn't gathered and rival missions during the mission phase stay hidden. Computed scores are labelled as such, with raw values shown.
-- Saves are never uploaded; no account, no tracking scripts.
+- Saves are never uploaded; no account, no tracking scripts; only an anonymous daily counter with no identifier.
 - Never writes to save files.
 - Reading your own saves needs Chrome or Edge (File System Access API); the demo works in any browser.
 - Free, no ads, optional donations. Fan project, not affiliated with Pavonis Interactive or Hooded Horse.

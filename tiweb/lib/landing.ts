@@ -60,7 +60,7 @@ const en: Landing = {
     },
     {
       q: "Are my saves uploaded anywhere?",
-      a: "No. The companion runs entirely in your browser and reads the saves from the folder you choose. No account, no tracking scripts. History and notes stay in the browser; you can export them.",
+      a: "No. The companion runs entirely in your browser and reads the saves from the folder you choose. No account, no tracking scripts: only an anonymous daily counter with no identifier. History and notes stay in the browser; you can export them.",
     },
     {
       q: "Does it change my game or my saves?",
@@ -114,7 +114,7 @@ const it: Landing = {
     },
     {
       q: "I miei salvataggi vengono caricati da qualche parte?",
-      a: "No. Il companion gira tutto nel tuo browser e legge i salvataggi dalla cartella che scegli. Niente account, niente script di tracciamento. Storico e note restano nel browser; puoi esportarli.",
+      a: "No. Il companion gira tutto nel tuo browser e legge i salvataggi dalla cartella che scegli. Niente account, niente script di tracciamento: solo un contatore giornaliero anonimo, senza identificativi. Storico e note restano nel browser; puoi esportarli.",
     },
     {
       q: "Modifica il gioco o i salvataggi?",

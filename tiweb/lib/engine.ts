@@ -11,6 +11,7 @@
    Chrome/Edge); il riferimento resta in IndexedDB, il permesso va richiesto
    con un clic. I dati del gioco arrivano dall'estratto in /gamedata. */
 
+import { count } from "./count";
 import { currentDict, gameLangFromBrowser } from "./i18n";
 
 export type EngineMode = "browser" | "server";
@@ -273,6 +274,8 @@ class Engine {
     const i = BOOT_STEPS.indexOf(detail as BootStep);
     if (i >= 0) done = Math.max(done, i);
     if (state === "ready") done = BOOT_STEPS.length;
+    // la prima partita letta in questa pagina: chi usa davvero il companion
+    if (state === "ready" && !this.status.everReady) count(demoMode() ? "demo" : "use");
     this.status = { state, detail, done, folder: this.folder,
                     everReady: this.status.everReady || state === "ready" };
     this.statusSubs.forEach((f) => f(this.status));

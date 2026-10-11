@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { askNotificationPermission, useEngineStatus, useSnapshot } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
+import { count } from "@/lib/count";
 import { demoMode, engineMode, exitDemo, LOCKED_ENGINE, type EngineMode } from "@/lib/engine";
 import { EngineGate } from "@/components/EngineGate";
 import { EngineSplash } from "@/components/EngineSplash";
@@ -48,7 +49,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const mode = useSyncExternalStore<EngineMode | null>(noSubscribe, engineMode, () => null);
   const demo = useSyncExternalStore(noSubscribe, demoMode, () => false);
 
-  useEffect(() => { askNotificationPermission(); }, []);
+  useEffect(() => { askNotificationPermission(); count("visit"); }, []);
 
   const critical = live.alerts.filter((a) => a.severity === "critical").length;
   const warning = live.alerts.filter((a) => a.severity === "warning").length;
