@@ -38,6 +38,20 @@ python -m watchfiles --filter python --sigint-timeout 2 --sigkill-timeout 1 "pyt
 cd tiweb && npm run dev                            # interfaccia su :3000
 ```
 
+## Test
+
+```bash
+python -m pytest                 # regole e formule; -m "not slow" salta bundle --check
+cd tiweb && npm test             # formule di lib/yass.ts (node --test, niente dipendenze)
+```
+
+`tests/` gira sul salvataggio di `fixtures/saves/`; altri con `TI_TEST_SAVES`
+(glob separati da `;`), per esempio quelli che mandano gli utenti, che restano
+fuori dal repo. I test che leggono i template si saltano senza il gioco.
+Un bug corretto si fissa con un test che lo riproduce: il caso Cina di
+`test_yass_rules.py` è costruito a mano proprio perché sui totali dei pallini
+la regola sbagliata dava la stessa somma.
+
 ## Architettura
 
 ```
