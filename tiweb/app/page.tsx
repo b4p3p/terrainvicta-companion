@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useSnapshot } from "@/lib/api";
 import { ResearchPanel } from "@/components/ResearchPanel";
 import { useSettings } from "@/lib/settings";
@@ -25,6 +26,91 @@ function Flow({ snap, k, v, bold }: {
       <span className="text-dim">{r?.name ?? k}</span>
       {v > 0 ? "+" : ""}{nf(v)}
     </span>
+  );
+}
+
+// a fine partita i siti sono un centinaio: in colonna allungavano la pagina
+// di metri. Contano gli ultimi, a cui non hai ancora reagito; gli altri a
+// richiesta, su piu' colonne
+const RECENT_SITES = 6;
+
+type SiteSort = "date" | "name" | "nation";
+type Site = Snapshot["alienSites"][number];
+
+function SiteRow({ s, snap, game, label }: { s: Site; snap: Snapshot; game: string; label: string }) {
+  return (
+    <div className="flex justify-between items-baseline gap-3">
+      <span>{label}</span>
+      <span className="flex items-baseline gap-2">
+        <span className="text-faint text-[11.5px]">
+          {gameAgo(s.sinceKey, snap.dateKey, GAME_LOCALES[game] ?? "en")}
+        </span>
+        <Tag tone="warn">{s.since}</Tag>
+      </span>
+    </div>
+  );
+}
+
+function AlienSites({ snap }: { snap: Snapshot }) {
+  const { t, game } = useSettings();
+  const [all, setAll] = useState(false);
+  const [sort, setSort] = useState<SiteSort>("date");
+  const loc = GAME_LOCALES[game] ?? "en";
+  const more = snap.alienSites.length > RECENT_SITES;
+  // dal backend arrivano gia' dal piu' recente
+  const sorted = sort === "name"
+    ? [...snap.alienSites].sort((a, b) => a.region.localeCompare(b.region, loc))
+    : snap.alienSites;
+  const sites = all ? sorted : sorted.slice(0, RECENT_SITES);
+  // per nazione: prima chi ne ha di piu', dentro ogni gruppo dal piu' recente
+  const groups = new Map<string, Site[]>();
+  if (sort === "nation") {
+    for (const s of snap.alienSites) {
+      const k = s.nation ?? "?";
+      groups.set(k, [...(groups.get(k) ?? []), s]);
+    }
+  }
+  const byNation = [...groups.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], loc));
+  const grid = "grid gap-x-6 gap-y-1.5 grid-cols-[repeat(auto-fill,minmax(260px,1fr))]";
+  return (
+    <Panel title={t.overview.alienSites}>
+      {more && (
+        <div className="flex gap-1 mb-2 text-[12px]">
+          {(["date", "name", "nation"] as SiteSort[]).map((k) => (
+            <button key={k} type="button"
+              onClick={() => { setSort(k); if (k !== "date") setAll(true); }}
+              className={`px-2 py-0.5 border cursor-pointer ${sort === k
+                ? "border-accent text-accent" : "border-edge text-dim hover:text-ink"}`}>
+              {t.overview.alienSitesSort[k]}
+            </button>
+          ))}
+        </div>
+      )}
+      {sort === "nation" ? (
+        <div className={`text-[12.5px] ${grid}`}>
+          {byNation.map(([nation, list]) => (
+            <div key={nation} className="flex flex-col gap-1">
+              <div className="flex justify-between items-baseline border-b border-edge pb-0.5 font-semibold">
+                <span>{nation}</span><span className="text-faint">{list.length}</span>
+              </div>
+              {list.map((s) => (
+                <SiteRow key={s.region} s={s} snap={snap} game={game} label={s.regionName ?? s.region} />
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className={`text-[12.5px] ${all ? grid : "flex flex-col gap-1.5"}`}>
+          {sites.map((s) => <SiteRow key={s.region} s={s} snap={snap} game={game} label={s.region} />)}
+        </div>
+      )}
+      {more && (
+        <button type="button" onClick={() => { setAll(!all); if (all) setSort("date"); }}
+          className="mt-2 text-[12px] text-accent hover:underline cursor-pointer">
+          {all ? t.overview.alienSitesRecent : t.overview.alienSitesAll.replace("{n}", String(snap.alienSites.length))}
+        </button>
+      )}
+    </Panel>
   );
 }
 
@@ -144,23 +230,7 @@ export default function Overview() {
             )}
           </Panel>
 
-          {snap.alienSites.length > 0 && (
-            <Panel title={t.overview.alienSites}>
-              <div className="flex flex-col gap-1.5 text-[12.5px]">
-                {snap.alienSites.map((s) => (
-                  <div key={s.region} className="flex justify-between items-baseline gap-3">
-                    <span>{s.region}</span>
-                    <span className="flex items-baseline gap-2">
-                      <span className="text-faint text-[11.5px]">
-                        {gameAgo(s.sinceKey, snap.dateKey, GAME_LOCALES[game] ?? "en")}
-                      </span>
-                      <Tag tone="warn">{s.since}</Tag>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </Panel>
-          )}
+          {snap.alienSites.length > 0 && <AlienSites snap={snap} />}
         </div>
 
         {/* la corsa alla ricerca e' la card piu' alta: da sola a destra, cosi'

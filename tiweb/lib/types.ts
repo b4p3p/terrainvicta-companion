@@ -239,7 +239,7 @@ export interface Snapshot {
   orgMarket: Org[];
   projects: { rate: number; items: Project[] };
   /** since: GG/MM/AAAA come il gioco; sinceKey: AAAA-MM-GG, per i conti */
-  alienSites: { region: string; since: string; sinceKey: string }[];
+  alienSites: { region: string; regionName?: string | null; nation?: string | null; since: string; sinceKey: string }[];
   cpCapOverage: boolean;
 }
 

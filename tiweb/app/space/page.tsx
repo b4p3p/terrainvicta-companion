@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo, useState } from "react";
+
 import { useApi } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { Empty, Panel, ResourceIcon, Stat, Tag, nf } from "@/components/ui";
@@ -142,6 +144,154 @@ function ModuleList({ mods }: { mods: HabModule[] }) {
         </span>
       ))}
     </span>
+  );
+}
+
+type HabSort = "faction" | "name" | "where" | "tier" | "status" | "modules";
+const HAB_ASC_FIRST: HabSort[] = ["faction", "name", "where"];
+
+/** Intestazione ordinabile: un clic ordina, il secondo inverte. */
+function HabTh({ k, sort, asc, onSort, right, last, children }: {
+  k: HabSort; sort: HabSort; asc: boolean; onSort: (k: HabSort) => void;
+  right?: boolean; last?: boolean; children: React.ReactNode;
+}) {
+  const active = k === sort;
+  return (
+    <th className={`font-normal pb-1.5 ${last ? "" : "pr-3"} ${right ? "text-right" : ""}`}
+      aria-sort={active ? (asc ? "ascending" : "descending") : undefined}>
+      <button type="button" onClick={() => onSort(k)}
+        className={`whitespace-nowrap hover:text-ink ${active ? "text-accent" : ""}`}>
+        {children}{active ? (asc ? " ▲" : " ▼") : ""}
+      </button>
+    </th>
+  );
+}
+
+/** Valori distinti coi conteggi, dal piu' numeroso. */
+function counted(habs: Hab[], key: (h: Hab) => string): [string, number][] {
+  const m = new Map<string, number>();
+  for (const h of habs) m.set(key(h), (m.get(key(h)) ?? 0) + 1);
+  return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+const bodyOf = (h: Hab) => h.location?.body.name ?? "—";
+
+// a fine partita gli habitat visibili sono centinaia: filtri e ordinamento
+// come nella tabella dei siti di Estrazione
+function Habs({ habs }: { habs: Hab[] }) {
+  const { t } = useSettings();
+  const s = t.space;
+  const [q, setQ] = useState("");
+  const [faction, setFaction] = useState("");
+  const [type, setType] = useState("");
+  const [body, setBody] = useState("");
+  const [status, setStatus] = useState("");
+  const [sort, setSort] = useState<HabSort>("faction");
+  const [asc, setAsc] = useState(true);
+  const sortBy = (k: HabSort) => {
+    if (k === sort) setAsc(!asc);
+    else { setSort(k); setAsc(HAB_ASC_FIRST.includes(k)); }
+  };
+
+  const factions = useMemo(() => counted(habs, (h) => h.faction.name), [habs]);
+  const bodies = useMemo(() => counted(habs, bodyOf), [habs]);
+
+  const rows = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    const xs = habs.filter((h) =>
+      (!faction || h.faction.name === faction)
+      && (!type || h.type === type)
+      && (!body || bodyOf(h) === body)
+      && (!status || (status === "done") === h.coreDone)
+      && (!needle || [h.name, h.faction.name, h.location?.name, h.location?.body.name]
+        .some((x) => x?.toLowerCase().includes(needle))));
+    // i miei in testa quando si ordina per fazione
+    const key = (h: Hab): string | number => {
+      switch (sort) {
+        case "faction": return (h.mine ? "0" : "1") + h.faction.name + " " + h.name;
+        case "name": return h.name;
+        case "where": return bodyOf(h) + " " + (h.location?.name ?? "");
+        case "tier": return h.tier;
+        case "status": return h.coreDone ? 1 : 0;
+        case "modules": return h.modules.length;
+      }
+    };
+    return xs.sort((a, b) => {
+      const va = key(a), vb = key(b);
+      const c = typeof va === "number" && typeof vb === "number"
+        ? va - vb : String(va).localeCompare(String(vb));
+      return asc ? c : -c;
+    });
+  }, [habs, q, faction, type, body, status, sort, asc]);
+  const th = { sort, asc, onSort: sortBy };
+
+  return (
+    <Panel title={s.habsTitle} className="mt-4">
+      <div className="flex gap-2.5 flex-wrap items-center mb-3 text-[12.5px]">
+        <input type="search" placeholder={s.habsFilter} value={q}
+          onChange={(e) => setQ(e.target.value)} className="min-w-[220px]" />
+        <select value={faction} onChange={(e) => setFaction(e.target.value)}>
+          <option value="">{s.allFactions}</option>
+          {factions.map(([f, n]) => <option key={f} value={f}>{f} ({n})</option>)}
+        </select>
+        <select value={type} onChange={(e) => setType(e.target.value)}>
+          <option value="">{s.allTypes}</option>
+          <option value="Station">{s.station}</option>
+          <option value="Base">{s.base}</option>
+        </select>
+        <select value={body} onChange={(e) => setBody(e.target.value)}>
+          <option value="">{s.allBodies}</option>
+          {bodies.map(([b, n]) => <option key={b} value={b}>{b} ({n})</option>)}
+        </select>
+        <select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">{s.allStatus}</option>
+          <option value="done">{s.operational}</option>
+          <option value="building">{s.building}</option>
+        </select>
+        <span className="text-faint">
+          {s.habsShown.replace("{n}", String(rows.length)).replace("{tot}", String(habs.length))}
+        </span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="text-[12px] w-full border-collapse">
+          <thead>
+            <tr className="text-left text-faint">
+              <HabTh k="faction" {...th}>{s.faction}</HabTh>
+              <HabTh k="name" {...th}>{s.habitat}</HabTh>
+              <HabTh k="where" {...th}>{s.where}</HabTh>
+              <HabTh k="tier" right {...th}>{s.tier}</HabTh>
+              <HabTh k="status" {...th}>{s.status}</HabTh>
+              <HabTh k="modules" last {...th}>{s.modules}</HabTh>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((h) => (
+              <tr key={h.id} className={`border-t border-edge align-top ${h.mine ? "bg-sel/40" : ""}`}>
+                <td className="py-1.5 pr-3"><FactionName f={h.faction} mine={h.mine} /></td>
+                <td className="py-1.5 pr-3 whitespace-nowrap">
+                  <div>{h.name}</div>
+                  <div className="text-faint text-[11px]">{h.type === "Station" ? s.station : s.base}</div>
+                </td>
+                <td className="py-1.5 pr-3">
+                  {h.location ? (
+                    <>
+                      <div>{h.location.name}</div>
+                      <div className="text-faint text-[11px]">{h.location.body.name}</div>
+                    </>
+                  ) : <span className="text-faint">—</span>}
+                </td>
+                <td className="py-1.5 pr-3 text-right">{h.tier}</td>
+                <td className="py-1.5 pr-3 whitespace-nowrap">
+                  {h.coreDone ? <span className="text-dim">{s.operational}</span>
+                    : <span className="text-warn">{s.building}</span>}
+                </td>
+                <td className="py-1.5"><ModuleList mods={h.modules} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
   );
 }
 
@@ -295,44 +445,7 @@ export default function SpacePage() {
         </Panel>
       </div>
 
-      <Panel title={s.habsTitle} className="mt-4">
-        <div className="overflow-x-auto">
-          <table className="text-[12px] w-full border-collapse">
-            <thead>
-              <tr className="text-left text-faint">
-                <th className="font-normal pb-1.5 pr-3">{s.faction}</th>
-                <th className="font-normal pb-1.5 pr-3">{s.habitat}</th>
-                <th className="font-normal pb-1.5 pr-3">{s.where}</th>
-                <th className="font-normal pb-1.5 pr-3 text-right">{s.tier}</th>
-                <th className="font-normal pb-1.5 pr-3">{s.status}</th>
-                <th className="font-normal pb-1.5">{s.modules}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.habs.map((h) => (
-                <tr key={h.id} className={`border-t border-edge align-top ${h.mine ? "bg-sel/40" : ""}`}>
-                  <td className="py-1.5 pr-3"><FactionName f={h.faction} mine={h.mine} /></td>
-                  <td className="py-1.5 pr-3 whitespace-nowrap">{h.name}</td>
-                  <td className="py-1.5 pr-3">
-                    {h.location ? (
-                      <>
-                        <div>{h.location.name}</div>
-                        <div className="text-faint text-[11px]">{h.location.body.name}</div>
-                      </>
-                    ) : <span className="text-faint">—</span>}
-                  </td>
-                  <td className="py-1.5 pr-3 text-right">{h.tier}</td>
-                  <td className="py-1.5 pr-3 whitespace-nowrap">
-                    {h.coreDone ? <span className="text-dim">{s.operational}</span>
-                      : <span className="text-warn">{s.building}</span>}
-                  </td>
-                  <td className="py-1.5"><ModuleList mods={h.modules} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
+      <Habs habs={data.habs} />
     </>
   );
 }

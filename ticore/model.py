@@ -672,9 +672,12 @@ def alien_sites(g, lang="ita"):
     for e in (g.me.get("knownAlienSites") or []):
         rid = (e.get("Key") or {}).get("value")
         d = e.get("Value") or {}
+        r = g.regions.get(rid) or {}
         out.append({
             "regionId": rid,
             "region": nm.region_label(rid),
+            "regionName": nm.region(r) if r else None,
+            "nation": nm.nation(g.ref(r, "nation", g.nations)) if r else None,
             "since": "%02d/%02d/%04d" % (d.get("day", 0), d.get("month", 0), d.get("year", 0)),
             "sinceKey": "%04d-%02d-%02d" % (d.get("year", 0), d.get("month", 0), d.get("day", 0)),
         })
