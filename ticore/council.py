@@ -14,6 +14,8 @@ from .names import Namer, nation_id
 ATTRS = ["Persuasion", "Investigation", "Espionage", "Command",
          "Administration", "Science", "Security"]
 
+# TIGlobalConfig.maxCouncilorAttribute: il tetto di GetAttribute «capped»
+MAX_ATTRIBUTE = 25
 # sigle degli attributi: italiane (quelle storiche, anche della CLI) e inglesi
 ATTR_SHORT = {
     "Persuasion": "PER", "Investigation": "IND", "Espionage": "SPI",
@@ -176,6 +178,9 @@ def councilor_view(g, c, lang="ita", known=True):
     # zero. Le modifiche con una condizione restano fuori: dipendono da dove si
     # trova o cosa fa il consigliere, e non le sappiamo valutare.
     effective = {a: attrs.get(a, 0) for a in ATTRS}
+    # tetto (maxCouncilorAttribute, 25): ogni malus di un tratto lo abbassa.
+    # Lo usa chi chiede l'attributo «capped», per esempio Consiglia
+    caps = {a: MAX_ATTRIBUTE for a in ATTRS}
     for tn in traits:
         for m in (gamedata.templates()["traits"].get(tn) or {}).get("statMods") or []:
             a, op = m.get("stat"), m.get("operation")
@@ -188,6 +193,8 @@ def councilor_view(g, c, lang="ita", known=True):
             v = int(v) if v.is_integer() else v
             if op == "Additive":
                 effective[a] += v
+                if v < 0:
+                    caps[a] += v
             elif op == "SetToFixedValue":
                 effective[a] = v
     for o in orgs:
@@ -211,6 +218,7 @@ def councilor_view(g, c, lang="ita", known=True):
         "declineAt": AGE_DECLINE_AT,
         "base": {a: attrs.get(a, 0) for a in ATTRS},
         "attributes": effective,
+        "attributeCaps": caps,
         "traits": [{"id": t, "name": gamedata.trait_name(lang, t),
                     "description": gamedata.trait_description(lang, t),
                     "effects": gamedata.trait_effects(lang, t)} for t in traits],

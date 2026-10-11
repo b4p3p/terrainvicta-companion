@@ -98,3 +98,26 @@ def test_not_mine_control_point_is_empty():
     _, cps = yass.priority_panel(g, n, "en", {}, best_sust=0.28250000000000003)
     assert [c["mine"] for c in cps].count(False) == 1
     assert next(c for c in cps if not c["mine"])["priorities"] == {}
+
+
+def test_advise_uses_capped_administration(monkeypatch):
+    """vindicator117: Mudgett ha 48 di Amministrazione ma Consiglia rende +25%,
+    due consiglieri ~38%. AdvisingBonus chiede l'attributo «capped» (25)."""
+    from ticore import council
+    admin = {1: 48, 2: 31}
+    monkeypatch.setattr(council, "councilor_view", lambda g, c: {
+        "attributes": {"Administration": admin[c["id"]]}, "attributeCaps": {"Administration": 25}})
+
+    class G:
+        me = {"councilors": [{"value": 1}, {"value": 2}]}
+        councilors = {1: {"id": 1, "displayName": "Mudgett"}, 2: {"id": 2, "displayName": "Grant"}}
+
+        def state(self, name):
+            return {}
+
+        def my_councilors(self):
+            return list(self.councilors.values())
+
+    n = {"ID": {"value": 5}, "advisingCouncilors": [{"value": 1}, {"value": 2}]}
+    bonus, who, _, _ = yass.advise_bonus(G(), n)
+    assert abs(bonus - 0.375) < 1e-9

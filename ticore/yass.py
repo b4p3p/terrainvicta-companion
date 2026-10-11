@@ -170,12 +170,17 @@ def _advise_score(adv):
 
 def advise_bonus(g, n):
     """Bonus agli IP dai NOSTRI consiglieri che consigliano la nazione
-    (GetAdvisingScore con l'Amministrazione): dal piu' bravo, AMM / 100 /
-    posizione. Due letture: chi consiglia ora (`advisingCouncilors`, gia'
+    (GetAdvisingScore con l'Amministrazione, al piu' 25): dal piu' bravo,
+    AMM / 100 / posizione. Due letture: chi consiglia ora (`advisingCouncilors`, gia'
     dentro gli IP del salvataggio) e chi ha Consiglia assegnata come missione
     attiva, che entra in vigore alla risoluzione: un salvataggio fatto in fase
     missioni ha la prima lista vuota. Anche i nomi, per la nota della cella."""
     from .council import councilor_view
+
+    def admin(c):
+        # AdvisingBonus chiede l'attributo «capped»: al piu' 25, meno i malus dei tratti
+        v = councilor_view(g, c)
+        return max(0, min(v["attributes"]["Administration"], v["attributeCaps"]["Administration"]))
     mine = {c["value"] for c in (g.me.get("councilors") or [])}
     nid = (n.get("ID") or {}).get("value")
     missions = g.state("TIMissionState")
@@ -183,11 +188,11 @@ def advise_bonus(g, n):
     for ref in n.get("advisingCouncilors") or []:
         c = g.councilors.get(ref["value"])
         if c and ref["value"] in mine and c.get("active") is not False:
-            now.append((councilor_view(g, c)["attributes"]["Administration"], c.get("displayName")))
+            now.append((admin(c), c.get("displayName")))
     for c in g.my_councilors():
         m = missions.get((c.get("activeMission") or {}).get("value")) or {}
         if m.get("templateName") == "Advise" and (m.get("target") or {}).get("value") == nid:
-            assigned.append((councilor_view(g, c)["attributes"]["Administration"], c.get("displayName")))
+            assigned.append((admin(c), c.get("displayName")))
     b_now, who_now = _advise_score(now)
     b_next, who_next = _advise_score(assigned) if assigned else (b_now, who_now)
     return b_now, who_now, b_next, who_next
