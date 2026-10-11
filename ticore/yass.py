@@ -102,6 +102,11 @@ EFFECTS = {
     "uniCoh": 0.1,               # unityBaseCohesionChange
     "uniCohMin": 0.025,          # unityMinCohesionChange
     "uniEdu": -0.001,            # unityPriorityEducationChange
+    # TINationState.get_militaryPriorityTechLevelChange: per completamento
+    # militaryPriorityMiltechIncrease x miglior miltech umano / max(1, miltech),
+    # poi AddToMilitaryTechLevel lo tiene fra minMilitaryTechLevel e il tetto
+    "milTech": 0.00125,          # militaryPriorityMiltechIncrease
+    "milTechMin": 2.0,           # minMilitaryTechLevel
 }
 # Crescita (TINationState.ModifyGDP, SetBaseInvestmentPoints_month;
 # TIRegionState.get_maxMissionControl, NationalGDPProportion): gli IP seguono
@@ -509,11 +514,14 @@ def priority_panel(g, n, lang, fbonus, best_sust=None):
     for i, ref in enumerate(n.get("controlPoints") or []):
         cp = g.cps.get(ref["value"]) or {}
         if g.factions.get((cp.get("faction") or {}).get("value")) is not g.me:
+            # i pallini altrui il gioco non li mostra: il punto c'e', vuoto, per
+            # provare «e se fosse mio»
+            cps.append({"index": i, "priorities": {}, "total": 0, "disabled": False, "mine": False})
             continue
         cps.append({"index": i, "priorities": {k: v for k, v in (cp.get("controlPointPriorities") or {}).items()},
                     "total": cp.get("totalWeightsForControlPoint") or 0,
-                    "disabled": bool(cp.get("benefitsDisabled"))})
-    valid = _fit_validity(valid_priorities(n, best_sust, mc_room(g, n)), cps)
+                    "disabled": bool(cp.get("benefitsDisabled")), "mine": True})
+    valid = _fit_validity(valid_priorities(n, best_sust, mc_room(g, n)), [c for c in cps if c["mine"]])
     national = {"Economy": (n.get("restofFederationECOBonus_dailyCache") or 0) * FEDERATION_ECO_BONUS,
                 "Military_BuildArmy": (n.get("numMiningRegions_dailyCache") or 0) * CORE_MINERAL_MILITARY,
                 "Military_BuildNavy": (n.get("numMiningRegions_dailyCache") or 0) * CORE_MINERAL_MILITARY}
@@ -632,6 +640,9 @@ def overview(g, lang="ita"):
             "ipOther": (n.get("baseInvestmentPoints_month") or 0) - base_ip(n.get("GDP") or 0, n.get("unrest") or 0),
             # bonus Consiglia dei nostri consiglieri, gia' dentro "ip"
             "advise": advise,
+            # senza esercito il Miltech non si muove: niente colonna
+            "miltech": (n.get("militaryTechLevel") or 0) if n.get("military") else None,
+            "maxMiltech": n.get("maxMilitaryTechLevel") or 0,
             "advisers": advisers,
             # Consiglia assegnata come missione: vale dalla risoluzione
             "adviseNext": advise_next,
@@ -669,6 +680,7 @@ def overview(g, lang="ita"):
             "knowledgeIP": KNOWLEDGE_IP / ip_mult,
             "diversity": DIVERSITY_BONUS,
             "effects": EFFECTS,
+            "bestMiltech": g.globals.get("bestGlobalHumanMiltech") or 0,
             "legitimize": PRIORITIES_FOR_LEGITIMIZE,
             "ineqCohesionMult": INEQ_COHESION_MULT,
             "severeInequality": SEVERE_INEQUALITY,
@@ -818,7 +830,7 @@ def check_economy(g, d, tolerance=0.1):
     for n in d["nations"]:
         tr = (g.nations.get(n["id"]) or {}).get("tracker_GDPChangeReason_CurrentTrackingPeriod") or {}
         gdp = tr.get("GDPReason_EconomyPriority") or 0
-        if gdp <= 0 or len(n["panelCPs"]) != n["controlPoints"] or not n["controlPoints"]:
+        if gdp <= 0 or sum(cp["mine"] for cp in n["panelCPs"]) != n["controlPoints"] or not n["controlPoints"]:
             continue
         # nata, annessa o divisa nel mese: il registro copre solo una parte del mese
         if n["advise"] or n["adviseNext"] or n["id"] in advised or tr.get("GDPReason_TerritoryChange"):

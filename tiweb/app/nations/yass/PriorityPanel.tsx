@@ -53,7 +53,8 @@ export function PriorityPanel({ rows, cps, pips, saved, results, controlPoints, 
   const { t } = useSettings();
   const y = t.yass;
   const res = Object.fromEntries(results.map((r) => [r.id, r]));
-  const others = controlPoints - cps.length;
+  const mineCount = cps.filter((cp) => cp.mine !== false).length;
+  const others = controlPoints - mineCount;
 
   const change = (cp: number, id: string, delta: number, wrap: boolean) => {
     const v = pips(cp, id) + delta;
@@ -117,7 +118,11 @@ export function PriorityPanel({ rows, cps, pips, saved, results, controlPoints, 
             <th className="text-left">{y.panelTitle}</th>
             {cps.map((cp) => (
               <th key={cp.index} className="yass-prio-cp">
-                <FactionLogo template={faction} size={22} />
+                {cp.mine === false
+                  ? <Tip title={y.panelNotMine} content={<PipText text={y.panelNotMineHint} />}>
+                      <span className="opacity-60"><ResourceIcon icon="ICO_ControlPoint_empty" size={20} /></span>
+                    </Tip>
+                  : <FactionLogo template={faction} size={22} />}
               </th>
             ))}
             <th><Tip title="/M" content={y.panelIPHint}><span className="inline-flex items-center gap-1"><ResourceIcon icon="ICO_investments" size={13} />/M</span></Tip></th>
@@ -148,7 +153,7 @@ export function PriorityPanel({ rows, cps, pips, saved, results, controlPoints, 
                 const v = pips(cp.index, r.id);
                 const changed = v !== saved(cp.index, r.id);
                 return (
-                  <td key={cp.index} className="yass-prio-cp">
+                  <td key={cp.index} className={`yass-prio-cp ${cp.mine === false ? "yass-prio-other" : ""}`}>
                     <button type="button" aria-label={`${r.name}: ${v}`} data-pip={r.id} data-cp={cp.index}
                       className={`yass-pip ${changed ? "yass-pip-changed" : ""}`}
                       onClick={(e) => step(cp.index, r.id, 1, e.shiftKey, true)}
@@ -171,7 +176,7 @@ export function PriorityPanel({ rows, cps, pips, saved, results, controlPoints, 
         {used.length ? y.panelUsed.replace("{sheet}", usedBy) : y.panelUsedNone.replace("{sheet}", usedBy)}
       </p>
       <p className="text-faint text-[11.5px] mt-1 mb-0">
-        <PipText text={y.panelHelp} />{others > 0 && <> <PipText text={y.panelOthers.replace("{n}", String(others))} /></>}
+        <PipText text={y.panelHelp} />{others > 0 && <> <PipText text={(mineCount ? y.panelOthers : y.panelNoneMine).replace("{n}", String(others))} /></>}
       </p>
     </div>
   );

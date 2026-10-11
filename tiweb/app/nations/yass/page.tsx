@@ -27,6 +27,8 @@ interface Nation {
   /** bonus Consiglia dei nostri consiglieri (0,25 = +25% IP) e i loro nomi:
       chi consiglia ora (gia' negli IP) e chi ha la missione assegnata */
   advise: number; advisers: string[]; adviseNext: number; advisersNext: string[];
+  /** Miltech (null senza esercito) e tetto della nazione */
+  miltech: number | null; maxMiltech: number;
   /** effetti sull'Economia: base, regioni di risorse, regioni economiche centrali */
   ecoMult: EcoMult;
   canOil: boolean; canMine: boolean;
@@ -38,7 +40,7 @@ interface Yass {
   nations: Nation[];
   constants: YassConstants & GrowthConstants & {
     diversity: Record<string, number>; effects: EffectConstants; priorityCost: Record<string, number>; legitimize: number;
-    ineqCohesionMult: number; severeInequality: number;
+    ineqCohesionMult: number; severeInequality: number; bestMiltech: number;
   };
   faction: string | null; campaign: string | null;
 }
@@ -439,7 +441,7 @@ function Grid({ rows, values, originals, edited, set, unset, selected, select, p
 
 const PROJ_YEARS = [0, 1, 2, 5, 10, 20];
 type StatKey = "cohesion" | "rest" | "unrest" | "pcgdp" | "inequality" | "democracy" | "education" | "gdp" | "ip" | "mc" | "mcCap"
-  | "core" | "resource";
+  | "core" | "resource" | "miltech";
 const PROJ_COLS: { key: StatKey; icon: string; digits: number; upIsGood: boolean; scale?: number }[] = [
   { key: "cohesion", icon: "ICO_Cohesion_mid", digits: 2, upIsGood: true },
   { key: "rest", icon: "ICO_Cohesion_mid", digits: 2, upIsGood: true },
@@ -455,6 +457,8 @@ const PROJ_COLS: { key: StatKey; icon: string; digits: number; upIsGood: boolean
   { key: "mcCap", icon: "ICO_mission_control", digits: 0, upIsGood: true },
   { key: "core", icon: "ICO_economy_priority", digits: 0, upIsGood: true },
   { key: "resource", icon: "ICO_economy_priority", digits: 0, upIsGood: true },
+  // solo chi ha un esercito
+  { key: "miltech", icon: "ICO_military_priority", digits: 2, upIsGood: true },
 ];
 
 /** La nazione fra 1, 2, 5… anni coi pallini di oggi: righe gli anni, colonne
@@ -710,7 +714,7 @@ export default function YassPage() {
     : { value: nf(Math.min(k.cohesionTarget, v.cohesionRest + kGain), 2),
         formula: `= ${f(v.cohesionRest)} + ${f(completions, 1)} × ${f(absStep, 5)}   ${y.stopsNote}` };
 
-  const pipsNote = nation.panelCPs.length
+  const pipsNote = nation.panelCPs.some((c) => c.mine !== false)
     ? <span className={pipsChanged ? "text-warn" : ""}>
         <PipText text={(pipsChanged ? y.fromPanelChanged : y.fromPanel).replace("{pct}", nf(v.nationIP ? (knowledgeNow / v.nationIP) * 100 : 0, 0))} />
       </span>
@@ -1156,17 +1160,30 @@ export default function YassPage() {
   let projection: ReactNode = null;
   if (sheet === "projection") {
     const at = PROJ_YEARS.map((yy) => yy * 12);
-    // a Controllo missioni pieno la sua priorita' non vale: i pallini si
-    // ricontano senza, e gli IP vanno alle altre priorita'
-    const full = panel(nation.priorities.filter((r) => r.id !== "MissionControl"), nation.panelCPs, effPips,
-      nationIPNow, nation.controlPoints, k.diversity);
-    const fullOf = (id: string) => (id === "Knowledge" && mine.knowledgeIP !== undefined ? v.knowledgeIP
-      : full.find((r) => r.id === id)?.ip ?? 0) / (k.priorityCost[id] ?? 1);
+    // le priorita' che la proiezione muove: gli effetti, il Controllo
+    // missioni (in punti) e il Miltech
+    const ids = [...Object.keys(per), "MissionControl", "Military"];
+    // a Controllo missioni pieno o Miltech al massimo la priorita' non vale: i
+    // pallini si ricontano senza, e gli IP vanno alle altre
+    const cache = new Map<string, Record<string, number>>();
+    const without = (invalid: string[]) => {
+      const key = invalid.join();
+      if (!cache.has(key)) {
+        const rs = panel(nation.priorities.filter((r) => !invalid.includes(r.id)), nation.panelCPs, effPips,
+          nationIPNow, nation.controlPoints, k.diversity);
+        cache.set(key, Object.fromEntries(ids.map((id) => [id, (id === "Knowledge" && mine.knowledgeIP !== undefined
+          ? v.knowledgeIP : rs.find((r) => r.id === id)?.ip ?? 0) / (k.priorityCost[id] ?? 1)])));
+      }
+      return cache.get(key)!;
+    };
     const states = projectNation(k, k.effects, {
       start: { cohesion: v.cohesion, pcgdp: v.pcgdp, inequality: v.inequality, democracy: v.democracy, education: v.education },
       rest: v.cohesionRest, scaling, hostileShare: v.hostileShare / 100, armyOther: v.armyOther,
       resourceRegions: nation.resourceRegions, coreEcoRegions: nation.coreEcoRegions, ecoMult: nation.ecoMult,
-      completions: Object.fromEntries(Object.keys(per).map((id) => [id, compOf(id)])),
+      completions: Object.fromEntries(ids.map((id) => [id, compOf(id)])),
+      without,
+      miltech: nation.miltech != null && nation.miltech > 0
+        ? { start: nation.miltech, max: nation.maxMiltech, best: Math.max(k.bestMiltech, nation.miltech) } : undefined,
       // il riposo segue disuguaglianza, istruzione, democrazia e PIL del mese;
       // se l'hai fissato con la matita resta fermo
       restOf: mine.cohesionRest === undefined
@@ -1176,9 +1193,6 @@ export default function YassPage() {
         g: k, population: v.population, ip0: v.nationIP, regions: nation.regions,
         canOil: nation.canOil, canMine: nation.canMine,
         advise0: nation.advise, advise: Math.max(0, v.advise) / 100,
-        mcIP: results.find((r) => r.id === "MissionControl")?.ip ?? 0,
-        mcCost: k.priorityCost.MissionControl ?? 25,
-        completionsFull: Object.fromEntries(Object.keys(per).map((id) => [id, fullOf(id)])),
       },
     }, at);
     rows = [

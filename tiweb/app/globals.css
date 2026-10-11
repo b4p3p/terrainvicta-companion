@@ -266,6 +266,8 @@ html:not([data-engine="browser"]) .ti-splash { display: none; }
 }
 .yass-prio td { padding: 2px 8px; height: 28px; text-align: right; border-top: 1px solid color-mix(in srgb, var(--edge) 55%, transparent); }
 .yass-prio .yass-prio-cp { text-align: center; padding: 2px 3px; width: 44px; }
+/* punti non miei: pallini ipotetici, su fondo tratteggiato */
+.yass-prio .yass-prio-other { background: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--edge) 35%, transparent) 4px 5px); }
 .yass-prio th:first-child, .yass-prio td:first-child { text-align: left; padding-left: 2px; }
 .yass-pip {
   display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 22px;

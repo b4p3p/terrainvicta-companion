@@ -80,7 +80,8 @@ export interface PriorityRow {
   factionBonus: number; nationalBonus: number;
   parts: { source: "org" | "trait" | "hab" | "effect"; name: string; who: string | null; bonus: number }[];
 }
-export interface PanelCP { index: number; priorities: Record<string, number>; total: number; disabled: boolean }
+/** `mine` falso: un punto altrui o libero, vuoto, per provare «e se fosse mio» */
+export interface PanelCP { index: number; priorities: Record<string, number>; total: number; disabled: boolean; mine?: boolean }
 export type Pips = Record<number, Record<string, number>>;   // punto -> priorita' -> pallini
 
 export interface RowResult { id: string; ip: number; bonus: number; share: number }
@@ -91,9 +92,11 @@ export function panel(rows: PriorityRow[], cps: PanelCP[], pips: Pips, nationIP:
   controlPoints: number, diversity: Record<string, number>): RowResult[] {
   const valid = rows.map((r) => r.id);
   const perCP = nationIP / Math.max(1, controlPoints);
+  // il bonus medio sui punti che contano: i miei e quelli provati coi pallini
+  const counted = cps.filter((cp) => cp.mine !== false || valid.some((k) => (pips[cp.index] ?? cp.priorities)[k]));
   return rows.map((r) => {
     let ip = 0, bonus = 0, share = 0;
-    for (const cp of cps) {
+    for (const cp of counted) {
       const p = pips[cp.index] ?? cp.priorities;
       const total = valid.reduce((s, k) => s + (p[k] ?? 0), 0);
       const withPips = valid.filter((k) => p[k]).length;
@@ -104,7 +107,7 @@ export function panel(rows: PriorityRow[], cps: PanelCP[], pips: Pips, nationIP:
       if (cp.disabled && b > 0) b = 0;
       const mine = p[r.id] ?? 0;
       if (total && mine) ip += perCP * mine / total * (1 + b);
-      bonus += b / cps.length;
+      bonus += b / counted.length;
       share += total ? mine / total / Math.max(1, controlPoints) : 0;
     }
     return { id: r.id, ip, bonus, share };
@@ -121,6 +124,8 @@ export interface EffectConstants {
   ecoPcBase: number; ecoPcPerResource: number; ecoPcPerCore: number;
   ecoIneq: number; ecoIneqPerResource: number; welIneq: number;
   knoEdu: number; govDem: number; uniCoh: number; uniCohMin: number; uniEdu: number;
+  /** Military: militaryPriorityMiltechIncrease e minMilitaryTechLevel */
+  milTech: number; milTechMin: number;
 }
 export interface EcoMult { base: number; resource: number; core: number }
 export interface EffectInputs {
@@ -257,6 +262,8 @@ export interface NationState {
   /** solo con `growth`: PIL, IP del mese, Controllo missioni e tetto, regioni
       economiche centrali e di risorse */
   gdp?: number; ip?: number; mc?: number; mcCap?: number; core?: number; resource?: number;
+  /** solo per chi ha un esercito */
+  miltech?: number;
 }
 
 /** Una regione per la crescita: peso nel PIL, Controllo missioni e sviluppo
@@ -315,17 +322,18 @@ export interface GrowthInputs {
   regions: GrowthRegion[];
   /** la nazione puo' sviluppare petrolio e miniere (politiche, fine del petrolio) */
   canOil: boolean; canMine: boolean;
-  mcIP: number;                       // IP al mese sul Controllo missioni, oggi (gia' col bonus)
-  mcCost: number;                     // IP per un punto di Controllo missioni
-  /** completamenti al mese col Controllo missioni pieno: i suoi pallini non contano piu' */
-  completionsFull: Record<string, number>;
 }
 export interface ProjectionInputs {
   start: Omit<NationState, "unrest" | "rest">;
   rest: number; scaling: number; hostileShare: number; armyOther: number;
   resourceRegions: number; coreEcoRegions: number; ecoMult?: EcoMult;
-  /** completamenti al mese, priorita' per priorita' */
+  /** completamenti al mese, priorita' per priorita' (Controllo missioni: punti al mese) */
   completions: Record<string, number>;
+  /** i completamenti quando alcune priorita' non valgono piu' (Controllo
+      missioni al tetto, Miltech al massimo): i loro pallini passano alle altre */
+  without?: (invalid: string[]) => Record<string, number>;
+  /** Miltech di oggi, tetto della nazione e miglior miltech umano */
+  miltech?: { start: number; max: number; best: number };
   /** coesione di riposo dallo stato del mese; senza, resta `rest` */
   restOf?: (s: Omit<NationState, "unrest" | "rest">, unrest: number) => number;
   growth?: GrowthInputs;
@@ -348,6 +356,8 @@ export function projectNation(k: YassConstants, e: EffectConstants, p: Projectio
   const ipOther = gr ? gr.ip0 - baseIP(gr.g, gdpOf(p.start), unrestOf(k, p.start, p)) * (1 + gr.advise0) : 0;
   const ipOf = (st: typeof s) => (gr ? Math.max(0, baseIP(gr.g, gdpOf(st), unrestOf(k, st, p)) * (1 + gr.advise) + ipOther) : 0);
   let mc = gr ? gr.regions.reduce((t, r) => t + r.missionControl, 0) : 0;
+  let mil = p.miltech?.start ?? 0;
+  let best = p.miltech?.best ?? 0;
   let mcPoints = 0;
   // le regioni cambiano: l'Economia ne sviluppa di nuove, e cambiano i pesi nel PIL
   const regs = gr ? gr.regions.map((r) => ({ ...r })) : [];
@@ -357,23 +367,27 @@ export function projectNation(k: YassConstants, e: EffectConstants, p: Projectio
   const snap = (st: typeof s, now = false): NationState => ({
     ...st, rest: restAt(st), unrest: unrestOf(k, st, p),
     ...(gr ? { gdp: gdpOf(st), ip: now ? gr.ip0 : ipOf(st), mc, mcCap: capOf(st), core: coreOf(), resource: resOf() } : {}),
+    ...(p.miltech ? { miltech: mil } : {}),
   });
   const out = new Map<number, NationState>([[0, snap(s, true)]]);
   for (let m = 1; m <= last; m++) {
-    // gli IP del mese rispetto a oggi: tutti i completamenti scalano con loro;
-    // a Controllo missioni pieno la sua priorita' non e' valida e i suoi pallini
-    // passano alle altre
-    let ratio = 1, comp = p.completions;
-    if (gr) {
-      ratio = gr.ip0 > 0 ? ipOf(s) / gr.ip0 : 1;
-      if (mc < capOf(s)) {
-        mcPoints += gr.mcIP * ratio;
-        while (mcPoints >= gr.mcCost && mc < capOf(s)) { mcPoints -= gr.mcCost; mc += 1; }
-      } else {
-        comp = gr.completionsFull;
-      }
-    }
+    // gli IP del mese rispetto a oggi: tutti i completamenti scalano con loro.
+    // Controllo missioni al tetto e Miltech al massimo non sono priorita'
+    // valide: i loro pallini passano alle altre
+    const ratio = gr && gr.ip0 > 0 ? ipOf(s) / gr.ip0 : 1;
+    const invalid: string[] = [];
+    if (gr && mc >= capOf(s)) invalid.push("MissionControl");
+    if (p.miltech && mil >= p.miltech.max) invalid.push("Military");
+    const comp = invalid.length && p.without ? p.without(invalid) : p.completions;
     const c = (id: string) => (comp[id] ?? 0) * ratio;
+    if (gr && mc < capOf(s)) {
+      mcPoints += c("MissionControl");
+      while (mcPoints >= 1 && mc < capOf(s)) { mcPoints -= 1; mc += 1; }
+    }
+    if (p.miltech) {
+      mil = Math.min(p.miltech.max, Math.max(e.milTechMin, mil + c("Military") * e.milTech * best / Math.max(1, mil)));
+      best = Math.max(best, mil);       // TrySetMaximumMiltech
+    }
     const per = perCompletion(k, e, {
       scaling: p.scaling, education: s.education, democracy: s.democracy, cohesion: s.cohesion,
       resourceRegions: resOf(), coreEcoRegions: coreOf(), ecoMult: p.ecoMult,
@@ -389,7 +403,9 @@ export function projectNation(k: YassConstants, e: EffectConstants, p: Projectio
     s = {
       cohesion: Math.min(10, Math.max(0, coh)),
       pcgdp: Math.max(0, s.pcgdp + sum("pcgdp")),
-      inequality: Math.max(0, s.inequality + sum("inequality")),
+      // AddToInequality la tiene fra 1 e 9 a ogni variazione: sotto 1 c'e'
+      // solo chi ci parte dal template (Somaliland) e nessuno la tocca
+      inequality: sum("inequality") ? Math.min(9, Math.max(1, s.inequality + sum("inequality"))) : s.inequality,
       democracy: Math.min(10, Math.max(0, s.democracy + sum("democracy"))),
       education: Math.max(0, s.education + sum("education")),
     };
