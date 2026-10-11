@@ -35,6 +35,7 @@ _TEMPLATE_FILES = {
     "spaceBodies": "TISpaceBodyTemplate.json",
     "miningProfiles": "TIMiningProfileTemplate.json",
     "regions": "TIRegionTemplate.json",
+    "nations": "TINationTemplate.json",
 }
 
 

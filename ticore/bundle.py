@@ -126,6 +126,8 @@ def _dump(path, obj):
 SLIM_FIELDS = {
     # YASS: quali regioni l'Economia puo' sviluppare in petrolio o miniere
     "regions": ("dataName", "oilCapable", "mineCapable"),
+    # YASS: la sostenibilita' migliore (yass.best_sustainability)
+    "nations": ("dataName", "greenEconomy"),
     "habSites": ("dataName", "miningProfileName"),
     "spaceBodies": ("dataName", "barycenterName", "objectType", "mass_kg", "density_gcm3",
                     "semiMajorAxis_AU", "effectToExplore", "alternativeEffectToExplore"),

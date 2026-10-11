@@ -385,10 +385,67 @@ def faction_priority_bonuses(g, lang="ita"):
     return out
 
 
-def valid_priorities(n):
+def best_sustainability(g):
+    """TINationState.BestCurrentSustainabilityValue: la sostenibilita' sotto cui
+    l'Ambiente non porta piu' (max(0, initialSustainabilityMin + modificatore ×
+    effetti della fazione)). Il modificatore lo fissa l'inizio della campagna
+    (TIGlobalValuesState.PostGlobalGameStateCreateInit_2): se le tecnologie, tutte
+    insieme, scenderebbero sotto il greenEconomy piu' basso delle nazioni, le si
+    scala fino a quello. None senza il dato."""
+    lo = g.globals.get("initialSustainabilityMin")
+    if lo is None:
+        return None
+    tpl = gamedata.templates()
+    ctx = "Environment_BestSustainabilityValue"
+    reach = -sum((tpl["effects"].get(e) or {}).get("value") or 0
+                 for t in tpl["techs"].values() for e in t.get("effects") or []
+                 if ctx in ((tpl["effects"].get(e) or {}).get("contexts") or []))
+    green = [((tpl.get("nations") or {}).get(n.get("templateName")) or {}).get("greenEconomy")
+             for n in g.nations.values() if not n.get("alienNation")]
+    green = [x for x in green if x is not None]
+    mod = min(green) / reach if green and reach > min(green) else 1.0
+    mine = sum((tpl["effects"].get(e) or {}).get("value") or 0
+               for e in _faction_effects(g, g.me).get(ctx) or [])
+    return max(0.0, lo + mod * mine)
+
+
+def mc_room(g, n):
+    """Controllo missioni (TINationState.ValidPriority): (valida, certa).
+    Programma spaziale, anche della federazione (TIFederationState.
+    SetSpaceProgramValue: un membro che ce l'ha), e una regione sotto il tetto
+    (TIRegionState.get_maxMissionControl). Il PIL salvato non e' quello con cui
+    il gioco ha contato i pallini: un tetto a meno dell'1% da un intero resta
+    incerto, e lo decidono i pallini (_fit_validity)."""
+    space = bool(n.get("spaceFlightProgram"))
+    fed = g.state("TIFederationState").get((n.get("federation") or {}).get("value"))
+    if not space and fed:
+        space = any((g.nations.get(m.get("value")) or {}).get("spaceFlightProgram") for m in fed.get("members") or [])
+    if not space:
+        return (False, True)
+    regs = [g.regions.get(rid) or {} for rid in _ids(n.get("regions"))]
+    weights = [gdp_weight(r) for r in regs]
+    total = sum(weights)
+    if not total:
+        return (False, True)
+    div = max(MC_DIV_MIN, MC_DIV - MC_DIV_PER_EDU * (n.get("education") or 0))
+    gdp = n.get("GDP") or 0
+    near = False
+    for r, w in zip(regs, weights):
+        x = gdp / 1e9 * w / total / div
+        mc = r.get("missionControl") or 0
+        if abs(x - round(x)) <= 0.01 * max(1.0, x) and mc in (round(x), round(x) + 1) and mc > 0:
+            near = True
+        elif mc < 1 + int(x):
+            return (True, True)
+    return (True, False) if near else (False, True)
+
+
+def valid_priorities(n, best_sust=None, mc=None):
     """{priorita': (valida, certa)} con le regole di TINationState.ValidPriority.
     Dove il salvataggio non ha il dato (tetto dei finanziamenti, posti di
-    controllo missioni, eserciti costruibili…) si suppone valida: `certa` False."""
+    controllo missioni, eserciti costruibili…) si suppone valida: `certa` False.
+    `best_sust` e' best_sustainability(), `mc` mc_room(): senza, Ambiente e
+    Controllo missioni restano incerti."""
     mil = bool(n.get("military"))
     space = bool(n.get("spaceFlightProgram"))
     nuke = bool(n.get("nuclearProgram"))
@@ -398,21 +455,32 @@ def valid_priorities(n):
         "Economy": (True, True), "Welfare": (True, True), "Knowledge": (True, True),
         "Unity": (True, True), "Spoils": (True, True),
         "Government": ((n.get("democracy") or 0) < 10 or bool(n.get("canAccumulateLegitimizeClaimTriggers")), True),
-        "Environment": (True, sust <= 0 or bool(n.get("canAccumulateDecontaminateTriggers"))),
+        "Environment": _environment_valid(sust, bool(n.get("canAccumulateDecontaminateTriggers")), best_sust),
         "Oppression": (mil, True),
         "Funding": (True, False),
         "Civilian_InitiateSpaceflightProgram": (not space, True),
         "LaunchFacilities": (space, space),
-        "MissionControl": (space, False),
+        "MissionControl": (space, False) if mc is None else mc,
         "Military_FoundMilitary": (not mil, True),
         "Military": (mil and (n.get("militaryTechLevel") or 0) < (n.get("maxMilitaryTechLevel") or 0), True),
         "Military_BuildArmy": (mil, False),
-        "Military_BuildNavy": (False, False),
+        "Military_BuildNavy": (mil, False),
         "Military_InitiateNuclearProgram": (mil and not nuke and not no_nukes, True),
         "Military_BuildNuclearWeapons": (nuke and not no_nukes, True),
         "Military_BuildSpaceDefenses": (mil and bool(n.get("canBuildSpaceDefenses")), False),
         "Military_BuildSTOSquadron": (mil and bool(n.get("canBuildSTOSquadrons")), False),
     }
+
+
+def _environment_valid(sust, decontaminate, best):
+    """Ambiente: valida con sostenibilita' <= 0, sopra la migliore raggiungibile
+    o con contaminazione da ripulire. Una nazione gia' alla migliore (vi resta
+    ferma: e' il pavimento) non la vede; il confronto e' fra float del gioco."""
+    if sust <= 0 or decontaminate:
+        return (True, True)
+    if best is None:
+        return (True, False)
+    return (sust > best + 1e-5, True)
 
 
 def _fit_validity(valid, cps):
@@ -435,7 +503,7 @@ def _fit_validity(valid, cps):
     return valid
 
 
-def priority_panel(g, n, lang, fbonus):
+def priority_panel(g, n, lang, fbonus, best_sust=None):
     """Righe del pannello Priorita' di una nazione e i miei punti di controllo."""
     cps = []
     for i, ref in enumerate(n.get("controlPoints") or []):
@@ -445,7 +513,7 @@ def priority_panel(g, n, lang, fbonus):
         cps.append({"index": i, "priorities": {k: v for k, v in (cp.get("controlPointPriorities") or {}).items()},
                     "total": cp.get("totalWeightsForControlPoint") or 0,
                     "disabled": bool(cp.get("benefitsDisabled"))})
-    valid = _fit_validity(valid_priorities(n), cps)
+    valid = _fit_validity(valid_priorities(n, best_sust, mc_room(g, n)), cps)
     national = {"Economy": (n.get("restofFederationECOBonus_dailyCache") or 0) * FEDERATION_ECO_BONUS,
                 "Military_BuildArmy": (n.get("numMiningRegions_dailyCache") or 0) * CORE_MINERAL_MILITARY,
                 "Military_BuildNavy": (n.get("numMiningRegions_dailyCache") or 0) * CORE_MINERAL_MILITARY}
@@ -507,6 +575,7 @@ def overview(g, lang="ita"):
                                 if x.get("displayName") and x.get("regions")) if r is not None)
     resid_med = resids[len(resids) // 2] if resids else 0.0
     pbonus = faction_priority_bonuses(g, lang)
+    best_sust = best_sustainability(g)
     # i miei punti di controllo, nazione per nazione: quota dei pallini sulla
     # Conoscenza e bonus totale del punto
     my_cps = {}
@@ -539,7 +608,7 @@ def overview(g, lang="ita"):
         if pop_m <= 0 or n.get("alienNation"):
             continue
         hostile = set(_ids(n.get("hostileClaims")))
-        prows, pcps = priority_panel(g, n, lang, pbonus)
+        prows, pcps = priority_panel(g, n, lang, pbonus, best_sust)
         advise, advisers, advise_next, advisers_next = advise_bonus(g, n)
         out.append({
             "id": nid,
