@@ -44,6 +44,19 @@ def test_not_mine_control_points_start_empty(path, games):
                 assert cp["priorities"] == {} and cp["total"] == 0, n["name"]
 
 
+@pytest.mark.parametrize("path", SAVES, ids=ids)
+def test_population_growth_inputs(path, games):
+    """La crescita della popolazione della Proiezione (yass.ts, annualPopGrowth)
+    vuole latitudine e modificatore di ogni regione e gli anni di campagna: se
+    mancano la popolazione cresce di colpo da un'altra parte del mondo."""
+    ov = yass.overview(games(path), "en")
+    assert ov["constants"]["campaignYears"] > 0
+    regions = [r for n in ov["nations"] for r in n["regions"]]
+    # l'equatore esiste, ma non per quasi tutte le regioni
+    assert sum(1 for r in regions if r["lat"]) > 0.9 * len(regions)
+    assert any(r["popMod"] for r in regions)
+
+
 # solo i salvataggi del repo: su partite lunghe il modello ha scarti noti
 # (guerre, Consiglia altrui), che `python -m ticore.yass` elenca
 @pytest.mark.parametrize("path", FIXTURES, ids=[os.path.basename(p) for p in FIXTURES])

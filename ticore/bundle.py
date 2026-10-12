@@ -125,9 +125,13 @@ def _dump(path, obj):
 # (orbite, note degli astronomi) peserebbe mezzo megabyte nel browser
 SLIM_FIELDS = {
     # YASS: quali regioni l'Economia puo' sviluppare in petrolio o miniere
-    "regions": ("dataName", "oilCapable", "mineCapable"),
-    # YASS: la sostenibilita' migliore (yass.best_sustainability)
-    "nations": ("dataName", "greenEconomy"),
+    # YASS: quali regioni l'Economia puo' sviluppare in petrolio o miniere, e la
+    # latitudine (dalla regione della mappa) per la crescita della popolazione
+    "regions": ("dataName", "oilCapable", "mineCapable", "mapRegionName"),
+    "mapRegions": ("dataName", "latitude"),
+    # YASS: la sostenibilita' migliore (yass.best_sustainability) e il
+    # modificatore della crescita della popolazione
+    "nations": ("dataName", "greenEconomy", "popGrowthModifier"),
     "habSites": ("dataName", "miningProfileName"),
     "spaceBodies": ("dataName", "barycenterName", "objectType", "mass_kg", "density_gcm3",
                     "semiMajorAxis_AU", "effectToExplore", "alternativeEffectToExplore"),

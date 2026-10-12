@@ -126,6 +126,16 @@ ECOS_FOR_CORE_ECO = 1200            # numEcosForCoreEcoRegion
 ECOS_FOR_CORE_MINING = 750          # numEcosForCoreMiningRegion
 ECOS_FOR_CORE_OIL = 500             # numEcosForCoreOilRegion
 CORE_ECO_MIN_GDP_BN = 500.0         # nationalGDPShareValue_bn > 500
+# TIRegionState.get_annualPopulationGrowth, % annua: base + max(-base,
+# istruzione x c) + coesione x c + min(180.000, pro capite) x c + sqrt|latitudine|
+# x c + modificatore della regione che svanisce in 20 anni di campagna +
+# modificatore della nazione - xenoformazione / 200 - 4 x esplosioni nucleari,
+# fra -10 e 10. Il clima toglie solo sopra 8 gradi di anomalia: non lo ricostruiamo.
+POP_GROWTH = {"base": 4.49788037409348, "education": -0.418190741, "cohesion": -0.0624798523403752,
+              "pcgdp": 9.80843732089162e-06, "pcgdpMax": 180000.0, "latitude": -0.115739931206548,
+              "xenoDiv": 200.0, "nuke": 4.0, "clamp": 10.0}
+POP_REGRESSION_YEARS = 20.0         # TIStartTimeTemplate.populationRegressionPeriod_years
+DAYS_PER_YEAR = 365.2421875         # TITimeState.CampaignDuration_years_Exact
 
 
 def gdp_weight(r):
@@ -140,10 +150,13 @@ def gdp_weight(r):
     return w
 
 
-def region_view(nm, rid, r, hostile, rtpl):
-    """Una regione per YASS: peso nel PIL, Controllo missioni e lo sviluppo
-    dall'Economia (flag del template, contatori che il gioco mostra)."""
+def region_view(nm, rid, r, hostile, rtpl, mtpl=None, xeno=None):
+    """Una regione per YASS: peso nel PIL, Controllo missioni, lo sviluppo
+    dall'Economia (flag del template, contatori che il gioco mostra) e quello
+    che serve alla crescita della popolazione."""
     tp = rtpl.get(r.get("templateName")) or {}
+    mp = (mtpl or {}).get(tp.get("mapRegionName")) or {}
+    xs = (xeno or {}).get((r.get("xenoforming") or {}).get("value")) or {}
     return {"id": rid, "name": nm.region(r), "population": r.get("populationInMillions") or 0,
             "hostile": rid in hostile, "gdpWeight": gdp_weight(r),
             "missionControl": r.get("missionControl") or 0,
@@ -153,7 +166,9 @@ def region_view(nm, rid, r, hostile, rtpl):
             "oilCapable": bool(tp.get("oilCapable")), "mineCapable": bool(tp.get("mineCapable")),
             "accOil": r.get("accumulatedCoreOilRegionTriggers") or 0,
             "accMine": r.get("accumulatedCoreMiningRegionTriggers") or 0,
-            "accCore": r.get("accumulatedCoreEconomyRegionTriggers") or 0}
+            "accCore": r.get("accumulatedCoreEconomyRegionTriggers") or 0,
+            "lat": mp.get("latitude") or 0, "popMod": r.get("annualPopGrowthModifier") or 0,
+            "xeno": xs.get("xenoformingLevel") or 0, "nukes": r.get("nuclearDetonations") or 0}
 
 
 def base_ip(gdp, unrest):
@@ -610,7 +625,11 @@ def overview(g, lang="ita"):
             "disabled": bool(cp.get("benefitsDisabled")),
         })
 
-    rtpl = gamedata.templates().get("regions") or {}
+    tpl = gamedata.templates()
+    rtpl = tpl.get("regions") or {}
+    mtpl = tpl.get("mapRegions") or {}
+    ntpl = tpl.get("nations") or {}
+    xeno = g.state("TIRegionXenoformingState")
     out = []
     for nid, n in g.nations.items():
         if not n.get("displayName") or not n.get("exists", True) or n.get("archived"):
@@ -657,7 +676,8 @@ def overview(g, lang="ita"):
             "priorities": prows,
             "restModel": rest_model(g, n, resid_med),
             "panelCPs": pcps,
-            "regions": [region_view(nm, rid, r, hostile, rtpl) for rid, r in regs],
+            "regions": [region_view(nm, rid, r, hostile, rtpl, mtpl, xeno) for rid, r in regs],
+            "popGrowthModifier": (ntpl.get(n.get("templateName")) or {}).get("popGrowthModifier") or 0,
             # puo' ancora sviluppare petrolio e miniere (politiche e fine del petrolio)
             "canOil": not n.get("policy_noOilDevelopment") and not gv.get("endOfOil"),
             "canMine": not n.get("policy_noMineralDevelopment"),
@@ -706,6 +726,9 @@ def overview(g, lang="ita"):
             "coreEcoMinGdp": CORE_ECO_MIN_GDP_BN,
             "gdpWeightCore": GDP_WEIGHT_CORE,
             "gdpWeightResource": GDP_WEIGHT_RESOURCE,
+            "popGrowth": POP_GROWTH,
+            "popRegressionYears": POP_REGRESSION_YEARS,
+            "campaignYears": (next(iter(g.state("TITimeState").values()), {}).get("daysInCampaign") or 0) / DAYS_PER_YEAR,
         },
     }
 

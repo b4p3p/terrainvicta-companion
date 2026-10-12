@@ -32,6 +32,8 @@ interface Nation {
   /** effetti sull'Economia: base, regioni di risorse, regioni economiche centrali */
   ecoMult: EcoMult;
   canOil: boolean; canMine: boolean;
+  /** modificatore della crescita della popolazione del template della nazione */
+  popGrowthModifier?: number;
   controlPoints: number;
   priorities: PriorityRow[]; panelCPs: PanelCP[];
   regions: Region[]; claims: number[]; hostileClaims: number[];
@@ -41,6 +43,8 @@ interface Yass {
   constants: YassConstants & GrowthConstants & {
     diversity: Record<string, number>; effects: EffectConstants; priorityCost: Record<string, number>; legitimize: number;
     ineqCohesionMult: number; severeInequality: number; bestMiltech: number;
+    /** anni di campagna oggi (daysInCampaign / 365,24) */
+    campaignYears?: number;
   };
   faction: string | null; campaign: string | null;
 }
@@ -440,7 +444,7 @@ function Grid({ rows, values, originals, edited, set, unset, selected, select, p
 // ---------------------------------------------------------------- proiezione
 
 const PROJ_YEARS = [0, 1, 2, 5, 10, 20];
-type StatKey = "cohesion" | "rest" | "unrest" | "pcgdp" | "inequality" | "democracy" | "education" | "gdp" | "ip" | "mc" | "mcCap"
+type StatKey = "cohesion" | "rest" | "unrest" | "pcgdp" | "inequality" | "democracy" | "education" | "population" | "gdp" | "ip" | "mc" | "mcCap"
   | "core" | "resource" | "miltech";
 const PROJ_COLS: { key: StatKey; icon: string; digits: number; upIsGood: boolean; scale?: number }[] = [
   { key: "cohesion", icon: "ICO_Cohesion_mid", digits: 2, upIsGood: true },
@@ -451,6 +455,7 @@ const PROJ_COLS: { key: StatKey; icon: string; digits: number; upIsGood: boolean
   { key: "democracy", icon: "ICO_gov_type", digits: 2, upIsGood: true },
   { key: "education", icon: "ICO_education", digits: 2, upIsGood: true },
   // crescita: ci sono solo se la proiezione ha i dati delle regioni
+  { key: "population", icon: "ICO_population", digits: 1, upIsGood: true },
   { key: "gdp", icon: "ICO_economy_priority", digits: 0, upIsGood: true, scale: 1e9 },
   { key: "ip", icon: "ICO_investments", digits: 2, upIsGood: true },
   { key: "mc", icon: "ICO_mission_control", digits: 0, upIsGood: true },
@@ -1192,6 +1197,7 @@ export default function YassPage() {
       growth: {
         g: k, population: v.population, ip0: v.nationIP, regions: nation.regions,
         canOil: nation.canOil, canMine: nation.canMine,
+        campaignYears: k.campaignYears, popGrowthModifier: nation.popGrowthModifier,
         advise0: nation.advise, advise: Math.max(0, v.advise) / 100,
       },
     }, at);

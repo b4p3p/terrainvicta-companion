@@ -178,6 +178,27 @@ export interface GrowthConstants {
   ecosForCoreEco: number; ecosForCoreMining: number; ecosForCoreOil: number; coreEcoMinGdp: number;
   /** peso nel PIL nazionale di una regione economica centrale e di una di risorse */
   gdpWeightCore: number; gdpWeightResource: number;
+  /** crescita della popolazione (TIRegionState.get_annualPopulationGrowth): senza, resta ferma */
+  popGrowth?: PopGrowthConstants; popRegressionYears?: number;
+}
+export interface PopGrowthConstants {
+  base: number; education: number; cohesion: number; pcgdp: number; pcgdpMax: number;
+  latitude: number; xenoDiv: number; nuke: number; clamp: number;
+}
+
+/** Crescita annua di una regione, in frazione: % = base + max(−base, istruzione × c)
+    + coesione × c + min(180.000, pro capite) × c + √|latitudine| × c
+    + modificatore della regione × max(0, (20 − anni di campagna) / 20)
+    + modificatore della nazione − xenoformazione / 200 − 4 × esplosioni nucleari,
+    fra −10 e 10. Il clima toglie solo sopra 8 gradi di anomalia: non c'e'. */
+export function annualPopGrowth(c: PopGrowthConstants, regressionYears: number,
+  n: { education: number; cohesion: number; pcgdp: number; popGrowthModifier: number; campaignYears: number },
+  r: { lat?: number; popMod?: number; xeno?: number; nukes?: number }) {
+  const x = c.base + Math.max(-c.base, c.education * n.education) + c.cohesion * n.cohesion
+    + c.pcgdp * Math.min(c.pcgdpMax, n.pcgdp) + c.latitude * Math.sqrt(Math.abs(r.lat ?? 0))
+    + (r.popMod ?? 0) * Math.max(0, (regressionYears - n.campaignYears) / regressionYears)
+    + n.popGrowthModifier - (r.xeno ?? 0) / c.xenoDiv - (r.nukes ?? 0) * c.nuke;
+  return Math.min(c.clamp, Math.max(-c.clamp, x)) / 100;
 }
 
 /** IP dal PIL: (PIL / 1 mld)^0,35, meno la penalita' dei disordini sopra 2. */
@@ -259,9 +280,9 @@ export function piece(k: YassConstants, e: EffectConstants, g: GrowthConstants, 
 
 export interface NationState {
   cohesion: number; rest: number; pcgdp: number; inequality: number; democracy: number; education: number; unrest: number;
-  /** solo con `growth`: PIL, IP del mese, Controllo missioni e tetto, regioni
-      economiche centrali e di risorse */
-  gdp?: number; ip?: number; mc?: number; mcCap?: number; core?: number; resource?: number;
+  /** solo con `growth`: popolazione (milioni), PIL, IP del mese, Controllo
+      missioni e tetto, regioni economiche centrali e di risorse */
+  population?: number; gdp?: number; ip?: number; mc?: number; mcCap?: number; core?: number; resource?: number;
   /** solo per chi ha un esercito */
   miltech?: number;
 }
@@ -273,6 +294,9 @@ export interface GrowthRegion {
   core: boolean; mine: boolean; oil: boolean; colony: boolean; nuked: boolean;
   oilCapable: boolean; mineCapable: boolean;
   accOil: number; accMine: number; accCore: number;
+  /** per la crescita della popolazione: milioni, latitudine, modificatore della
+      regione, xenoformazione, esplosioni nucleari */
+  population?: number; lat?: number; popMod?: number; xeno?: number; nukes?: number;
 }
 
 /** OnEconomyPriorityComplete: ogni Economia fa un passo verso una regione
@@ -315,7 +339,9 @@ export function developRegions(g: GrowthConstants, regs: GrowthRegion[], gdp: nu
 }
 export interface GrowthInputs {
   g: GrowthConstants;
-  population: number;                 // milioni, ferma
+  population: number;                 // milioni, oggi
+  /** per la crescita della popolazione: anni di campagna oggi, modificatore della nazione */
+  campaignYears?: number; popGrowthModifier?: number;
   ip0: number;                        // IP del mese oggi: i completamenti di oggi sono per questi
   /** bonus Consiglia gia' dentro ip0 e quello da provare, dal primo mese */
   advise0: number; advise: number;
@@ -349,8 +375,18 @@ export function projectNation(k: YassConstants, e: EffectConstants, p: Projectio
   let s = { ...p.start };
   const gr = p.growth;
   const restAt = (st: typeof s) => (p.restOf ? p.restOf(st, unrestOf(k, st, p)) : p.rest);
-  // crescita: PIL dal PIL pro capite (popolazione ferma), IP dal PIL, MC verso il tetto
-  const gdpOf = (st: typeof s) => (gr ? st.pcgdp * gr.population * 1e6 : 0);
+  // le regioni cambiano: l'Economia ne sviluppa di nuove, la popolazione cresce,
+  // e cambiano i pesi nel PIL. La popolazione di oggi e' quella della cella:
+  // le regioni si scalano su quella
+  const regs = gr ? gr.regions.map((r) => ({ ...r })) : [];
+  const regPop = regs.reduce((t, r) => t + (r.population ?? 0), 0);
+  const growPop = !!gr?.g.popGrowth && regPop > 0 && regs.every((r) => r.population != null);
+  if (growPop) for (const r of regs) { r.population = r.population! * gr!.population / regPop; }
+  let pop = gr ? gr.population : 0;
+  // la scala degli effetti segue la popolazione: (pop / 50 mln)^−0,35
+  let scaling = p.scaling;
+  // crescita: PIL dal PIL pro capite per la popolazione, IP dal PIL, MC verso il tetto
+  const gdpOf = (st: typeof s) => (gr ? st.pcgdp * pop * 1e6 : 0);
   // IP = base dal PIL x (1 + Consiglia) + il resto (eserciti, consiglieri
   // altrui) fermo, ricavato da oggi: al mese 0 gli IP sono quelli della cella
   const ipOther = gr ? gr.ip0 - baseIP(gr.g, gdpOf(p.start), unrestOf(k, p.start, p)) * (1 + gr.advise0) : 0;
@@ -359,14 +395,12 @@ export function projectNation(k: YassConstants, e: EffectConstants, p: Projectio
   let mil = p.miltech?.start ?? 0;
   let best = p.miltech?.best ?? 0;
   let mcPoints = 0;
-  // le regioni cambiano: l'Economia ne sviluppa di nuove, e cambiano i pesi nel PIL
-  const regs = gr ? gr.regions.map((r) => ({ ...r })) : [];
   const coreOf = () => (gr ? regs.filter((r) => r.core).length : p.coreEcoRegions);
   const resOf = () => (gr ? regs.filter((r) => r.mine || r.oil).length : p.resourceRegions);
   const capOf = (st: typeof s) => (gr ? mcCap(gr.g, gdpOf(st), regs, st.education) : 0);
   const snap = (st: typeof s, now = false): NationState => ({
     ...st, rest: restAt(st), unrest: unrestOf(k, st, p),
-    ...(gr ? { gdp: gdpOf(st), ip: now ? gr.ip0 : ipOf(st), mc, mcCap: capOf(st), core: coreOf(), resource: resOf() } : {}),
+    ...(gr ? { population: pop, gdp: gdpOf(st), ip: now ? gr.ip0 : ipOf(st), mc, mcCap: capOf(st), core: coreOf(), resource: resOf() } : {}),
     ...(p.miltech ? { miltech: mil } : {}),
   });
   const out = new Map<number, NationState>([[0, snap(s, true)]]);
@@ -389,7 +423,7 @@ export function projectNation(k: YassConstants, e: EffectConstants, p: Projectio
       best = Math.max(best, mil);       // TrySetMaximumMiltech
     }
     const per = perCompletion(k, e, {
-      scaling: p.scaling, education: s.education, democracy: s.democracy, cohesion: s.cohesion,
+      scaling, education: s.education, democracy: s.democracy, cohesion: s.cohesion,
       resourceRegions: resOf(), coreEcoRegions: coreOf(), ecoMult: p.ecoMult,
     });
     const sum = (stat: "pcgdp" | "inequality" | "education" | "democracy") =>
@@ -397,7 +431,7 @@ export function projectNation(k: YassConstants, e: EffectConstants, p: Projectio
     // coesione: prima il ritorno verso il riposo, poi la Conoscenza (che non
     // scavalca 5), poi l'Unita'
     let coh = s.cohesion + monthlyMovement(k, s.cohesion, restAt(s), s.inequality);
-    let kn = c("Knowledge") * knowledgeStep(k, p.scaling, coh) + (s.democracy >= 10 ? c("Government") * knowledgeStep(k, p.scaling, coh) : 0);
+    let kn = c("Knowledge") * knowledgeStep(k, scaling, coh) + (s.democracy >= 10 ? c("Government") * knowledgeStep(k, scaling, coh) : 0);
     if ((coh < k.cohesionTarget && coh + kn > k.cohesionTarget) || (coh > k.cohesionTarget && coh + kn < k.cohesionTarget)) kn = k.cohesionTarget - coh;
     coh += kn + c("Unity") * (per.Unity.cohesion ?? 0);
     s = {
@@ -412,6 +446,20 @@ export function projectNation(k: YassConstants, e: EffectConstants, p: Projectio
     // le Economie del mese, dopo averne preso l'effetto: passi verso petrolio,
     // miniere e regioni economiche centrali
     if (gr) developRegions(gr.g, regs, gdpOf(s), c("Economy"), gr.canOil, gr.canMine);
+    // popolazione (GrowPopulationByMonth): ogni regione col suo tasso, il PIL
+    // cresce col pro capite, che resta quello del mese
+    if (growPop) {
+      const n = { education: s.education, cohesion: s.cohesion, pcgdp: s.pcgdp,
+        popGrowthModifier: gr!.popGrowthModifier ?? 0, campaignYears: (gr!.campaignYears ?? 0) + m / 12 };
+      for (const r of regs) {
+        const dp = r.population! * (Math.pow(1 + annualPopGrowth(gr!.g.popGrowth!, gr!.g.popRegressionYears ?? 20, n, r), 1 / 12) - 1);
+        if (r.population! > 0) r.gdpWeight *= (r.population! + dp) / r.population!;
+        r.population = Math.max(0.001, r.population! + dp);
+      }
+      const now = regs.reduce((t, r) => t + r.population!, 0);
+      scaling *= Math.pow(now / pop, k.popScalingExp);
+      pop = now;
+    }
     if (at.includes(m)) out.set(m, snap(s));
   }
   return at.map((m) => out.get(m)!);
