@@ -189,6 +189,12 @@ coffee that keeps this thing running. If it saved you a few trips between screen
 PayPal opens with the amount already filled in; you can change it. No alien project will
 be funded by mistake.
 
+## Credits
+
+Some fixes come from [TI Companion Plus](https://github.com/joesco726/ti-companion-plus)
+by joesco726, a spinoff of this companion: finding the game in Steam libraries on other
+drives, and API answers that no longer mix up languages.
+
 ## License
 
 Source code: MIT — see [LICENSE](LICENSE).
