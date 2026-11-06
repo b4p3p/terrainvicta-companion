@@ -25,14 +25,19 @@ const saira = Saira_Semi_Condensed({
   display: "swap",
 });
 
+/* ~155 caratteri: oltre, Google taglia lo snippet */
 const DESCRIPTION =
-  "Free second-screen companion for Terra Invicta: reads your save in the browser and puts " +
-  "nations, councilors, missions, factions and technologies side by side. No cheats, no uploads.";
+  "Free second-screen companion for Terra Invicta: reads your save in the browser and " +
+  "compares nations, councilors, missions and techs. No cheats, no uploads.";
+
+/* il nome da solo Google tende a riscriverlo: il titolo dice anche cos'e' */
+const TITLE = "Terra Invicta Companion: second-screen save dashboard";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: "Terra Invicta Companion", template: "%s · Terra Invicta Companion" },
+  title: { default: TITLE, template: "%s · Terra Invicta Companion" },
   description: DESCRIPTION,
+  robots: "index, follow, max-image-preview:large",
   applicationName: "Terra Invicta Companion",
   authors: [{ name: SITE.author }],
   /* senza salvataggio ogni scheda mostra la stessa presentazione: una sola
@@ -42,21 +47,39 @@ export const metadata: Metadata = {
     type: "website",
     url: "/",
     siteName: "Terra Invicta Companion",
-    title: "Terra Invicta Companion",
+    title: TITLE,
     description: DESCRIPTION,
     locale: "en_GB",
     alternateLocale: ["it_IT"],
   },
-  twitter: { card: "summary_large_image", title: "Terra Invicta Companion", description: DESCRIPTION },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
 
 /* Dati strutturati per motori di ricerca e LLM: cos'e' e le domande della
    presentazione, in inglese come l'HTML statico. */
 const L = LANDING.en;
+const AUTHOR = {
+  "@type": "Person",
+  "@id": `${SITE_URL}/#author`,
+  name: SITE.author,
+  url: `https://github.com/${SITE.author}`,
+  sameAs: [`https://github.com/${SITE.author}`, SITE.repo],
+};
 const JSON_LD = JSON.stringify([
+  {
+    // il nome del sito che Google mostra sopra il risultato
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": `${SITE_URL}/#website`,
+    name: "Terra Invicta Companion",
+    url: `${SITE_URL}/`,
+    inLanguage: "en",
+    publisher: { "@id": `${SITE_URL}/#author` },
+  },
   {
     "@context": "https://schema.org",
     "@type": "WebApplication",
+    "@id": `${SITE_URL}/#app`,
     name: "Terra Invicta Companion",
     url: SITE_URL,
     description: DESCRIPTION,
@@ -67,7 +90,8 @@ const JSON_LD = JSON.stringify([
     offers: { "@type": "Offer", price: "0", priceCurrency: "EUR" },
     inLanguage: ["en", "it"],
     featureList: L.features.map((f) => `${f.title}: ${f.text}`),
-    author: { "@type": "Person", name: SITE.author },
+    author: AUTHOR,
+    sameAs: [SITE.repo],
     about: { "@type": "VideoGame", name: "Terra Invicta", author: { "@type": "Organization", name: "Pavonis Interactive" } },
   },
   {

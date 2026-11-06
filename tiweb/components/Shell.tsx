@@ -124,7 +124,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             )}
             <span className={live.connected ? "text-good" : "text-bad"}>
               {live.connected ? t.common.live
-                : engineStatus ? t.engine.waiting : t.common.offline}
+                /* sul sito il motore e' nel browser: nell'HTML statico (prima
+                   dell'avvio) «server irraggiungibile» non e' vero, e finiva
+                   in testa al testo letto dai motori di ricerca */
+                : engineStatus || LOCKED_ENGINE === "browser" ? t.engine.waiting : t.common.offline}
             </span>
             {/* solo nella copia locale: il sito online ha il motore fissato.
                 Ricarica la pagina: il motore si sceglie una volta, all'avvio. */}
@@ -224,9 +227,11 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
       {/* nessun limite di larghezza: è una console da secondo monitor, e un cap
           disallineava il contenuto dall'intestazione a tutta larghezza */}
-      <EngineSplash />
       <EngineGate />
-      <main className="p-4 w-full">{children}</main>
+      {/* la schermata d'avvio e' fissa sopra tutto, ma sta dentro <main>: porta
+          la presentazione (Landing), che nell'HTML statico e' il contenuto
+          principale della pagina per motori di ricerca e assistenti AI */}
+      <main className="p-4 w-full"><EngineSplash />{children}</main>
     </div>
   );
 }

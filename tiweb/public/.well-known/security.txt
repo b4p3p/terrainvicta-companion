@@ -1,0 +1,5 @@
+Contact: https://github.com/b4p3p/terrainvicta-companion/security/advisories/new
+Contact: https://github.com/b4p3p/terrainvicta-companion/issues
+Expires: 2027-11-01T00:00:00.000Z
+Preferred-Languages: en, it
+Canonical: https://terrainvicta-companion.b4p3p.it/.well-known/security.txt
