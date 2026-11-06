@@ -8,11 +8,45 @@ lista di {"Key":{"value":id}, "Value":{...}}.
 import gzip
 import json
 import os
+import re
 import time
 
 from .texts import t
 
 NS = "PavonisInteractive.TerraInvicta."
+
+# Tag rich-text di Unity/TextMeshPro: alcuni mod colorano i nomi delle nazioni
+# scrivendo `<color=#795FA3FF>Hong Kong</color>` direttamente nel salvataggio
+# (issue #1). Solo i tag noti, cosi' un `<` vero in un nome resta.
+_RICH = re.compile(
+    r"</?(?:b|i|u|s|sub|sup|color|size|alpha|mark|font|material|sprite|quad|link|style"
+    r"|nobr|noparse|lowercase|uppercase|allcaps|smallcaps|cspace|mspace|voffset|indent"
+    r"|line-height|line-indent|margin|pos|rotate|width|align|gradient|br)"
+    r"(?:\s*=[^>]*|\s+[^>]*)?/?>"
+    r"|<#[0-9a-fA-F]{3,8}>",
+    re.IGNORECASE)
+
+
+def plain(text):
+    """Il testo senza tag rich-text: «<color=#72A0E5FF>Hainan</color>» -> «Hainan»."""
+    if not isinstance(text, str) or "<" not in text:
+        return text
+    return _RICH.sub("", text).strip()
+
+
+def _strip_rich_names(gs):
+    """Toglie i tag dai `displayName` di tutto il salvataggio, una volta sola:
+    il confronto con la localizzazione (names.Namer) e ogni nome mostrato
+    leggono da qui."""
+    for entries in gs.values():
+        if not isinstance(entries, list):
+            continue
+        for e in entries:
+            v = e.get("Value") if isinstance(e, dict) else None
+            if isinstance(v, dict):
+                name = v.get("displayName")
+                if isinstance(name, str) and "<" in name:
+                    v["displayName"] = plain(name)
 
 
 class SaveLocked(OSError):
@@ -42,6 +76,7 @@ class Game:
         self.path = path
         self.mtime = os.path.getmtime(path)
         self.gs = json.loads(read_save(path))["gamestates"]
+        _strip_rich_names(self.gs)
 
         meta = self.state("TIMetadataState")
         self.meta = next(iter(meta.values()), {})
